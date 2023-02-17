@@ -1,0 +1,17 @@
+[package]
+name = "hype"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+name = "hype"
+path = "src/lib.rs"
+
+[[bin]]
+name = "main"
+path = "src/main.rs"
+
+[dependencies]
+tokio = { version = "1", features = ["full"] }
+lazy_static = "1.4"
+
