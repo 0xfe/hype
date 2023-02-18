@@ -130,5 +130,6 @@ mod tests {
     #[test]
     fn it_works() {
         let server = Server::new("a".into(), 10);
+        assert_eq!(server.port, 10);
     }
 }

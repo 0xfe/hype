@@ -20,3 +20,10 @@ $ cargo test parser
 # Show standard output
 $ cargo test -- --nocapture
 ```
+
+## TODO
+
+-   implement handler abstraction
+-   end-to-end tests with reqwest
+-   serve files
+-   json handling (is it needed ??) -- serde_json

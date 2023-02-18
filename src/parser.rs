@@ -41,7 +41,7 @@ pub struct Request {
 }
 
 impl Request {
-    fn new() -> Request {
+    pub fn new() -> Request {
         Request {
             method: String::new(),
             path: String::new(),
