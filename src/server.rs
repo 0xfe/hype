@@ -12,7 +12,7 @@ pub struct Server {
 
 impl Server {
     async fn process_stream(mut stream: TcpStream) {
-        println!("Connection: {:?}", stream);
+        info!("Connection received from {:?}", stream.peer_addr().unwrap());
         let mut parser = Parser::new();
 
         loop {
@@ -31,14 +31,14 @@ impl Server {
                     }
                 }
                 Err(e) => {
-                    println!("Error: {:?}", e);
+                    warn!("Connection broken: {:?}", e);
                     break;
                 }
             }
         }
 
         let request = parser.get_request();
-        println!("request: {:?}", request);
+        debug!("Request: {:?}", request);
 
         if request.method == "GET".to_string() && request.path == "/".to_string() {
             let mut response = Response::new(status::from(status::OK));
@@ -61,7 +61,7 @@ impl Server {
 
     pub async fn start(&self) -> Result<(), ()> {
         let hostport = format!("{}:{}", self.address, self.port);
-        println!("Listening on {}...", hostport);
+        info!("Listening on {}", hostport);
         let listener = TcpListener::bind(hostport).await.unwrap();
 
         loop {
