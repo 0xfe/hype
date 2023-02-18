@@ -20,6 +20,10 @@ impl<'a> Response<'a> {
         }
     }
 
+    pub fn set_status(&mut self, status: status::Status<'a>) {
+        self.status = status;
+    }
+
     pub fn set_header(&mut self, key: String, value: String) {
         self.headers.insert(key, value);
     }
@@ -43,17 +47,6 @@ impl<'a> Response<'a> {
             .join("\r\n");
 
         format!("{status_line}\r\n{headers}\r\n\r\n{}", self.body)
-    }
-}
-
-pub struct Writer<'a, T: AsyncWriteExt> {
-    stream: &'a mut T,
-}
-
-#[allow(dead_code)]
-impl<'a, T: AsyncWriteExt> Writer<'a, T> {
-    pub fn new(stream: &'a mut T) -> Writer<T> {
-        return Writer { stream };
     }
 }
 
