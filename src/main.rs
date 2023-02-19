@@ -14,10 +14,8 @@ use tokio::io::AsyncWriteExt;
 
 struct MyHandler {}
 
-#[async_trait]
-impl Handler for MyHandler {
-    async fn handle(&self, r: &Request, w: &mut dyn AsyncStream) -> Result<(), handler::Error> {
-        println!("{:?}", r);
+impl MyHandler {
+    async fn handle_get(&self, r: &Request, w: &mut dyn AsyncStream) -> Result<(), handler::Error> {
         let mut response = Response::new(status::from(status::OK));
 
         match &r.path[..] {
@@ -34,6 +32,29 @@ impl Handler for MyHandler {
         w.write_all(buf.as_bytes()).await.unwrap();
         Ok(())
     }
+
+    async fn handle_post(
+        &self,
+        r: &Request,
+        w: &mut dyn AsyncStream,
+    ) -> Result<(), handler::Error> {
+        let mut response = Response::new(status::from(status::OK));
+        response.set_body(format!("{}\n", r.body));
+        let buf = response.serialize();
+        w.write_all(buf.as_bytes()).await.unwrap();
+        Ok(())
+    }
+}
+
+#[async_trait]
+impl Handler for MyHandler {
+    async fn handle(&self, r: &Request, w: &mut dyn AsyncStream) -> Result<(), handler::Error> {
+        match &r.method[..] {
+            "GET" => self.handle_get(r, w).await,
+            "POST" => self.handle_post(r, w).await,
+            _ => Ok(()),
+        }
+    }
 }
 
 #[tokio::main]
@@ -47,6 +68,9 @@ async fn main() {
     let server = Server::new("127.0.0.1".into(), 4000);
 
     server.route("/".to_string(), Box::new(MyHandler {})).await;
+    server
+        .route("/foo".to_string(), Box::new(MyHandler {}))
+        .await;
 
     server.start().await.unwrap();
 }

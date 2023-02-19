@@ -37,7 +37,7 @@ pub struct Request {
     pub path: String,
     pub version: String,
     pub headers: HashMap<String, String>,
-    pub body: Vec<u8>,
+    pub body: String,
 }
 
 impl Request {
@@ -47,7 +47,7 @@ impl Request {
             path: String::new(),
             version: String::new(),
             headers: HashMap::new(),
-            body: Vec::with_capacity(16384),
+            body: String::new(),
         }
     }
 }

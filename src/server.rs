@@ -1,19 +1,17 @@
 #![allow(non_snake_case)]
 
 use tokio::{
-    io::{AsyncReadExt, AsyncWriteExt},
+    io::AsyncReadExt,
     net::{TcpListener, TcpStream},
     sync::RwLock,
 };
 
 use crate::{
     handler::{AsyncStream, Handler},
-    parser::{Parser, Request},
-    response::Response,
-    status,
+    parser::Parser,
 };
 
-use std::{collections::HashMap, str, sync::Arc};
+use std::{collections::HashMap, sync::Arc};
 
 impl AsyncStream for TcpStream {}
 
@@ -31,45 +29,6 @@ pub struct Server {
 }
 
 impl Server {
-    async fn process_GET(request: Request, stream: &mut TcpStream) -> Result<(), Error> {
-        let mut response = Response::new(status::from(status::OK));
-
-        match &request.path[..] {
-            "/" => {
-                response.set_body("<html>hi!</html>\n".into());
-            }
-            _ => {
-                response.set_status(status::from(status::NOT_FOUND));
-                response.set_body("<html>404 NOT FOUND</html>".into());
-            }
-        }
-
-        let buf = response.serialize();
-        stream.write_all(buf.as_bytes()).await.unwrap();
-        Ok(())
-    }
-
-    async fn process_POST(request: Request, stream: &mut TcpStream) -> Result<(), Error> {
-        let mut response = Response::new(status::from(status::OK));
-
-        match &request.path[..] {
-            "/" => {
-                response.set_body(format!(
-                    "{{\"request\": {}}}\n",
-                    str::from_utf8(&request.body[..]).unwrap()
-                ));
-            }
-            _ => {
-                response.set_status(status::from(status::NOT_FOUND));
-                response.set_body("<html>404 NOT FOUND</html>".into());
-            }
-        }
-
-        let buf = response.serialize();
-        stream.write_all(buf.as_bytes()).await.unwrap();
-        Ok(())
-    }
-
     async fn process_stream(
         mut stream: TcpStream,
         handlers: Arc<RwLock<HashMap<String, Box<dyn Handler>>>>,
@@ -106,18 +65,6 @@ impl Server {
 
         if let Some(handler) = handlers.read().await.get(&request.path) {
             handler.handle(&request, &mut stream).await.unwrap();
-        }
-
-        match &request.method[..] {
-            "GET" => Server::process_GET(request, &mut stream).await.unwrap(),
-            "POST" => Server::process_POST(request, &mut stream).await.unwrap(),
-            _ => {
-                let mut response = Response::new(status::from(status::SERVER_ERROR));
-                response.set_body("<html>boo!</html>\n".into());
-                let buf = response.serialize();
-
-                stream.write_all(buf.as_bytes()).await.unwrap();
-            }
         }
     }
 
