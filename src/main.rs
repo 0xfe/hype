@@ -4,7 +4,7 @@ extern crate log;
 use async_trait::async_trait;
 use env_logger::Env;
 use hype::{
-    handler::{self, AsyncStream, HandlerFn},
+    handler::{self, AsyncStream, Handler},
     parser::Request,
     response::Response,
     server::Server,
@@ -15,7 +15,7 @@ use tokio::io::AsyncWriteExt;
 struct MyHandler {}
 
 #[async_trait]
-impl HandlerFn for MyHandler {
+impl Handler for MyHandler {
     async fn handle(&self, r: &Request, w: &mut dyn AsyncStream) -> Result<(), handler::Error> {
         println!("{:?}", r);
         let mut response = Response::new(status::from(status::OK));
@@ -46,12 +46,7 @@ async fn main() {
     info!("Starting hype...");
     let server = Server::new("127.0.0.1".into(), 4000);
 
-    server
-        .handle(
-            "/".to_string(),
-            handler::Handler::new("GET".to_string(), Box::new(MyHandler {})),
-        )
-        .await;
+    server.route("/".to_string(), Box::new(MyHandler {})).await;
 
     server.start().await.unwrap();
 }

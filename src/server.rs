@@ -27,7 +27,7 @@ enum Error {
 pub struct Server {
     address: String,
     port: u16,
-    handlers: Arc<RwLock<HashMap<String, Handler>>>,
+    handlers: Arc<RwLock<HashMap<String, Box<dyn Handler>>>>,
 }
 
 impl Server {
@@ -72,7 +72,7 @@ impl Server {
 
     async fn process_stream(
         mut stream: TcpStream,
-        handlers: Arc<RwLock<HashMap<String, Handler>>>,
+        handlers: Arc<RwLock<HashMap<String, Box<dyn Handler>>>>,
     ) {
         info!("Connection received from {:?}", stream.peer_addr().unwrap());
 
@@ -105,7 +105,7 @@ impl Server {
         debug!("Request: {:?}", request);
 
         if let Some(handler) = handlers.read().await.get(&request.path) {
-            handler.call(&request, &mut stream).await.unwrap();
+            handler.handle(&request, &mut stream).await.unwrap();
         }
 
         match &request.method[..] {
@@ -129,7 +129,7 @@ impl Server {
         }
     }
 
-    pub async fn handle(&self, path: String, handler: Handler) {
+    pub async fn route(&self, path: String, handler: Box<dyn Handler>) {
         let mut handlers = self.handlers.write().await;
         handlers.insert(path, handler);
     }
