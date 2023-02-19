@@ -2,6 +2,9 @@
 
 use std::fmt;
 
+use async_trait::async_trait;
+use tokio::io::AsyncWrite;
+
 use crate::parser::Request;
 
 #[derive(Debug)]
@@ -9,12 +12,15 @@ pub enum Error {
     Failed,
 }
 
-pub trait HandlerFnT: Fn(&Request) -> Result<(), Error> + Send + Sync {}
-impl<F> HandlerFnT for F where F: Fn(&Request) -> Result<(), Error> + Send + Sync {}
-pub type HandlerFn = dyn HandlerFnT<Output = Result<(), Error>>;
+pub trait AsyncStream: AsyncWrite + Unpin + Send + Sync {}
 
-impl fmt::Debug for HandlerFn {
-    fn fmt(&self, f: &mut fmt::Formatter) -> Result<(), fmt::Error> {
+#[async_trait]
+pub trait HandlerFn: Send + Sync {
+    async fn handle(&self, r: &Request, w: &mut dyn AsyncStream) -> Result<(), Error>;
+}
+
+impl std::fmt::Debug for dyn HandlerFn {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "HandlerFn").unwrap();
         Ok(())
     }
@@ -23,32 +29,45 @@ impl fmt::Debug for HandlerFn {
 #[derive(Debug)]
 pub struct Handler {
     method: String,
-    func: Box<HandlerFn>,
+    handler: Box<dyn HandlerFn>,
 }
 
 impl Handler {
-    pub fn new(method: String, func: Box<HandlerFn>) -> Handler {
-        Handler { method, func }
+    pub fn new(method: String, handler: Box<dyn HandlerFn>) -> Handler {
+        Handler { method, handler }
     }
 
-    pub fn call(&self, request: &Request) -> Result<(), Error> {
-        let f = &self.func;
-        f(request)
+    pub async fn call(&self, request: &Request, stream: &mut dyn AsyncStream) -> Result<(), Error> {
+        self.handler.handle(request, stream).await
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use super::*;
+    use tokio::io::AsyncWriteExt;
 
-    #[test]
-    fn it_works() {
-        fn boo(r: &Request) -> Result<(), Error> {
+    use super::*;
+    impl AsyncStream for Vec<u8> {}
+
+    struct MyHandler {}
+
+    #[async_trait]
+    impl HandlerFn for MyHandler {
+        async fn handle(&self, r: &Request, w: &mut dyn AsyncStream) -> Result<(), Error> {
             println!("boo: {:?}", r);
+            let data: Vec<u8> = vec![13];
+            w.write_all(&data).await.unwrap();
             Ok(())
         }
+    }
 
-        let h = Handler::new("GET".to_string(), Box::new(&boo));
-        h.call(&Request::new()).unwrap();
+    #[tokio::test]
+    async fn it_works() {
+        let h = Handler::new("GET".to_string(), Box::new(MyHandler {}));
+
+        let mut stream: Vec<u8> = vec![];
+        tokio::spawn(async move {
+            h.call(&Request::new(), &mut stream).await.unwrap();
+        });
     }
 }

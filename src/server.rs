@@ -3,20 +3,19 @@
 use tokio::{
     io::{AsyncReadExt, AsyncWriteExt},
     net::{TcpListener, TcpStream},
+    sync::RwLock,
 };
 
 use crate::{
-    handler::Handler,
+    handler::{AsyncStream, Handler},
     parser::{Parser, Request},
     response::Response,
     status,
 };
 
-use std::{
-    collections::HashMap,
-    str,
-    sync::{Arc, RwLock},
-};
+use std::{collections::HashMap, str, sync::Arc};
+
+impl AsyncStream for TcpStream {}
 
 #[allow(dead_code)]
 #[derive(Debug)]
@@ -77,7 +76,7 @@ impl Server {
     ) {
         info!("Connection received from {:?}", stream.peer_addr().unwrap());
 
-        info!("Handlers: {:?}", handlers.read().unwrap());
+        info!("Handlers: {:?}", handlers.read().await);
         let mut parser = Parser::new();
 
         loop {
@@ -105,8 +104,8 @@ impl Server {
         let request = parser.get_request();
         debug!("Request: {:?}", request);
 
-        if let Some(handler) = handlers.read().unwrap().get(&request.path) {
-            handler.call(&request).unwrap();
+        if let Some(handler) = handlers.read().await.get(&request.path) {
+            handler.call(&request, &mut stream).await.unwrap();
         }
 
         match &request.method[..] {
@@ -130,8 +129,8 @@ impl Server {
         }
     }
 
-    pub fn handle(&self, path: String, handler: Handler) {
-        let mut handlers = self.handlers.write().unwrap();
+    pub async fn handle(&self, path: String, handler: Handler) {
+        let mut handlers = self.handlers.write().await;
         handlers.insert(path, handler);
     }
 
