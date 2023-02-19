@@ -1,4 +1,41 @@
-# hype is a web server
+# hype is a web server from scratch
+
+## Example
+
+```rust
+struct MyHandler {}
+
+#[async_trait]
+impl Handler for MyHandler {
+    async fn handle(&self, r: &Request, w: &mut dyn AsyncStream) -> Result<(), handler::Error> {
+        let mut response = Response::new(status::from(status::OK));
+
+        match &r.path[..] {
+            "/" => {
+                response.set_body("<html>hi!</html>\n".into());
+            }
+            _ => {
+                response.set_status(status::from(status::NOT_FOUND));
+                response.set_body("<html>404 NOT FOUND</html>".into());
+            }
+        }
+
+        let buf = response.serialize();
+        w.write_all(buf.as_bytes()).await.unwrap();
+        Ok(())
+    }
+}
+
+#[tokio::main]
+async fn main() {
+    let server = Server::new("127.0.0.1".into(), 4000);
+
+    server.route("/".to_string(), Box::new(MyHandler {})).await;
+    server.route("*".to_string(), Box::new(MyHandler {})).await;
+    server.start().await.unwrap();
+}
+
+```
 
 ## To run
 
