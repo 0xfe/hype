@@ -6,23 +6,29 @@ use tokio::{
 };
 
 use crate::{
+    handler::Handler,
     parser::{Parser, Request},
     response::Response,
     status,
 };
 
-use std::str;
-
-#[derive(Debug)]
-pub struct Server {
-    address: String,
-    port: u16,
-}
+use std::{
+    collections::HashMap,
+    str,
+    sync::{Arc, RwLock},
+};
 
 #[allow(dead_code)]
 #[derive(Debug)]
 enum Error {
     ConnectionBroken,
+}
+
+#[derive(Debug)]
+pub struct Server {
+    address: String,
+    port: u16,
+    handlers: Arc<RwLock<HashMap<String, Handler>>>,
 }
 
 impl Server {
@@ -65,8 +71,13 @@ impl Server {
         Ok(())
     }
 
-    async fn process_stream(mut stream: TcpStream) {
+    async fn process_stream(
+        mut stream: TcpStream,
+        handlers: Arc<RwLock<HashMap<String, Handler>>>,
+    ) {
         info!("Connection received from {:?}", stream.peer_addr().unwrap());
+
+        info!("Handlers: {:?}", handlers.read().unwrap());
         let mut parser = Parser::new();
 
         loop {
@@ -94,6 +105,10 @@ impl Server {
         let request = parser.get_request();
         debug!("Request: {:?}", request);
 
+        if let Some(handler) = handlers.read().unwrap().get(&request.path) {
+            handler.call(&request).unwrap();
+        }
+
         match &request.method[..] {
             "GET" => Server::process_GET(request, &mut stream).await.unwrap(),
             "POST" => Server::process_POST(request, &mut stream).await.unwrap(),
@@ -108,7 +123,16 @@ impl Server {
     }
 
     pub fn new(address: String, port: u16) -> Self {
-        Self { address, port }
+        Self {
+            address,
+            port,
+            handlers: Arc::new(RwLock::new(HashMap::new())),
+        }
+    }
+
+    pub fn handle(&self, path: String, handler: Handler) {
+        let mut handlers = self.handlers.write().unwrap();
+        handlers.insert(path, handler);
     }
 
     pub async fn start(&self) -> Result<(), ()> {
@@ -118,7 +142,10 @@ impl Server {
 
         loop {
             let (socket, _) = listener.accept().await.unwrap();
-            tokio::spawn(async move { Server::process_stream(socket).await });
+            let handlers = Arc::clone(&self.handlers);
+            tokio::spawn(async move {
+                Server::process_stream(socket, handlers).await;
+            });
         }
     }
 }

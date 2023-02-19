@@ -2,7 +2,7 @@
 extern crate log;
 
 use env_logger::Env;
-use hype::server::Server;
+use hype::{handler, server::Server};
 
 #[tokio::main]
 async fn main() {
@@ -13,5 +13,17 @@ async fn main() {
 
     info!("Starting hype...");
     let server = Server::new("127.0.0.1".into(), 4000);
+
+    server.handle(
+        "/".to_string(),
+        handler::Handler::new(
+            "GET".to_string(),
+            Box::new(|request| -> Result<(), handler::Error> {
+                println!("{:?}", request);
+                Ok(())
+            }),
+        ),
+    );
+
     server.start().await.unwrap();
 }
