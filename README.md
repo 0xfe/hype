@@ -10,8 +10,8 @@ impl Handler for MyHandler {
     async fn handle(&self, r: &Request, w: &mut dyn AsyncStream) -> Result<(), handler::Error> {
         let mut response = Response::new(status::from(status::OK));
 
-        match &r.path[..] {
-            "/" => {
+        match (r.method, &r.path[..]) {
+            (Method::GET | Method::POST, "/") => {
                 response.set_body("<html>hi!</html>\n".into());
             }
             _ => {
@@ -31,9 +31,7 @@ async fn main() {
     let server = Server::new("127.0.0.1".into(), 4000);
 
     let handler = MyHandler{}
-    server.route("/".to_string(), Box::new(MyHandler {})).await;
-    server.route("*".to_string(), Box::new(MyHandler {})).await;
-    server.start().await.unwrap();
+    server.route_default(Box::new(MyHandler {})).await;
 }
 
 ```
