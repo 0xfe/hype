@@ -30,6 +30,7 @@ impl Handler for MyHandler {
 async fn main() {
     let server = Server::new("127.0.0.1".into(), 4000);
 
+    let handler = MyHandler{}
     server.route("/".to_string(), Box::new(MyHandler {})).await;
     server.route("*".to_string(), Box::new(MyHandler {})).await;
     server.start().await.unwrap();

@@ -5,7 +5,7 @@ use std::fmt;
 use async_trait::async_trait;
 use tokio::io::AsyncWrite;
 
-use crate::parser::Request;
+use crate::request::Request;
 
 #[derive(Debug)]
 pub enum Error {

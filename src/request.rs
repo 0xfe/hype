@@ -8,6 +8,19 @@ enum State {
     InBody,
 }
 
+#[derive(Debug, Clone, Copy, Eq, PartialEq)]
+pub enum Method {
+    GET,
+    POST,
+    PUT,
+    HEAD,
+    OPTIONS,
+    CONNECT,
+    DELETE,
+    TRACE,
+    PATCH,
+}
+
 lazy_static! {
     // map of target state -> prior state(s)
     static ref STATE_MACHINE: HashMap<State, Vec<State>> = HashMap::from([
@@ -16,9 +29,17 @@ lazy_static! {
         (State::InBody, vec![State::InHeaders]),
     ]);
 
-    static ref VALID_METHODS: Vec<&'static str> = vec![
-        "GET", "HEAD", "POST", "PUT", "OPTIONS", "CONNECT", "DELETE", "TRACE", "PATCH"
-    ];
+    static ref VALID_METHODS: HashMap<&'static str, Method> = HashMap::from([
+        ("GET", Method::GET),
+        ("HEAD", Method::HEAD),
+        ("POST", Method::POST),
+        ("PUT", Method::PUT),
+        ("OPTIONS", Method::OPTIONS),
+        ("CONNECT", Method::CONNECT),
+        ("DELETE", Method::DELETE),
+        ("TRACE", Method::TRACE),
+        ("PATCH", Method::PATCH),
+    ]);
 }
 
 #[derive(Debug, PartialEq)]
@@ -33,7 +54,7 @@ pub enum ParseError {
 
 #[derive(Debug, Clone)]
 pub struct Request {
-    pub method: String,
+    pub method: Method,
     pub path: String,
     pub version: String,
     pub headers: HashMap<String, String>,
@@ -43,7 +64,7 @@ pub struct Request {
 impl Request {
     pub fn new() -> Request {
         Request {
-            method: String::new(),
+            method: Method::GET,
             path: String::new(),
             version: String::new(),
             headers: HashMap::new(),
@@ -90,11 +111,12 @@ impl Parser {
             return Err(ParseError::BadCommandLine(command_line.into()));
         }
 
-        if !VALID_METHODS.contains(&parts[0]) {
+        if let Some(method) = VALID_METHODS.get(&parts[0]) {
+            self.request.method = *method;
+        } else {
             return Err(ParseError::InvalidMethod(parts[0].into()));
         }
 
-        self.request.method = parts[0].into();
         self.request.path = parts[1].into();
         self.request.version = parts[2].into();
 
@@ -242,7 +264,7 @@ Content-Length: 20
 
         assert!(request.is_some());
         let request = request.unwrap();
-        assert_eq!(request.method, "POST");
+        assert_eq!(request.method, Method::POST);
     }
 
     #[test]
@@ -263,7 +285,7 @@ Content-Length: 20
         let request = assert_parse_ok("GET / HTTP/1.1\n");
         assert!(request.is_some());
         let request = request.unwrap();
-        assert_eq!(request.method, "GET");
+        assert_eq!(request.method, Method::GET);
         assert_eq!(request.path, "/");
         assert_eq!(request.version, "HTTP/1.1");
     }

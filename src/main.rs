@@ -7,7 +7,7 @@ use async_trait::async_trait;
 use env_logger::Env;
 use hype::{
     handler::{self, AsyncStream, Handler},
-    parser::Request,
+    request::{Method, Request},
     response::Response,
     server::Server,
     status,
@@ -94,9 +94,9 @@ impl MyHandler {
 #[async_trait]
 impl Handler for MyHandler {
     async fn handle(&self, r: &Request, w: &mut dyn AsyncStream) -> Result<(), handler::Error> {
-        match &r.method[..] {
-            "GET" => self.handle_get(r, w).await,
-            "POST" => self.handle_post(r, w).await,
+        match r.method {
+            Method::GET => self.handle_get(r, w).await,
+            Method::POST => self.handle_post(r, w).await,
             _ => Ok(()),
         }
     }

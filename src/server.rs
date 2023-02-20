@@ -8,7 +8,7 @@ use tokio::{
 
 use crate::{
     handler::{AsyncStream, Handler},
-    parser::Parser,
+    request::Parser,
 };
 
 use std::{collections::HashMap, sync::Arc};

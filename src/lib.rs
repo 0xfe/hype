@@ -5,7 +5,7 @@ extern crate lazy_static;
 extern crate log;
 
 pub mod handler;
-pub mod parser;
+pub mod request;
 pub mod response;
 pub mod server;
 pub mod status;
