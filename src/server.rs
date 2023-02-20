@@ -1,7 +1,7 @@
 #![allow(non_snake_case)]
 
 use tokio::{
-    io::AsyncReadExt,
+    io::{AsyncReadExt, AsyncWriteExt},
     net::{TcpListener, TcpStream},
     sync::RwLock,
 };
@@ -9,6 +9,8 @@ use tokio::{
 use crate::{
     handler::{AsyncStream, Handler},
     request::Parser,
+    response::Response,
+    status,
 };
 
 use std::{collections::HashMap, sync::Arc};
@@ -26,16 +28,16 @@ pub struct Server {
     address: String,
     port: u16,
     handlers: Arc<RwLock<HashMap<String, Box<dyn Handler>>>>,
+    default_handler: Option<Arc<Box<dyn Handler>>>,
 }
 
 impl Server {
     async fn process_stream(
         mut stream: TcpStream,
         handlers: Arc<RwLock<HashMap<String, Box<dyn Handler>>>>,
+        default_handler: Option<Arc<Box<dyn Handler>>>,
     ) {
         info!("Connection received from {:?}", stream.peer_addr().unwrap());
-
-        info!("Handlers: {:?}", handlers.read().await);
         let mut parser = Parser::new();
 
         loop {
@@ -65,6 +67,14 @@ impl Server {
 
         if let Some(handler) = handlers.read().await.get(&request.path) {
             handler.handle(&request, &mut stream).await.unwrap();
+        } else if let Some(handler) = default_handler {
+            handler.handle(&request, &mut stream).await.unwrap();
+        } else {
+            let mut response = Response::new(status::from(status::NOT_FOUND));
+            response.set_header("Content-Type".into(), "text/plain".into());
+            response.set_body("Hype: no route handlers installed.".into());
+            let buf = response.serialize();
+            stream.write_all(buf.as_bytes()).await.unwrap();
         }
     }
 
@@ -73,7 +83,12 @@ impl Server {
             address,
             port,
             handlers: Arc::new(RwLock::new(HashMap::new())),
+            default_handler: None,
         }
+    }
+
+    pub fn route_default(&mut self, handler: Box<dyn Handler>) {
+        self.default_handler = Some(Arc::new(handler));
     }
 
     pub async fn route(&self, path: String, handler: Box<dyn Handler>) {
@@ -89,8 +104,13 @@ impl Server {
         loop {
             let (socket, _) = listener.accept().await.unwrap();
             let handlers = Arc::clone(&self.handlers);
+            let default_handler: Option<Arc<Box<dyn Handler>>> = self
+                .default_handler
+                .as_ref()
+                .and_then(|h| Some(Arc::clone(&h)));
+
             tokio::spawn(async move {
-                Server::process_stream(socket, handlers).await;
+                Server::process_stream(socket, handlers, default_handler).await;
             });
         }
     }

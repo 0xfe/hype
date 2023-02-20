@@ -10,7 +10,7 @@ use hype::{
     request::{Method, Request},
     response::Response,
     server::Server,
-    status,
+    status::{self},
 };
 use tokio::{io::AsyncWriteExt, sync::Mutex};
 
@@ -41,52 +41,52 @@ impl MyHandler {
         MyHandler { app }
     }
 
-    async fn handle_get(&self, r: &Request, w: &mut dyn AsyncStream) -> Result<(), handler::Error> {
-        let mut response = Response::new(status::from(status::OK));
-
-        match &r.path[..] {
-            "/" => {
-                response.set_body("<html>hi!</html>\n".into());
-            }
-            "/count" => {
-                response.set_body(format!(
-                    "<html>count: {}</html>\n",
-                    self.app.lock().await.get()
-                ));
-            }
-            _ => {
-                response.set_status(status::from(status::NOT_FOUND));
-                response.set_body("<html>404 NOT FOUND</html>".into());
-            }
-        }
-
+    async fn write_response<'a>(w: &mut dyn AsyncStream, status: status::Code<'a>, body: String) {
+        let mut response = Response::new(status::from(status));
+        response.set_body(body);
         let buf = response.serialize();
         w.write_all(buf.as_bytes()).await.unwrap();
+    }
+
+    async fn handle_root(
+        &self,
+        _r: &Request,
+        w: &mut dyn AsyncStream,
+    ) -> Result<(), handler::Error> {
+        MyHandler::write_response(w, status::OK, "<html>hi!</html>\n".into()).await;
         Ok(())
     }
 
-    async fn handle_post(
+    async fn handle_get_counter(
         &self,
-        r: &Request,
+        _r: &Request,
         w: &mut dyn AsyncStream,
     ) -> Result<(), handler::Error> {
-        let mut response = Response::new(status::from(status::OK));
-        match &r.path[..] {
-            "/" => {
-                response.set_body(format!("{}\n", r.body));
-            }
-            "/inc" => {
-                self.app.lock().await.inc();
-                response.set_body("{ \"op\": \"inc\" }\n".into());
-            }
-            _ => {
-                response.set_status(status::from(status::NOT_FOUND));
-                response.set_body("<html>404 NOT FOUND</html>".into());
-            }
-        }
+        MyHandler::write_response(
+            w,
+            status::OK,
+            format!("<html>count: {}</html>\n", self.app.lock().await.get()),
+        )
+        .await;
+        Ok(())
+    }
 
-        let buf = response.serialize();
-        w.write_all(buf.as_bytes()).await.unwrap();
+    async fn handle_post_inc(
+        &self,
+        _r: &Request,
+        w: &mut dyn AsyncStream,
+    ) -> Result<(), handler::Error> {
+        self.app.lock().await.inc();
+        MyHandler::write_response(w, status::OK, "{ \"op\": \"inc\" }\n".into()).await;
+        Ok(())
+    }
+
+    async fn handle_not_found(
+        &self,
+        _r: &Request,
+        w: &mut dyn AsyncStream,
+    ) -> Result<(), handler::Error> {
+        MyHandler::write_response(w, status::NOT_FOUND, "<html>NOT FOUND!</html>\n".into()).await;
         Ok(())
     }
 }
@@ -94,10 +94,11 @@ impl MyHandler {
 #[async_trait]
 impl Handler for MyHandler {
     async fn handle(&self, r: &Request, w: &mut dyn AsyncStream) -> Result<(), handler::Error> {
-        match r.method {
-            Method::GET => self.handle_get(r, w).await,
-            Method::POST => self.handle_post(r, w).await,
-            _ => Ok(()),
+        match (r.method, &r.path[..]) {
+            (Method::GET | Method::POST, "/") => self.handle_root(r, w).await,
+            (Method::GET, "/counter") => self.handle_get_counter(r, w).await,
+            (Method::POST, "/inc") => self.handle_post_inc(r, w).await,
+            _ => self.handle_not_found(r, w).await,
         }
     }
 }
@@ -110,19 +111,9 @@ async fn main() {
     env_logger::Builder::from_env(Env::default().default_filter_or("info")).init();
 
     info!("Starting hype...");
-    let server = Server::new("127.0.0.1".into(), 4000);
-
+    let mut server = Server::new("127.0.0.1".into(), 4000);
     let app = Arc::new(Mutex::new(App::new()));
-
-    server
-        .route("/".to_string(), Box::new(MyHandler::new(app.clone())))
-        .await;
-    server
-        .route("/inc".to_string(), Box::new(MyHandler::new(app.clone())))
-        .await;
-    server
-        .route("/count".to_string(), Box::new(MyHandler::new(app.clone())))
-        .await;
+    server.route_default(Box::new(MyHandler::new(app.clone())));
 
     server.start().await.unwrap();
 }

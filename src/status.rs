@@ -1,4 +1,4 @@
-type Code<'a> = (u16, &'a str);
+pub type Code<'a> = (u16, &'a str);
 
 pub const OK: Code = (200, "OK");
 pub const NOT_FOUND: Code = (404, "NOT FOUND");
