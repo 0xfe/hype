@@ -10,7 +10,7 @@ impl Handler for MyHandler {
     async fn handle(&self, r: &Request, w: &mut dyn AsyncStream) -> Result<(), handler::Error> {
         let mut response = Response::new(status::from(status::OK));
 
-        match (r.method, &r.path[..]) {
+        match (r.method, r.url.as_ref().unwrap().path()) {
             (Method::GET | Method::POST, "/") => {
                 response.set_body("<html>hi!</html>\n".into());
             }
@@ -58,6 +58,7 @@ $ cargo test -- --nocapture
 ## TODO
 
 -   implement handler abstraction
--   end-to-end tests with reqwest
+-   URL parsing (use `url` crate) -- https://docs.rs/url/latest/url/
 -   serve files
+-   end-to-end tests with reqwest
 -   json handling (is it needed ??) -- serde_json

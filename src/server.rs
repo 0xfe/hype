@@ -27,6 +27,7 @@ enum Error {
 pub struct Server {
     address: String,
     port: u16,
+    base_url: String,
     handlers: Arc<RwLock<HashMap<String, Box<dyn Handler>>>>,
     default_handler: Option<Arc<Box<dyn Handler>>>,
 }
@@ -34,11 +35,12 @@ pub struct Server {
 impl Server {
     async fn process_stream(
         mut stream: TcpStream,
+        base_url: String,
         handlers: Arc<RwLock<HashMap<String, Box<dyn Handler>>>>,
         default_handler: Option<Arc<Box<dyn Handler>>>,
     ) {
         info!("Connection received from {:?}", stream.peer_addr().unwrap());
-        let mut parser = Parser::new();
+        let mut parser = Parser::new(base_url);
 
         loop {
             let mut buf = [0u8; 16];
@@ -65,7 +67,12 @@ impl Server {
         let request = parser.get_request();
         debug!("Request: {:?}", request);
 
-        if let Some(handler) = handlers.read().await.get(&request.path) {
+        let mut path = String::from("/__bad_path__");
+        if let Some(url) = &request.url {
+            path = url.path().into()
+        }
+
+        if let Some(handler) = handlers.read().await.get(&path) {
             handler.handle(&request, &mut stream).await.unwrap();
         } else if let Some(handler) = default_handler {
             handler.handle(&request, &mut stream).await.unwrap();
@@ -79,11 +86,14 @@ impl Server {
     }
 
     pub fn new(address: String, port: u16) -> Self {
+        let base_url = format!("http://{}:{}", address, port);
+
         Self {
             address,
             port,
             handlers: Arc::new(RwLock::new(HashMap::new())),
             default_handler: None,
+            base_url,
         }
     }
 
@@ -103,6 +113,7 @@ impl Server {
 
         loop {
             let (socket, _) = listener.accept().await.unwrap();
+            let base_url = self.base_url.clone();
             let handlers = Arc::clone(&self.handlers);
             let default_handler: Option<Arc<Box<dyn Handler>>> = self
                 .default_handler
@@ -110,7 +121,7 @@ impl Server {
                 .and_then(|h| Some(Arc::clone(&h)));
 
             tokio::spawn(async move {
-                Server::process_stream(socket, handlers, default_handler).await;
+                Server::process_stream(socket, base_url, handlers, default_handler).await;
             });
         }
     }

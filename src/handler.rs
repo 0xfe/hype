@@ -51,7 +51,9 @@ mod tests {
 
         let mut stream: Vec<u8> = vec![];
         tokio::spawn(async move {
-            h.handle(&Request::new(), &mut stream).await.unwrap();
+            h.handle(&Request::new("http://foobar:8080".into()), &mut stream)
+                .await
+                .unwrap();
         });
     }
 }

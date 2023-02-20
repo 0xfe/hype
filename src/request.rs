@@ -1,5 +1,7 @@
 use std::collections::HashMap;
 
+use url::Url;
+
 #[derive(Debug, PartialEq, Eq, Hash)]
 enum State {
     Start,
@@ -49,23 +51,26 @@ pub enum ParseError {
     BadCommandLine(String),
     BadHeaderLine(String),
     InvalidMethod(String),
+    InvalidPath(String),
     UnexpectedEOF,
 }
 
 #[derive(Debug, Clone)]
 pub struct Request {
+    pub base_url: String,
+    pub url: Option<Url>,
     pub method: Method,
-    pub path: String,
     pub version: String,
     pub headers: HashMap<String, String>,
     pub body: String,
 }
 
 impl Request {
-    pub fn new() -> Request {
+    pub fn new(base_url: String) -> Request {
         Request {
+            base_url,
+            url: None,
             method: Method::GET,
-            path: String::new(),
             version: String::new(),
             headers: HashMap::new(),
             body: String::new(),
@@ -75,17 +80,19 @@ impl Request {
 
 #[derive(Debug)]
 pub struct Parser {
+    base_url: String,
     state: State,
     buf: Vec<u8>,
     request: Request,
 }
 
 impl Parser {
-    pub fn new() -> Parser {
+    pub fn new(base_url: String) -> Parser {
         Parser {
+            base_url: base_url.clone(),
             state: State::Start,
             buf: Vec::with_capacity(16384),
-            request: Request::new(),
+            request: Request::new(base_url),
         }
     }
 
@@ -117,7 +124,13 @@ impl Parser {
             return Err(ParseError::InvalidMethod(parts[0].into()));
         }
 
-        self.request.path = parts[1].into();
+        let base_url = Url::parse(&self.base_url[..])
+            .or(Err(ParseError::InvalidPath(self.base_url.clone())))?;
+        let url = base_url
+            .join(parts[1])
+            .or(Err(ParseError::InvalidPath(parts[1].into())))?;
+
+        self.request.url = Some(url);
         self.request.version = parts[2].into();
 
         self.buf.clear();
@@ -221,7 +234,7 @@ impl Parser {
     pub fn reset(&mut self) {
         self.state = State::Start;
         self.buf.clear();
-        self.request = Request::new();
+        self.request = Request::new(self.base_url.clone());
     }
 }
 
@@ -234,7 +247,7 @@ mod tests {
         parse_buf_result: Result<(), ParseError>,
         parse_eof_result: Result<(), ParseError>,
     ) -> Option<Request> {
-        let mut parser = Parser::new();
+        let mut parser = Parser::new("http://localhost".into());
         println!("Parsing buffer:\n{}", buf);
         let result1 = parser.parse_buf(String::from(buf).as_bytes());
         assert_eq!(result1, parse_buf_result);
@@ -286,7 +299,12 @@ Content-Length: 20
         assert!(request.is_some());
         let request = request.unwrap();
         assert_eq!(request.method, Method::GET);
-        assert_eq!(request.path, "/");
+
+        if let Some(url) = &request.url {
+            assert_eq!(url.path(), "/");
+        } else {
+            assert!(&request.url.is_some())
+        }
         assert_eq!(request.version, "HTTP/1.1");
     }
 
