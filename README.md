@@ -29,8 +29,6 @@ impl Handler for MyHandler {
 #[tokio::main]
 async fn main() {
     let server = Server::new("127.0.0.1".into(), 4000);
-
-    let handler = MyHandler{}
     server.route_default(Box::new(MyHandler {})).await;
 }
 
