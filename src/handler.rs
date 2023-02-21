@@ -9,7 +9,8 @@ use crate::request::Request;
 
 #[derive(Debug)]
 pub enum Error {
-    Failed,
+    Done,
+    Failed(String),
 }
 
 pub trait AsyncStream: AsyncWrite + Unpin + Send + Sync {}

@@ -9,7 +9,11 @@ path = "src/lib.rs"
 
 [[bin]]
 name = "main"
-path = "src/main.rs"
+path = "src/bin/main.rs"
+
+[[bin]]
+name = "app"
+path = "src/bin/app.rs"
 
 [dependencies]
 tokio = { version = "1", features = ["full"] }
