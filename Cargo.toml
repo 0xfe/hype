@@ -8,8 +8,8 @@ name = "hype"
 path = "src/lib.rs"
 
 [[bin]]
-name = "main"
-path = "src/bin/main.rs"
+name = "hello"
+path = "src/bin/hello.rs"
 
 [[bin]]
 name = "app"

@@ -17,6 +17,10 @@ impl Stack {
     pub fn push_handler(&mut self, handler: Box<dyn Handler>) {
         self.handlers.push(handler)
     }
+
+    pub fn push_handlers(&mut self, handlers: &mut Vec<Box<dyn Handler>>) {
+        self.handlers.append(handlers)
+    }
 }
 
 #[async_trait]

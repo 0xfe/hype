@@ -126,8 +126,10 @@ async fn main() {
     let app = Arc::new(Mutex::new(App::new()));
 
     let mut stack = middleware::Stack::new();
-    stack.push_handler(Box::new(LogHandler {}));
-    stack.push_handler(Box::new(MyHandler::new(app.clone())));
+    stack.push_handlers(&mut vec![
+        Box::new(LogHandler {}),
+        Box::new(MyHandler::new(app.clone())),
+    ]);
     server.route_default(Box::new(stack));
 
     server.start().await.unwrap();
