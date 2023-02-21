@@ -59,12 +59,13 @@ $ cargo test -- --nocapture
 
 -   serve files
 -   end-to-end tests with reqwest
+-   more unit tests
 -   json handling (is it needed ??) -- serde_json
--   API for URL parameters
--   API to get POST parameters
 -   API to set cookies in response
 
 ### Done
 
 -   implement handler abstraction
 -   URL parsing (use `url` crate) -- https://docs.rs/url/latest/url/
+-   API for URL parameters
+-   API to get form POST parameters

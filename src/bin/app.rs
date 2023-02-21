@@ -54,9 +54,9 @@ impl MyHandler {
 
     async fn write_response<'a>(w: &mut dyn AsyncStream, status: status::Code<'a>, body: String) {
         let mut response = Response::new(status::from(status));
-        response.set_body(body);
-        let buf = response.serialize();
-        w.write_all(buf.as_bytes()).await.unwrap();
+        w.write_all(response.set_body(body).serialize().as_bytes())
+            .await
+            .unwrap();
     }
 
     async fn handle_root(

@@ -18,16 +18,19 @@ impl<'a> Response<'a> {
         }
     }
 
-    pub fn set_status(&mut self, status: status::Status<'a>) {
+    pub fn set_status(&mut self, status: status::Status<'a>) -> &mut Self {
         self.status = status;
+        self
     }
 
-    pub fn set_header(&mut self, key: String, value: String) {
+    pub fn set_header(&mut self, key: String, value: String) -> &mut Self {
         self.headers.insert(key, value);
+        self
     }
 
-    pub fn set_body(&mut self, body: String) {
+    pub fn set_body(&mut self, body: String) -> &mut Self {
         self.body = body;
+        self
     }
 
     pub fn serialize(&mut self) -> String {

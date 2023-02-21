@@ -273,23 +273,33 @@ impl Parser {
 mod tests {
     use super::*;
 
+    fn parse(
+        buf: &str,
+    ) -> (
+        Option<Request>,
+        Result<(), ParseError>,
+        Result<(), ParseError>,
+    ) {
+        println!("Parsing buffer:\n{}", buf);
+        let mut parser = Parser::new("http://localhost".into());
+        let result1 = parser.parse_buf(String::from(buf).as_bytes());
+        let result2 = parser.parse_eof();
+        if result1 == Ok(()) && result2 == Ok(()) {
+            (Some(parser.get_request()), result1, result2)
+        } else {
+            (None, result1, result2)
+        }
+    }
+
     fn assert_parse_result(
         buf: &str,
         parse_buf_result: Result<(), ParseError>,
         parse_eof_result: Result<(), ParseError>,
     ) -> Option<Request> {
-        let mut parser = Parser::new("http://localhost".into());
-        println!("Parsing buffer:\n{}", buf);
-        let result1 = parser.parse_buf(String::from(buf).as_bytes());
+        let (request, result1, result2) = parse(buf);
         assert_eq!(result1, parse_buf_result);
-        let result2 = parser.parse_eof();
         assert_eq!(result2, parse_eof_result);
-
-        if result1 == Ok(()) && result2 == Ok(()) {
-            return Some(parser.get_request());
-        }
-
-        None
+        request
     }
 
     fn assert_parse_ok(buf: &str) -> Option<Request> {
@@ -346,5 +356,20 @@ Content-Length: 20
             Err(ParseError::InvalidMethod("BIT".into())),
             Ok(()),
         );
+    }
+
+    #[test]
+    fn post_params() {
+        let r = r##"POST / HTTP/1.1
+Host: localhost:4000
+Content-Type: application/x-www-form-urlencoded
+Content-Length: 23
+
+merchantID=2003&foo=bar"##;
+
+        let request = assert_parse_ok(r);
+        assert!(request.is_some());
+        let post_params = request.unwrap().post_params();
+        assert!(post_params.is_some());
     }
 }
