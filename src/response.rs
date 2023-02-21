@@ -50,21 +50,3 @@ impl<'a> Response<'a> {
         format!("{status_line}\r\n{headers}\r\n\r\n{}", self.body)
     }
 }
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn it_works() {
-        let mut response = Response::new(status::from(status::OK));
-        println!("{}", response.serialize())
-    }
-
-    #[test]
-    fn it_works_with_body() {
-        let mut response = Response::new(status::from(status::OK));
-        response.set_body("<HTML><b>Hello world!</b></HTML>".into());
-        println!("{}", response.serialize())
-    }
-}
