@@ -51,6 +51,9 @@ $ cargo test
 # Run specific tests
 $ cargo test parser
 
+# Run all tests in file
+# cargo test --test request_test
+
 # Show standard output
 $ cargo test -- --nocapture
 ```
