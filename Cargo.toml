@@ -15,6 +15,10 @@ path = "src/bin/hello.rs"
 name = "app"
 path = "src/bin/app.rs"
 
+[[bin]]
+name = "fileserver"
+path = "src/bin/fileserver.rs"
+
 [dependencies]
 tokio = { version = "1", features = ["full"] }
 lazy_static = "1.4"
