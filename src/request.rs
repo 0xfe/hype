@@ -59,7 +59,6 @@ pub enum ParseError {
 pub struct Request {
     pub base_url: String,
     pub url: Option<Url>,
-    pub query: HashMap<String, String>,
     pub method: Method,
     pub version: String,
     pub headers: HashMap<String, String>,
@@ -71,12 +70,42 @@ impl Request {
         Request {
             base_url,
             url: None,
-            query: HashMap::new(),
             method: Method::GET,
             version: String::new(),
             headers: HashMap::new(),
             body: String::new(),
         }
+    }
+
+    pub fn post_params(&mut self) -> Option<HashMap<String, String>> {
+        let mut result: HashMap<String, String> = HashMap::new();
+        if let Some(content_type) = self.headers.get("Content-Type") {
+            if *content_type == "application/x-www-form-urlencoded".to_string() {
+                let parts = self.body.split('&');
+
+                parts.for_each(|part| {
+                    let kv: Vec<&str> = part.split('=').collect();
+                    if kv.len() == 2 {
+                        result.insert(kv[0].into(), kv[1].into());
+                    }
+                });
+            }
+            return Some(result);
+        } else {
+            return None;
+        }
+    }
+
+    pub fn query_params(&self) -> Option<HashMap<String, String>> {
+        if let Some(url) = &self.url {
+            Some(
+                url.query_pairs()
+                    .into_owned()
+                    .collect::<HashMap<String, String>>(),
+            );
+        }
+
+        None
     }
 }
 
@@ -132,7 +161,6 @@ impl Parser {
             .join(parts[1])
             .or(Err(ParseError::InvalidPath(parts[1].into())))?;
 
-        self.request.query = url.query_pairs().into_owned().collect();
         self.request.version = parts[2].into();
         self.request.url = Some(url);
 
