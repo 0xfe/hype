@@ -39,7 +39,7 @@ async fn main() {
 Start with debug logging.
 
 ```
-$ RUST_LOG=debug cargo run
+$ RUST_LOG=debug cargo run --bin {app, hello}
 ```
 
 ## Run tests
@@ -57,8 +57,14 @@ $ cargo test -- --nocapture
 
 ## TODO
 
--   implement handler abstraction
--   URL parsing (use `url` crate) -- https://docs.rs/url/latest/url/
 -   serve files
 -   end-to-end tests with reqwest
 -   json handling (is it needed ??) -- serde_json
+-   API for URL parameters
+-   API to get POST parameters
+-   API to set cookies in response
+
+### Done
+
+-   implement handler abstraction
+-   URL parsing (use `url` crate) -- https://docs.rs/url/latest/url/

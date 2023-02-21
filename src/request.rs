@@ -5,7 +5,7 @@ use url::Url;
 #[derive(Debug, PartialEq, Eq, Hash)]
 enum State {
     Start,
-    InCommand,
+    InMethod,
     InHeaders,
     InBody,
 }
@@ -26,8 +26,8 @@ pub enum Method {
 lazy_static! {
     // map of target state -> prior state(s)
     static ref STATE_MACHINE: HashMap<State, Vec<State>> = HashMap::from([
-        (State::InCommand, vec![State::Start]),
-        (State::InHeaders, vec![State::InCommand]),
+        (State::InMethod, vec![State::Start]),
+        (State::InHeaders, vec![State::InMethod]),
         (State::InBody, vec![State::InHeaders]),
     ]);
 
@@ -48,7 +48,7 @@ lazy_static! {
 pub enum ParseError {
     UnexpectedState,
     InvalidStateTransition,
-    BadCommandLine(String),
+    BadMethodLine(String),
     BadHeaderLine(String),
     InvalidMethod(String),
     InvalidPath(String),
@@ -59,6 +59,7 @@ pub enum ParseError {
 pub struct Request {
     pub base_url: String,
     pub url: Option<Url>,
+    pub query: HashMap<String, String>,
     pub method: Method,
     pub version: String,
     pub headers: HashMap<String, String>,
@@ -70,6 +71,7 @@ impl Request {
         Request {
             base_url,
             url: None,
+            query: HashMap::new(),
             method: Method::GET,
             version: String::new(),
             headers: HashMap::new(),
@@ -110,12 +112,12 @@ impl Parser {
         Ok(())
     }
 
-    fn commit_command(&mut self) -> Result<(), ParseError> {
-        let command_line = std::str::from_utf8(&self.buf[..]).unwrap();
-        let parts = command_line.split_ascii_whitespace().collect::<Vec<&str>>();
+    fn commit_method(&mut self) -> Result<(), ParseError> {
+        let method_line = std::str::from_utf8(&self.buf[..]).unwrap();
+        let parts = method_line.split_ascii_whitespace().collect::<Vec<&str>>();
 
         if parts.len() != 3 {
-            return Err(ParseError::BadCommandLine(command_line.into()));
+            return Err(ParseError::BadMethodLine(method_line.into()));
         }
 
         if let Some(method) = VALID_METHODS.get(&parts[0]) {
@@ -130,8 +132,9 @@ impl Parser {
             .join(parts[1])
             .or(Err(ParseError::InvalidPath(parts[1].into())))?;
 
-        self.request.url = Some(url);
+        self.request.query = url.query_pairs().into_owned().collect();
         self.request.version = parts[2].into();
+        self.request.url = Some(url);
 
         self.buf.clear();
         Ok(())
@@ -160,8 +163,8 @@ impl Parser {
 
         match self.state {
             State::Start => result = Ok(()),
-            State::InCommand => {
-                result = self.commit_command();
+            State::InMethod => {
+                result = self.commit_method();
                 self.update_state(State::InHeaders)?;
             }
             State::InHeaders => {
@@ -187,10 +190,10 @@ impl Parser {
                 State::Start => {
                     if !ch.is_whitespace() {
                         self.consume(*c)?;
-                        self.update_state(State::InCommand)?;
+                        self.update_state(State::InMethod)?;
                     }
                 }
-                State::InCommand | State::InHeaders => {
+                State::InMethod | State::InHeaders => {
                     if ch == '\n' {
                         self.commit_line()?;
                     } else {
