@@ -105,7 +105,7 @@ impl MyHandler {
 #[async_trait]
 impl Handler for MyHandler {
     async fn handle(&self, r: &Request, w: &mut dyn AsyncStream) -> Result<(), handler::Error> {
-        match (r.method, r.url.as_ref().unwrap().path()) {
+        match (r.method(), r.path()) {
             (Method::GET | Method::POST, "/") => self.handle_root(r, w).await,
             (Method::GET, "/counter") => self.handle_get_counter(r, w).await,
             (Method::POST, "/inc") => self.handle_post_inc(r, w).await,

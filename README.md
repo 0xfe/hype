@@ -65,6 +65,7 @@ $ cargo test -- --nocapture
 -   more unit tests
 -   json handling (is it needed ??) -- serde_json
 -   API to set cookies in response
+-   templating engine with https://crates.io/crates/tera
 
 ### Done
 

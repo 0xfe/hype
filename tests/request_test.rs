@@ -45,7 +45,7 @@ Content-Length: 20
 
     assert!(request.is_some());
     let request = request.unwrap();
-    assert_eq!(request.method, Method::POST);
+    assert_eq!(request.method(), Method::POST);
 }
 
 #[test]
@@ -66,7 +66,7 @@ fn get_request() {
     let request = assert_parse_ok("GET / HTTP/1.1\n");
     assert!(request.is_some());
     let request = request.unwrap();
-    assert_eq!(request.method, Method::GET);
+    assert_eq!(request.method(), Method::GET);
 
     if let Some(url) = &request.url {
         assert_eq!(url.path(), "/");

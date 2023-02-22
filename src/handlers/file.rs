@@ -1,7 +1,7 @@
 use std::path::Path;
 
 use async_trait::async_trait;
-use tokio::io::AsyncWriteExt;
+use tokio::{fs, io::AsyncWriteExt};
 
 use crate::{
     handler::{self, AsyncStream, Handler},
@@ -10,19 +10,19 @@ use crate::{
     status,
 };
 
-pub struct File<'a> {
-    path: &'a Path,
+pub struct File {
+    path: String,
 }
 
-impl<'a> File<'a> {
-    pub fn new(path: &'a str) -> File<'a> {
-        File {
-            path: Path::new(path),
-        }
+impl File {
+    pub fn new(path: String) -> File {
+        File { path }
     }
 
     async fn write_response<'b>(w: &mut dyn AsyncStream, status: status::Code<'b>, body: String) {
         let mut response = Response::new(status::from(status));
+        response.set_header("Content-Type".into(), "text/plain".into());
+
         w.write_all(response.set_body(body).serialize().as_bytes())
             .await
             .unwrap();
@@ -30,21 +30,21 @@ impl<'a> File<'a> {
 }
 
 #[async_trait]
-impl<'a> Handler for File<'a> {
+impl Handler for File {
     async fn handle(&self, r: &Request, w: &mut dyn AsyncStream) -> Result<(), handler::Error> {
-        File::write_response(
-            w,
-            status::OK,
-            format!(
-                "Serving file: {} from path {}\n",
-                self.path
-                    .join(&r.url.as_ref().unwrap().path()[1..])
-                    .to_str()
-                    .unwrap(),
-                self.path.to_str().unwrap(),
-            ),
-        )
-        .await;
-        Ok(())
+        let path = Path::new(self.path.as_str()).join(&r.path()[1..]);
+        let path = path.to_str().unwrap();
+
+        info!("Serving file: {}", path);
+
+        let contents = fs::read_to_string(path).await;
+
+        if let Ok(contents) = contents {
+            File::write_response(w, status::OK, contents).await;
+            Ok(())
+        } else {
+            File::write_response(w, status::NOT_FOUND, "404 File not found\n".into()).await;
+            Err(handler::Error::Failed("could not read file".into()))
+        }
     }
 }

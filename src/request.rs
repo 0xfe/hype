@@ -57,9 +57,9 @@ pub enum ParseError {
 
 #[derive(Debug, Clone)]
 pub struct Request {
+    method: Method,
     pub base_url: String,
     pub url: Option<Url>,
-    pub method: Method,
     pub version: String,
     pub headers: HashMap<String, String>,
     pub body: String,
@@ -106,6 +106,14 @@ impl Request {
         }
 
         None
+    }
+
+    pub fn path(&self) -> &str {
+        return self.url.as_ref().unwrap().path();
+    }
+
+    pub fn method(&self) -> Method {
+        return self.method;
     }
 }
 

@@ -73,9 +73,13 @@ impl Server {
         }
 
         if let Some(handler) = handlers.read().await.get(&path) {
-            handler.handle(&request, &mut stream).await.unwrap();
+            if let Err(error) = handler.handle(&request, &mut stream).await {
+                error!("Error from handler {:?}: {:?}", handler, error);
+            }
         } else if let Some(handler) = default_handler {
-            handler.handle(&request, &mut stream).await.unwrap();
+            if let Err(error) = handler.handle(&request, &mut stream).await {
+                error!("Error from handler {:?}: {:?}", handler, error);
+            }
         } else {
             let mut response = Response::new(status::from(status::NOT_FOUND));
             response.set_header("Content-Type".into(), "text/plain".into());
