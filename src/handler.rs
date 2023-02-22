@@ -31,6 +31,8 @@ impl std::fmt::Debug for dyn Handler {
 mod tests {
     use tokio::io::AsyncWriteExt;
 
+    use crate::{request::Parser, response::Response, status};
+
     use super::*;
     impl AsyncStream for Vec<u8> {}
 
@@ -38,10 +40,12 @@ mod tests {
 
     #[async_trait]
     impl Handler for MyHandler {
-        async fn handle(&self, r: &Request, w: &mut dyn AsyncStream) -> Result<(), Error> {
-            println!("boo: {:?}", r);
-            let data: Vec<u8> = vec![13];
-            w.write_all(&data).await.unwrap();
+        async fn handle(&self, _: &Request, w: &mut dyn AsyncStream) -> Result<(), Error> {
+            let mut response = Response::new(status::from(status::OK));
+            response.set_header("foo".into(), "bar".into());
+            response.set_body("hello world!\n".into());
+
+            w.write_all(response.serialize().as_bytes()).await.unwrap();
             Ok(())
         }
     }
@@ -50,11 +54,22 @@ mod tests {
     async fn it_works() {
         let h = Box::new(MyHandler {});
 
+        let buf = r##"POST / HTTP/1.1
+Host: localhost:4000
+Content-Type: application/x-www-form-urlencoded
+Content-Length: 23
+
+merchantID=2003&foo=bar"##;
+
+        let mut parser = Parser::new("http://localhost".into());
+        parser.parse_buf(String::from(buf).as_bytes()).unwrap();
+        parser.parse_eof().unwrap();
+
+        let request = parser.get_request();
         let mut stream: Vec<u8> = vec![];
-        tokio::spawn(async move {
-            h.handle(&Request::new("http://foobar:8080".into()), &mut stream)
-                .await
-                .unwrap();
-        });
+
+        h.handle(&request, &mut stream).await.unwrap();
+
+        println!("REPLY: {}", String::from_utf8(stream).unwrap());
     }
 }
