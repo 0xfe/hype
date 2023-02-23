@@ -98,4 +98,27 @@ merchantID=2003&foo=bar"##;
     assert!(request.is_some());
     let post_params = request.unwrap().post_params();
     assert!(post_params.is_some());
+
+    let post_params = post_params.unwrap();
+    assert_eq!(post_params.get("merchantID").unwrap(), &"2003".to_string());
+    assert_eq!(post_params.get("foo").unwrap(), &"bar".to_string());
+}
+
+#[test]
+fn query_params() {
+    let r = r##"GET /admin?user=foo&action=delete HTTP/1.1
+Host: localhost:4000
+Content-Type: application/x-www-form-urlencoded"##;
+
+    let request = assert_parse_ok(r);
+    assert!(request.is_some());
+
+    let request = request.unwrap();
+    assert!(request.url.is_some());
+    let query_params = request.query_params();
+    assert!(query_params.is_some());
+
+    let query_params = query_params.unwrap();
+    assert_eq!(query_params.get("user").unwrap(), &"foo".to_string());
+    assert_eq!(query_params.get("action").unwrap(), &"delete".to_string());
 }

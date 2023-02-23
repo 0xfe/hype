@@ -15,7 +15,7 @@ pub enum Error {
 
 pub trait AsyncStream: AsyncWrite + Unpin + Send + Sync {}
 
-impl AsyncStream for Vec<u8> {}
+impl AsyncStream for Vec<u8> {} // for tests
 impl AsyncStream for TcpStream {}
 
 #[async_trait]

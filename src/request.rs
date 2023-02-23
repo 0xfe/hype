@@ -98,7 +98,7 @@ impl Request {
 
     pub fn query_params(&self) -> Option<HashMap<String, String>> {
         if let Some(url) = &self.url {
-            Some(
+            return Some(
                 url.query_pairs()
                     .into_owned()
                     .collect::<HashMap<String, String>>(),
