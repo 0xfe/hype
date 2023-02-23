@@ -6,16 +6,9 @@ use tokio::{
     sync::RwLock,
 };
 
-use crate::{
-    handler::{AsyncStream, Handler},
-    request::Parser,
-    response::Response,
-    status,
-};
+use crate::{handler::Handler, request::Parser, response::Response, status};
 
 use std::{collections::HashMap, sync::Arc};
-
-impl AsyncStream for TcpStream {}
 
 #[allow(dead_code)]
 #[derive(Debug)]
