@@ -70,6 +70,20 @@ merchantID=2003&foo=bar"##;
 
         h.handle(&request, &mut stream).await.unwrap();
 
-        println!("REPLY: {}", String::from_utf8(stream).unwrap());
+        // need to parse response because header ordering can vary
+        let expected_buf = "HTTP/1.1 200 OK\r
+foo: bar\r
+Content-Length: 13\r
+\r
+hello world!
+"
+        .to_string();
+
+        let response = Response::from(expected_buf).unwrap();
+
+        assert_eq!(
+            response.headers.get("foo".into()).unwrap(),
+            &"bar".to_string()
+        );
     }
 }

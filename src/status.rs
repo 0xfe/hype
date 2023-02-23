@@ -5,15 +5,15 @@ pub const NOT_FOUND: Code = (404, "NOT FOUND");
 pub const SERVER_ERROR: Code = (500, "SERVER ERROR");
 
 #[derive(Debug, Clone, Eq, PartialEq)]
-pub struct Status<'a> {
+pub struct Status {
     pub code: u16,
-    pub text: &'a str,
+    pub text: String,
 }
 
 pub fn from(c: Code) -> Status {
     Status {
         code: c.0,
-        text: c.1,
+        text: c.1.into(),
     }
 }
 
