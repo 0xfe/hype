@@ -1,7 +1,7 @@
 use async_trait::async_trait;
 use hype::{
     handler::{AsyncStream, Error, Handler},
-    request::{Parser, Request},
+    request::Request,
     response::Response,
     status,
 };
@@ -32,11 +32,7 @@ Content-Length: 23
 
 merchantID=2003&foo=bar"##;
 
-    let mut parser = Parser::new("http://localhost".into());
-    parser.parse_buf(String::from(buf).as_bytes()).unwrap();
-    parser.parse_eof().unwrap();
-
-    let request = parser.get_request();
+    let request = Request::from(buf.to_string(), "http://localhost".into()).unwrap();
     let mut stream: Vec<u8> = vec![];
 
     h.handle(&request, &mut stream).await.unwrap();

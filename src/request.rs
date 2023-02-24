@@ -66,7 +66,7 @@ pub struct Request {
 }
 
 impl Request {
-    pub fn new(base_url: String) -> Request {
+    pub fn new(base_url: String) -> Self {
         Request {
             base_url,
             url: None,
@@ -75,6 +75,15 @@ impl Request {
             headers: HashMap::new(),
             body: String::new(),
         }
+    }
+
+    pub fn from(buf: String, base_url: String) -> Result<Self, String> {
+        let mut parser = Parser::new(base_url);
+        parser
+            .parse_buf(buf.as_bytes())
+            .or(Err("could not parse buffer"))?;
+        parser.parse_eof().or(Err("could not parse buffer"))?;
+        Ok(parser.get_request())
     }
 
     pub fn post_params(&mut self) -> Option<HashMap<String, String>> {
