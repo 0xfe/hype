@@ -45,6 +45,9 @@ impl Server {
                 }
                 Ok(n) => {
                     parser.parse_buf(&buf[..n]).unwrap();
+
+                    // Clients may leave the connection open, so check to see if we've
+                    // got a full request in. (Otherwise, we just block.)
                     if parser.is_complete() {
                         parser.parse_eof().unwrap();
                         break;
