@@ -25,25 +25,41 @@ impl File {
     async fn write_response<'b>(
         w: &mut dyn AsyncStream,
         status: status::Code<'b>,
+        content_type: String,
         body: String,
     ) -> io::Result<()> {
         let mut response = Response::new(status::from(status));
-        response.set_header("Content-Type".into(), "text/html".into());
+        response.set_header("Content-Type".into(), content_type);
 
         w.write_all(response.set_body(body).serialize().as_bytes())
             .await
     }
 
-    async fn write_dir(w: &mut dyn AsyncStream, path: String) -> Result<(), ()> {
-        let mut files = fs::read_dir(path).await.or(Err(()))?;
+    async fn write_dir(
+        w: &mut dyn AsyncStream,
+        abs_path: String,
+        base_path: &String,
+    ) -> Result<(), ()> {
+        let mut files = fs::read_dir(&abs_path).await.or(Err(()))?;
 
         let mut body = String::from("<ul>\n");
 
         loop {
             let entry = files.next_entry().await.or(Err(()))?;
 
-            if let Some(entry) = entry {
-                let output = format!("  <li>{}</li>\n", &entry.file_name().to_string_lossy());
+            if let Some(entry) = &entry {
+                let file_name = entry.file_name();
+                let file_name = file_name.to_string_lossy();
+                let output = format!(
+                    "  <li><a href='{}/{}'>{}</a></li>\n",
+                    Path::new(&abs_path.as_str())
+                        .strip_prefix(base_path.as_str())
+                        .unwrap_or(Path::new(&abs_path.as_str()))
+                        .to_str()
+                        .unwrap_or(abs_path.as_str()),
+                    file_name,
+                    file_name
+                );
                 body = body + &output;
             } else {
                 body = body + "<ul>\n";
@@ -51,13 +67,15 @@ impl File {
             }
         }
 
-        File::write_response(w, status::OK, body).await.or(Err(()))
+        File::write_response(w, status::OK, "text/html".into(), body)
+            .await
+            .or(Err(()))
     }
 
     async fn write_file_contents(w: &mut dyn AsyncStream, path: String) -> Result<(), ()> {
         let contents = fs::read_to_string(path).await.or(Err(()))?;
 
-        File::write_response(w, status::OK, contents)
+        File::write_response(w, status::OK, "text/plain".into(), contents)
             .await
             .or(Err(()))
     }
@@ -81,7 +99,7 @@ impl File {
 
         let path = String::from(path);
         if metadata.is_dir() {
-            File::write_dir(w, path)
+            File::write_dir(w, path, &self.path)
                 .await
                 .or(Err(handler::Error::Failed(
                     "could not list directory".into(),
@@ -102,11 +120,16 @@ impl Handler for File {
         let result = self.handle_path(w, String::from(r.path())).await;
 
         if let Err(err) = &result {
-            File::write_response(w, status::NOT_FOUND, format!("404 NOT FOUND - {:?}", err))
-                .await
-                .or(Err(handler::Error::Failed(
-                    "could not write to stream".into(),
-                )))?;
+            File::write_response(
+                w,
+                status::NOT_FOUND,
+                "text/plain".into(),
+                format!("404 NOT FOUND - {:?}", err),
+            )
+            .await
+            .or(Err(handler::Error::Failed(
+                "could not write to stream".into(),
+            )))?;
 
             return result;
         }
