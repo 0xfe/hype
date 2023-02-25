@@ -60,12 +60,12 @@ $ cargo test -- --nocapture
 
 ## TODO
 
--   serve files
+-   set content type based on file name
 -   end-to-end tests with reqwest
--   more unit tests
 -   json handling (is it needed ??) -- serde_json
 -   API to set cookies in response
 -   templating engine with https://crates.io/crates/tera
+-   CGI interface
 
 ### Done
 
@@ -73,3 +73,5 @@ $ cargo test -- --nocapture
 -   URL parsing (use `url` crate) -- https://docs.rs/url/latest/url/
 -   API for URL parameters
 -   API to get form POST parameters
+-   serve files
+-   more unit tests

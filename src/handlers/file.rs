@@ -1,4 +1,4 @@
-use std::path::Path;
+use std::{collections::HashMap, ffi::OsStr, path::Path};
 
 use async_trait::async_trait;
 use tokio::{
@@ -15,11 +15,24 @@ use crate::{
 
 pub struct File {
     path: String,
+    content_types: HashMap<&'static str, &'static str>,
 }
 
 impl File {
     pub fn new(path: String) -> File {
-        File { path }
+        File {
+            path,
+            content_types: [
+                ("html", "text/html"),
+                ("htm", "text/html"),
+                ("txt", "text/plain"),
+                ("png", "image/png"),
+                ("jpg", "image/jpeg"),
+                ("jpeg", "image/jpeg"),
+            ]
+            .into_iter()
+            .collect(),
+        }
     }
 
     async fn write_response<'b>(
@@ -72,12 +85,27 @@ impl File {
             .or(Err(()))
     }
 
-    async fn write_file_contents(w: &mut dyn AsyncStream, path: String) -> Result<(), ()> {
-        let contents = fs::read_to_string(path).await.or(Err(()))?;
+    async fn write_file_contents(
+        w: &mut dyn AsyncStream,
+        path: String,
+        content_types: &HashMap<&str, &str>,
+    ) -> Result<(), ()> {
+        let contents = fs::read_to_string(&path).await.or(Err(()))?;
 
-        File::write_response(w, status::OK, "text/plain".into(), contents)
-            .await
-            .or(Err(()))
+        let ext = Path::new(&path)
+            .extension()
+            .unwrap_or(&OsStr::new("txt"))
+            .to_str()
+            .unwrap();
+
+        File::write_response(
+            w,
+            status::OK,
+            content_types.get(ext).unwrap_or(&"txt").to_string(),
+            contents,
+        )
+        .await
+        .or(Err(()))
     }
 
     async fn handle_path(
@@ -105,7 +133,7 @@ impl File {
                     "could not list directory".into(),
                 )))?;
         } else {
-            File::write_file_contents(w, path)
+            File::write_file_contents(w, path, &self.content_types)
                 .await
                 .or(Err(handler::Error::Failed("could not open file".into())))?;
         }
