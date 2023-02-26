@@ -129,10 +129,6 @@ impl Request {
 
     pub fn path(&self) -> String {
         if let Some(handler_path) = &self.handler_path {
-            info!(
-                "PATH: {} HANDLER PATH: {handler_path}",
-                self.url.as_ref().unwrap().path()
-            );
             return self
                 .url
                 .as_ref()

@@ -18,14 +18,14 @@ use crate::{
 };
 
 pub struct File {
-    path: String,
+    base_fs_path: String,
     content_types: HashMap<&'static str, &'static str>,
 }
 
 impl File {
-    pub fn new(path: String) -> File {
+    pub fn new(base_fs_path: String) -> File {
         File {
-            path,
+            base_fs_path,
             content_types: [
                 ("html", "text/html"),
                 ("htm", "text/html"),
@@ -58,10 +58,6 @@ impl File {
         base_fs_path: &String,
         handler_path: &String,
     ) -> Result<(), ()> {
-        info!(
-            "FS PATH: {} BASE_FS_PATH: {} HANDLER_PATH: {}",
-            &fs_path, &base_fs_path, &handler_path
-        );
         let mut files = fs::read_dir(&fs_path).await.or(Err(()))?;
 
         let mut body = String::from("<ul>\n");
@@ -124,23 +120,25 @@ impl File {
         r: &Request,
         w: &mut dyn AsyncStream,
     ) -> Result<(), handler::Error> {
-        let mut path = PathBuf::new();
-        path.push(self.path.as_str());
+        let mut abs_fs_path = PathBuf::new();
+        abs_fs_path.push(self.base_fs_path.as_str());
+
         if !r.path().is_empty() {
-            path.push(&r.path()[1..]);
+            abs_fs_path.push(&r.path()[1..]);
         }
 
-        let path = path.to_str().ok_or(handler::Error::Failed(
+        let abs_fs_path = abs_fs_path.to_str().ok_or(handler::Error::Failed(
             "could not parse request path".into(),
         ))?;
 
-        info!("Serving file: {}", path);
-        let metadata = fs::metadata(path).await.or(Err(handler::Error::Failed(
-            "could not fetch file metadata".to_string(),
-        )))?;
+        info!("Serving path: {}", abs_fs_path);
+        let metadata = fs::metadata(abs_fs_path)
+            .await
+            .or(Err(handler::Error::Failed(
+                "could not fetch file metadata".to_string(),
+            )))?;
 
-        let path = String::from(path);
-
+        let abs_fs_path = String::from(abs_fs_path);
         let default_path = String::new();
         let handler_path = r.handler_path.as_ref().unwrap_or(&default_path);
         let handler_path = handler_path
@@ -149,13 +147,13 @@ impl File {
             .to_string();
 
         if metadata.is_dir() {
-            File::write_dir(w, path, &self.path, &handler_path)
+            File::write_dir(w, abs_fs_path, &self.base_fs_path, &handler_path)
                 .await
                 .or(Err(handler::Error::Failed(
                     "could not list directory".into(),
                 )))?;
         } else {
-            File::write_file_contents(w, path, &self.content_types)
+            File::write_file_contents(w, abs_fs_path, &self.content_types)
                 .await
                 .or(Err(handler::Error::Failed("could not open file".into())))?;
         }

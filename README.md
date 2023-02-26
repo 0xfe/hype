@@ -60,21 +60,19 @@ $ cargo test -- --nocapture
 
 ## TODO
 
--   Routing
+-   API to set cookies in response header -- you can have multiple setcookie headers!
+-   API to fetch cookies from request header
+-   CookieJar API
+-   json handling (is it needed ??) -- serde_json
+-   templating engine with https://crates.io/crates/tera
+-   CGI interface
 
-    -   path
-    -   param capture
-    -   match path components: `/files/*, /pages/*/admin, /files, /files/foo`
-
-*   API: mount() path, route() within path
-*   API to set cookies in response
-*   end-to-end tests with reqwest
-*   json handling (is it needed ??) -- serde_json
-*   templating engine with https://crates.io/crates/tera
-*   CGI interface
+-   Housekeeping
+-   end-to-end tests with reqwest
 
 ### Done
 
+-   Routing: match path components: `/files/*, /pages/*/admin, /files, /files/foo`
 -   set content type based on file extension
 -   implement handler abstraction
 -   URL parsing (use `url` crate) -- https://docs.rs/url/latest/url/
