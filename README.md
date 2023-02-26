@@ -60,7 +60,7 @@ $ cargo test -- --nocapture
 
 ## TODO
 
--   API to set cookies in response header -- you can have multiple setcookie headers!
+-   Implement Cookie::from(...) to parse from string
 -   API to fetch cookies from request header
 -   CookieJar API
 -   json handling (is it needed ??) -- serde_json
@@ -72,6 +72,7 @@ $ cargo test -- --nocapture
 
 ### Done
 
+-   API to set cookies in response header -- you can have multiple setcookie headers!
 -   Routing: match path components: `/files/*, /pages/*/admin, /files, /files/foo`
 -   set content type based on file extension
 -   implement handler abstraction

@@ -1,5 +1,6 @@
 use chrono::{DateTime, Utc};
 
+#[derive(Debug)]
 pub enum Flag {
     Domain(String),
     Expires(DateTime<Utc>),
@@ -12,6 +13,7 @@ pub enum Flag {
     SameSiteNone,
 }
 
+#[derive(Debug)]
 pub struct Cookie {
     name: String,
     value: String,
@@ -27,12 +29,13 @@ impl Cookie {
         }
     }
 
-    pub fn push_flag(&mut self, flag: Flag) {
+    pub fn push_flag(&mut self, flag: Flag) -> &mut Self {
         self.flags.push(flag);
+        self
     }
 
     pub fn serialize(&self) -> Result<String, ()> {
-        let mut buf = String::new();
+        let mut buf = String::from("Set-Cookie: ");
         buf.push_str(&self.name);
         buf.push('=');
         buf.push_str(&self.value);
@@ -75,7 +78,7 @@ mod tests {
         cookie.push_flag(Flag::Secure);
         assert_eq!(
             cookie.serialize(),
-            Ok("ID=mo; Domain=mo.town; Secure".into())
+            Ok("Set-Cookie: ID=mo; Domain=mo.town; Secure".into())
         )
     }
 }

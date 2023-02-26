@@ -1,11 +1,12 @@
 use std::collections::HashMap;
 
-use crate::status;
+use crate::{cookie::Cookie, status};
 
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct Response {
     pub status: status::Status,
     pub headers: HashMap<String, String>,
+    pub cookies: Vec<Cookie>,
     pub body: String,
 }
 
@@ -50,6 +51,7 @@ impl Response {
         Ok(Response {
             status,
             headers,
+            cookies: vec![],
             body: String::new(),
         })
     }
@@ -58,6 +60,7 @@ impl Response {
         Response {
             status,
             headers: HashMap::new(),
+            cookies: vec![],
             body: String::new(),
         }
     }
@@ -77,6 +80,11 @@ impl Response {
         self
     }
 
+    pub fn push_cookie(&mut self, cookie: Cookie) -> &mut Self {
+        self.cookies.push(cookie);
+        self
+    }
+
     pub fn serialize(&mut self) -> String {
         let status_line = format!("HTTP/1.1 {} {}", self.status.code, self.status.text);
         let length = self.body.len();
@@ -91,6 +99,16 @@ impl Response {
             .collect::<Vec<String>>()
             .join("\r\n");
 
-        format!("{status_line}\r\n{headers}\r\n\r\n{}", self.body)
+        let cookie_headers: String = self
+            .cookies
+            .iter()
+            .map(|c| c.serialize().unwrap())
+            .collect::<Vec<String>>()
+            .join("\r\n");
+
+        format!(
+            "{status_line}\r\n{headers}\r\n{cookie_headers}\r\n\r\n{}",
+            self.body
+        )
     }
 }
