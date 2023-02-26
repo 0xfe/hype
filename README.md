@@ -60,15 +60,22 @@ $ cargo test -- --nocapture
 
 ## TODO
 
--   set content type based on file name
--   end-to-end tests with reqwest
--   json handling (is it needed ??) -- serde_json
--   API to set cookies in response
--   templating engine with https://crates.io/crates/tera
--   CGI interface
+-   Routing
+
+    -   path
+    -   param capture
+    -   match path components: `/files/*, /pages/*/admin, /files, /files/foo`
+
+*   API: mount() path, route() within path
+*   API to set cookies in response
+*   end-to-end tests with reqwest
+*   json handling (is it needed ??) -- serde_json
+*   templating engine with https://crates.io/crates/tera
+*   CGI interface
 
 ### Done
 
+-   set content type based on file extension
 -   implement handler abstraction
 -   URL parsing (use `url` crate) -- https://docs.rs/url/latest/url/
 -   API for URL parameters

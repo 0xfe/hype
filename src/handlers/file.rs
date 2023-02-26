@@ -1,4 +1,8 @@
-use std::{collections::HashMap, ffi::OsStr, path::Path};
+use std::{
+    collections::HashMap,
+    ffi::OsStr,
+    path::{Path, PathBuf},
+};
 
 use async_trait::async_trait;
 use tokio::{
@@ -50,10 +54,15 @@ impl File {
 
     async fn write_dir(
         w: &mut dyn AsyncStream,
-        abs_path: String,
-        base_path: &String,
+        fs_path: String,
+        base_fs_path: &String,
+        handler_path: &String,
     ) -> Result<(), ()> {
-        let mut files = fs::read_dir(&abs_path).await.or(Err(()))?;
+        info!(
+            "FS PATH: {} BASE_FS_PATH: {} HANDLER_PATH: {}",
+            &fs_path, &base_fs_path, &handler_path
+        );
+        let mut files = fs::read_dir(&fs_path).await.or(Err(()))?;
 
         let mut body = String::from("<ul>\n");
 
@@ -63,14 +72,16 @@ impl File {
             if let Some(entry) = &entry {
                 let file_name = entry.file_name();
                 let file_name = file_name.to_string_lossy();
+
+                let mut pathbuf = PathBuf::new();
+                pathbuf.push("/");
+                pathbuf.push(handler_path);
+                pathbuf.push(&fs_path.strip_prefix(base_fs_path).unwrap().to_string());
+                pathbuf.push(file_name.to_string());
+
                 let output = format!(
-                    "  <li><a href='{}/{}'>{}</a></li>\n",
-                    Path::new(&abs_path.as_str())
-                        .strip_prefix(base_path.as_str())
-                        .unwrap_or(Path::new(&abs_path.as_str()))
-                        .to_str()
-                        .unwrap_or(abs_path.as_str()),
-                    file_name,
+                    "  <li><a href='{}'>{}</a></li>\n",
+                    pathbuf.as_os_str().to_str().unwrap(),
                     file_name
                 );
                 body = body + &output;
@@ -110,10 +121,15 @@ impl File {
 
     async fn handle_path(
         &self,
+        r: &Request,
         w: &mut dyn AsyncStream,
-        path: String,
     ) -> Result<(), handler::Error> {
-        let path = Path::new(self.path.as_str()).join(&path[1..]);
+        let mut path = PathBuf::new();
+        path.push(self.path.as_str());
+        if !r.path().is_empty() {
+            path.push(&r.path()[1..]);
+        }
+
         let path = path.to_str().ok_or(handler::Error::Failed(
             "could not parse request path".into(),
         ))?;
@@ -123,11 +139,17 @@ impl File {
             "could not fetch file metadata".to_string(),
         )))?;
 
-        info!("Metadata: {:?}", metadata);
-
         let path = String::from(path);
+
+        let default_path = String::new();
+        let handler_path = r.handler_path.as_ref().unwrap_or(&default_path);
+        let handler_path = handler_path
+            .strip_prefix('/')
+            .unwrap_or(&handler_path)
+            .to_string();
+
         if metadata.is_dir() {
-            File::write_dir(w, path, &self.path)
+            File::write_dir(w, path, &self.path, &handler_path)
                 .await
                 .or(Err(handler::Error::Failed(
                     "could not list directory".into(),
@@ -145,7 +167,7 @@ impl File {
 #[async_trait]
 impl Handler for File {
     async fn handle(&self, r: &Request, w: &mut dyn AsyncStream) -> Result<(), handler::Error> {
-        let result = self.handle_path(w, String::from(r.path())).await;
+        let result = self.handle_path(r, w).await;
 
         if let Err(err) = &result {
             File::write_response(

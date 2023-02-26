@@ -58,6 +58,7 @@ pub enum ParseError {
 #[derive(Debug, Clone)]
 pub struct Request {
     method: Method,
+    pub handler_path: Option<String>,
     pub base_url: String,
     pub url: Option<Url>,
     pub version: String,
@@ -69,12 +70,17 @@ impl Request {
     pub fn new(base_url: String) -> Self {
         Request {
             base_url,
+            handler_path: None,
             url: None,
             method: Method::GET,
             version: String::new(),
             headers: HashMap::new(),
             body: String::new(),
         }
+    }
+
+    pub fn set_handler_path(&mut self, handler: String) {
+        self.handler_path = Some(handler);
     }
 
     pub fn from(buf: String, base_url: String) -> Result<Self, String> {
@@ -117,8 +123,27 @@ impl Request {
         None
     }
 
-    pub fn path(&self) -> &str {
-        return self.url.as_ref().unwrap().path();
+    pub fn abs_path(&self) -> String {
+        return self.url.as_ref().unwrap().path().to_string();
+    }
+
+    pub fn path(&self) -> String {
+        if let Some(handler_path) = &self.handler_path {
+            info!(
+                "PATH: {} HANDLER PATH: {handler_path}",
+                self.url.as_ref().unwrap().path()
+            );
+            return self
+                .url
+                .as_ref()
+                .unwrap()
+                .path()
+                .strip_prefix(handler_path.as_str())
+                .expect("can't strip handler path")
+                .to_string();
+        } else {
+            return self.abs_path();
+        }
     }
 
     pub fn method(&self) -> Method {

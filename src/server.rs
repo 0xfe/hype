@@ -6,9 +6,9 @@ use tokio::{
     sync::RwLock,
 };
 
-use crate::{handler::Handler, request::Parser, response::Response, status};
+use crate::{handler::Handler, request::Parser, response::Response, router::Matcher, status};
 
-use std::{collections::HashMap, sync::Arc};
+use std::sync::Arc;
 
 #[allow(dead_code)]
 #[derive(Debug)]
@@ -21,7 +21,7 @@ pub struct Server {
     address: String,
     port: u16,
     base_url: String,
-    handlers: Arc<RwLock<HashMap<String, Box<dyn Handler>>>>,
+    handlers: Arc<RwLock<Vec<(Matcher, Box<dyn Handler>)>>>,
     default_handler: Option<Arc<Box<dyn Handler>>>,
 }
 
@@ -29,7 +29,7 @@ impl Server {
     async fn process_stream(
         mut stream: TcpStream,
         base_url: String,
-        handlers: Arc<RwLock<HashMap<String, Box<dyn Handler>>>>,
+        handlers: Arc<RwLock<Vec<(Matcher, Box<dyn Handler>)>>>,
         default_handler: Option<Arc<Box<dyn Handler>>>,
     ) {
         info!("Connection received from {:?}", stream.peer_addr().unwrap());
@@ -60,7 +60,7 @@ impl Server {
             }
         }
 
-        let request = parser.get_request();
+        let mut request = parser.get_request();
         debug!("Request: {:?}", request);
 
         let mut path = String::from("/__bad_path__");
@@ -68,21 +68,29 @@ impl Server {
             path = url.path().into()
         }
 
-        if let Some(handler) = handlers.read().await.get(&path) {
-            if let Err(error) = handler.handle(&request, &mut stream).await {
-                error!("Error from handler {:?}: {:?}", handler, error);
+        for handler in handlers.read().await.iter() {
+            if let Some(matched_path) = handler.0.matches(&path) {
+                request.set_handler_path(String::from(matched_path.to_string_lossy()));
+                if let Err(error) = handler.1.handle(&request, &mut stream).await {
+                    error!("Error from handler {:?}: {:?}", handler, error);
+                }
+                return;
             }
-        } else if let Some(handler) = default_handler {
-            if let Err(error) = handler.handle(&request, &mut stream).await {
-                error!("Error from handler {:?}: {:?}", handler, error);
-            }
-        } else {
-            let mut response = Response::new(status::from(status::NOT_FOUND));
-            response.set_header("Content-Type".into(), "text/plain".into());
-            response.set_body("Hype: no route handlers installed.".into());
-            let buf = response.serialize();
-            stream.write_all(buf.as_bytes()).await.unwrap();
         }
+
+        if let Some(handler) = default_handler {
+            if let Err(error) = handler.handle(&request, &mut stream).await {
+                error!("Error from handler {:?}: {:?}", handler, error);
+            }
+            return;
+        }
+
+        // Fell through here, no handlers match
+        let mut response = Response::new(status::from(status::NOT_FOUND));
+        response.set_header("Content-Type".into(), "text/plain".into());
+        response.set_body("Hype: no route handlers installed.".into());
+        let buf = response.serialize();
+        stream.write_all(buf.as_bytes()).await.unwrap();
     }
 
     pub fn new(address: String, port: u16) -> Self {
@@ -91,7 +99,7 @@ impl Server {
         Self {
             address,
             port,
-            handlers: Arc::new(RwLock::new(HashMap::new())),
+            handlers: Arc::new(RwLock::new(Vec::new())),
             default_handler: None,
             base_url,
         }
@@ -103,7 +111,7 @@ impl Server {
 
     pub async fn route(&self, path: String, handler: Box<dyn Handler>) {
         let mut handlers = self.handlers.write().await;
-        handlers.insert(path, handler);
+        handlers.push((Matcher::new(&path), handler));
     }
 
     pub async fn start(&self) -> Result<(), ()> {

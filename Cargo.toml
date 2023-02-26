@@ -22,9 +22,9 @@ path = "src/bin/fileserver.rs"
 [dependencies]
 tokio = { version = "1", features = ["full"] }
 lazy_static = "1.4"
-log = "0.4.0"
+log = "0.4"
 env_logger = "0.10"
 async-trait = "0.1"
 url = "2.3"
-futures = "0.3"
+regex = "1"
 
