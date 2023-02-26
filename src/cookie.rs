@@ -1,6 +1,6 @@
 use chrono::{DateTime, Utc};
 
-pub enum Flags {
+pub enum Flag {
     Domain(String),
     Expires(DateTime<Utc>),
     MaxAge(u32),
@@ -15,7 +15,7 @@ pub enum Flags {
 pub struct Cookie {
     name: String,
     value: String,
-    flags: Vec<Flags>,
+    flags: Vec<Flag>,
 }
 
 impl Cookie {
@@ -25,6 +25,10 @@ impl Cookie {
             value: value.into(),
             flags: vec![],
         }
+    }
+
+    pub fn push_flag(&mut self, flag: Flag) {
+        self.flags.push(flag);
     }
 
     pub fn serialize(&self) -> Result<String, ()> {
@@ -37,15 +41,15 @@ impl Cookie {
 
         for flag in &self.flags {
             match flag {
-                Flags::Domain(domain) => flagvec.push(format!("Domain={}", domain)),
-                Flags::Expires(dt) => flagvec.push(format!("Expires={}", dt.to_string())),
-                Flags::MaxAge(seconds) => flagvec.push(format!("Max-Age={}", seconds)),
-                Flags::HttpOnly => flagvec.push("HttpOnly".into()),
-                Flags::Partitioned => flagvec.push("Partitioned".into()),
-                Flags::Secure => flagvec.push("Secure".into()),
-                Flags::SameSiteStrict => flagvec.push("SameSite=Strict".into()),
-                Flags::SameSiteLax => flagvec.push("SameSite=Lax".into()),
-                Flags::SameSiteNone => flagvec.push("SameSite=None".into()),
+                Flag::Domain(domain) => flagvec.push(format!("Domain={}", domain)),
+                Flag::Expires(dt) => flagvec.push(format!("Expires={}", dt.to_string())),
+                Flag::MaxAge(seconds) => flagvec.push(format!("Max-Age={}", seconds)),
+                Flag::HttpOnly => flagvec.push("HttpOnly".into()),
+                Flag::Partitioned => flagvec.push("Partitioned".into()),
+                Flag::Secure => flagvec.push("Secure".into()),
+                Flag::SameSiteStrict => flagvec.push("SameSite=Strict".into()),
+                Flag::SameSiteLax => flagvec.push("SameSite=Lax".into()),
+                Flag::SameSiteNone => flagvec.push("SameSite=None".into()),
             }
         }
 
@@ -56,6 +60,22 @@ impl Cookie {
             buf.push_str(&flagbuf);
         }
 
-        Ok(flagbuf)
+        Ok(buf)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn it_works() {
+        let mut cookie = Cookie::new("ID", "mo");
+        cookie.push_flag(Flag::Domain("mo.town".into()));
+        cookie.push_flag(Flag::Secure);
+        assert_eq!(
+            cookie.serialize(),
+            Ok("ID=mo; Domain=mo.town; Secure".into())
+        )
     }
 }
