@@ -80,7 +80,7 @@ impl Response {
         self
     }
 
-    pub fn push_cookie(&mut self, cookie: Cookie) -> &mut Self {
+    pub fn set_cookie(&mut self, cookie: Cookie) -> &mut Self {
         self.cookies.push(cookie);
         self
     }

@@ -60,7 +60,8 @@ $ cargo test -- --nocapture
 
 ## TODO
 
--   Implement Cookie::from(...) to parse from string
+-   Implement Cookie::try_from(...) to parse from string
+-   Implement TryFrom trait for request and cookie
 -   API to fetch cookies from request header
 -   CookieJar API
 -   json handling (is it needed ??) -- serde_json

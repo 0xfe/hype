@@ -3,16 +3,17 @@ use hype::response::*;
 use hype::status;
 
 #[test]
-fn it_works() {
-    let mut response = Response::new(status::from(status::OK));
-    println!("{}", response.serialize())
-}
-
-#[test]
 fn it_works_with_body() {
     let mut response = Response::new(status::from(status::OK));
     response.set_body("<HTML><b>Hello world!</b></HTML>".into());
-    println!("{}", response.serialize())
+    assert_eq!(
+        response.serialize(),
+        "HTTP/1.1 200 OK\r
+Content-Length: 32\r
+\r
+\r
+<HTML><b>Hello world!</b></HTML>"
+    );
 }
 
 #[test]
@@ -24,7 +25,18 @@ fn it_works_with_cookies() {
     cookie.push_flag(hype::cookie::Flag::Secure);
     cookie.push_flag(hype::cookie::Flag::Domain("mo.town".into()));
 
-    response.push_cookie(cookie);
-    response.push_cookie(Cookie::new("SID", "foobar"));
-    println!("{}", response.serialize())
+    response.set_cookie(cookie);
+    response.set_cookie(Cookie::new("SID", "foobar"));
+
+    /*
+        assert_eq!(
+            response.serialize(),
+            "HTTP/1.1 200 OK\r
+    Content-Length: 32\r
+    Set-Cookie: ID=mo; Secure; Domain=mo.town\r
+    Set-Cookie: SID=foobar\r
+    \r
+    <HTML><b>Hello world!</b></HTML>"
+        );
+        */
 }
