@@ -11,7 +11,6 @@ fn it_works_with_body() {
         "HTTP/1.1 200 OK\r
 Content-Length: 32\r
 \r
-\r
 <HTML><b>Hello world!</b></HTML>"
     );
 }

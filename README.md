@@ -60,8 +60,8 @@ $ cargo test -- --nocapture
 
 ## TODO
 
--   API to fetch cookies from request header
--   CookieJar API
+-   Match Host headers, bad request (400) if multiple headers
+-   Transfer-Encoding: chunked, gzip (note Content-Encoding and Accept-Encoding too)
 -   json handling (is it needed ??) -- serde_json
 -   templating engine with https://crates.io/crates/tera
 -   CGI interface
@@ -71,6 +71,7 @@ $ cargo test -- --nocapture
 
 ### Done
 
+-   API to fetch cookies from request header
 -   Implement Cookie::try_from(...) to parse from string
 -   Implement TryFrom trait for request and cookie
 -   API to set cookies in response header -- you can have multiple setcookie headers!

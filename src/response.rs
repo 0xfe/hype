@@ -106,9 +106,13 @@ impl Response {
             .collect::<Vec<String>>()
             .join("\r\n");
 
-        format!(
-            "{status_line}\r\n{headers}\r\n{cookie_headers}\r\n\r\n{}",
+        let buf = format!(
+            "{status_line}\r\n{headers}\r\n{cookie_headers}\r\n{}",
             self.body
-        )
+        );
+
+        debug!("Serializing to:\n{}", buf);
+
+        buf
     }
 }

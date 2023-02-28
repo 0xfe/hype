@@ -30,9 +30,11 @@ impl File {
                 ("html", "text/html"),
                 ("htm", "text/html"),
                 ("txt", "text/plain"),
+                ("js", "text/javascript"),
                 ("png", "image/png"),
                 ("jpg", "image/jpeg"),
                 ("jpeg", "image/jpeg"),
+                ("svg", "image/svg+xml"),
             ]
             .into_iter()
             .collect(),
