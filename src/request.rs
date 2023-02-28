@@ -123,6 +123,23 @@ impl Request {
         None
     }
 
+    pub fn cookies(&self) -> Option<HashMap<&str, &str>> {
+        if let Some(cookies) = self.headers.get("Cookie") {
+            let cookies: Vec<&str> = cookies.split(';').map(|c| c.trim()).collect();
+
+            let mut map: HashMap<&str, &str> = HashMap::new();
+
+            cookies.iter().for_each(|c| {
+                let parts = c.split('=').map(|c| c.trim()).collect::<Vec<&str>>();
+                map.insert(parts[0], parts[1]);
+            });
+
+            return Some(map);
+        }
+
+        None
+    }
+
     pub fn abs_path(&self) -> String {
         return self.url.as_ref().unwrap().path().to_string();
     }

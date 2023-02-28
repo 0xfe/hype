@@ -122,3 +122,22 @@ Content-Type: application/x-www-form-urlencoded"##;
     assert_eq!(query_params.get("user").unwrap(), &"foo".to_string());
     assert_eq!(query_params.get("action").unwrap(), &"delete".to_string());
 }
+
+#[test]
+fn cookies() {
+    let r = r##"GET /admin?user=foo&action=delete HTTP/1.1
+Host: localhost:4000
+Cookie: ID=mo; foo=bar; domain=boo.com
+Content-Type: application/x-www-form-urlencoded"##;
+
+    let request = assert_parse_ok(r);
+    assert!(request.is_some());
+
+    let request = request.unwrap();
+    let cookies = request.cookies();
+    assert!(cookies.is_some());
+
+    let cookies = cookies.unwrap();
+    assert_eq!(cookies.get("ID").unwrap(), &"mo");
+    assert_eq!(cookies.get("foo").unwrap(), &"bar");
+}

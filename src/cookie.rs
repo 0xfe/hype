@@ -26,6 +26,7 @@ impl TryFrom<&str> for Cookie {
     type Error = String;
 
     fn try_from(buf: &str) -> Result<Self, Self::Error> {
+        // Separate Cookie: or Set-Cookie: from request/response header
         let kv: Vec<&str> = buf.split(':').collect();
         if kv.len() != 2 {
             return Err(String::from("could not parse header fields"));
@@ -45,23 +46,23 @@ impl TryFrom<&str> for Cookie {
 
         if parts.len() > 1 {
             for part in &parts[1..] {
-                match part {
-                    &"Secure" => {
+                match part.to_lowercase().as_str() {
+                    "secure" => {
                         cookie.push_flag(Flag::Secure);
                     }
-                    &"HttpOnly" => {
+                    "httponly" => {
                         cookie.push_flag(Flag::HttpOnly);
                     }
-                    &"Partitioned" => {
+                    "partitioned" => {
                         cookie.push_flag(Flag::Partitioned);
                     }
-                    &"SameSite=Strict" => {
+                    "samesite=strict" => {
                         cookie.push_flag(Flag::SameSiteStrict);
                     }
-                    &"SameSite=Lax" => {
+                    "samesite=lax" => {
                         cookie.push_flag(Flag::SameSiteLax);
                     }
-                    &"SameSite=None" => {
+                    "samesite=none" => {
                         cookie.push_flag(Flag::SameSiteNone);
                     }
                     _ => {
@@ -70,17 +71,17 @@ impl TryFrom<&str> for Cookie {
                             return Err(format!("could not parse attribute: {}", part));
                         }
 
-                        match attrs[0] {
-                            "Domain" => {
+                        match attrs[0].to_lowercase().as_str() {
+                            "domain" => {
                                 cookie.push_flag(Flag::Domain(attrs[1].into()));
                             }
-                            "Expires" => {
+                            "expires" => {
                                 let date = DateTime::parse_from_rfc2822(attrs[1])
                                     .or(Err("could not parse cookie expiry"))?;
 
                                 cookie.push_flag(Flag::Expires(date.with_timezone::<Utc>(&Utc)));
                             }
-                            "Max-Age" => {
+                            "max-age" => {
                                 cookie.push_flag(Flag::MaxAge(
                                     str::parse::<u32>(attrs[1]).unwrap_or(0 as u32),
                                 ));
