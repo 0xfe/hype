@@ -10,6 +10,7 @@ use hype::{
     handler::{self, AsyncStream, Handler},
     request::Request,
     response::Response,
+    server::Server,
     status,
 };
 
@@ -43,15 +44,13 @@ async fn main() {
     }
 
     let input = fs::read_to_string(&args[1]).unwrap();
-    let config = Config::from_str(input);
+    let config = Config::from_str(input).expect("bad configuration file");
 
     info!("Starting hype...");
     info!("config: {:?}", config);
 
-    /*
-    let mut server = Server::new("127.0.0.1".into(), 4000);
+    let mut server = Server::new(config.server.listen_ip, config.server.port);
     server.route_default(Box::new(MyHandler {}));
 
     server.start().await.unwrap();
-    */
 }

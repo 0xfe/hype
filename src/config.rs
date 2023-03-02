@@ -29,7 +29,7 @@ pub enum LogLevel {
 #[derive(Debug)]
 pub struct Server {
     pub listen_ip: String,
-    pub port: u32,
+    pub port: u16,
     pub log_level: LogLevel,
 }
 
@@ -67,7 +67,7 @@ impl Config {
                 }
 
                 if let Some(port) = s.get("port") {
-                    config.server.port = port.as_u64().unwrap_or(0) as u32;
+                    config.server.port = port.as_u64().unwrap_or(0) as u16;
                 }
 
                 if let Some(log_level) = s.get("log_level") {
