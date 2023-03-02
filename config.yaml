@@ -1,3 +1,7 @@
+server:
+    - listen_ip: 127.0.0.1
+    - port: 4000
+    - log_level: INFO
 routes:
     - location: /emdr
       handler: file
