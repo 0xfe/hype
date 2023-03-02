@@ -1,0 +1,7 @@
+routes:
+    - location: /emdr
+      handler: file
+      fs_path: /home/mmuthanna/git/experiments/emdr
+    - location: /hype
+      handler: file
+      fs_path: /home/mmuthanna/git/hype

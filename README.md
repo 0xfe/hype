@@ -60,10 +60,13 @@ $ cargo test -- --nocapture
 
 ## TODO
 
--   Match Host headers, bad request (400) if multiple headers
+-   Config file like lighttpd -- keep it simple, reverse proxy support
+-   Use templating + #include to make file browser look better
+    -   templating engine with https://crates.io/crates/tera
 -   Transfer-Encoding: chunked, gzip (note Content-Encoding and Accept-Encoding too)
+-   Match Host headers, bad request (400) if multiple headers
+-   TLS support
 -   json handling (is it needed ??) -- serde_json
--   templating engine with https://crates.io/crates/tera
 -   CGI interface
 
 -   Housekeeping
