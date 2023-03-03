@@ -1,3 +1,5 @@
+use std::{error, fmt};
+
 use serde::Deserialize;
 use serde_yaml::{Deserializer, Value};
 
@@ -45,8 +47,27 @@ pub struct Config {
     pub routes: Vec<Route>,
 }
 
+#[derive(Debug, Clone)]
+pub enum ConfigError {
+    MissingField(String),
+    MalformedField(String),
+}
+
+impl fmt::Display for ConfigError {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        let e = match self {
+            Self::MissingField(field) => format!("missing field: {}", field),
+            Self::MalformedField(field) => format!("malformed field: {}", field),
+        };
+
+        write!(f, "ConfigError: {}", e)
+    }
+}
+
+impl error::Error for ConfigError {}
+
 impl Config {
-    pub fn from_str(config_str: impl AsRef<str>) -> Result<Self, String> {
+    pub fn from_str(config_str: impl AsRef<str>) -> Result<Self, ConfigError> {
         let mut config = Config {
             routes: vec![],
             server: Server {
@@ -61,20 +82,26 @@ impl Config {
 
             let server = value
                 .get("server")
-                .ok_or("missing server section".to_string())?;
+                .ok_or(ConfigError::MissingField("server".into()))?;
 
-            if !server.is_sequence() {
-                return Err("malformed server section".to_string());
-            }
+            let server_seq = server
+                .as_sequence()
+                .ok_or(ConfigError::MalformedField("server".into()))?;
 
-            for s in server.as_sequence().unwrap() {
-                if let Some(listen_ip) = s.get("listen_ip") {
-                    config.server.listen_ip = listen_ip.as_str().unwrap_or("".into()).into();
-                }
+            for s in server_seq {
+                config.server.listen_ip = s
+                    .get("listen_ip")
+                    .ok_or(ConfigError::MissingField("listen_ip".to_string()))?
+                    .as_str()
+                    .ok_or(ConfigError::MalformedField("listen_ip".to_string()))?
+                    .into();
 
-                if let Some(port) = s.get("port") {
-                    config.server.port = port.as_u64().unwrap_or(0) as u16;
-                }
+                config.server.port = s
+                    .get("port")
+                    .ok_or(ConfigError::MissingField("port".to_string()))?
+                    .as_u64()
+                    .ok_or(ConfigError::MalformedField("port".to_string()))?
+                    as u16;
 
                 if let Some(log_level) = s.get("log_level") {
                     match log_level.as_str().unwrap_or("info") {
@@ -87,35 +114,32 @@ impl Config {
                 }
             }
 
-            let routes = value.get("routes").ok_or("missing routes".to_string())?;
+            let routes = value
+                .get("routes")
+                .ok_or(ConfigError::MissingField("routes".into()))?;
 
-            if !routes.is_sequence() {
-                return Err("expected list of routes".to_string());
-            }
+            let routes_seq = routes
+                .as_sequence()
+                .ok_or(ConfigError::MalformedField("routes".into()))?;
 
-            for r in routes.as_sequence().unwrap() {
+            for r in routes_seq {
                 let location = r
                     .get("location")
-                    .ok_or("missing route parameter".to_string())?;
+                    .ok_or(ConfigError::MissingField("route:location".into()))?
+                    .as_str()
+                    .ok_or(ConfigError::MalformedField("route:location".to_string()))?
+                    .to_string();
+
                 let handler = r
                     .get("handler")
-                    .ok_or("missing handler parameter".to_string())?;
-
-                if !location.is_string() {
-                    return Err("location should be a string".into());
-                }
-                if !handler.is_string()
-                    || (handler.as_str().unwrap() != "file" && handler.as_str().unwrap() != "web")
-                {
-                    return Err(format!(
-                        "handler not recognized: {}",
-                        handler.as_str().unwrap().to_string()
-                    ));
-                }
+                    .ok_or(ConfigError::MissingField("route:handler".into()))?
+                    .as_str()
+                    .ok_or(ConfigError::MalformedField("route:handler".to_string()))?
+                    .to_string();
 
                 config.routes.push(Route {
-                    location: location.as_str().unwrap().to_string(),
-                    handler: match handler.as_str().unwrap() {
+                    location,
+                    handler: match handler.as_str() {
                         "file" => Handler::File(FileHandlerParams {
                             fs_path: r
                                 .get("fs_path")
@@ -138,7 +162,12 @@ impl Config {
                                 .unwrap_or("index.html")
                                 .to_string(),
                         }),
-                        _ => return Err("bad handler type".into()),
+                        _ => {
+                            return Err(ConfigError::MalformedField(format!(
+                                "route:handler: {}",
+                                handler
+                            )))
+                        }
                     },
                 })
             }
