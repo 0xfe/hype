@@ -6,7 +6,7 @@ use std::fs;
 use async_trait::async_trait;
 use env_logger::Env;
 use hype::{
-    config::Config,
+    config::{self, Config},
     handler::{self, AsyncStream, Handler},
     request::Request,
     response::Response,
@@ -20,9 +20,9 @@ struct MyHandler {}
 
 #[async_trait]
 impl Handler for MyHandler {
-    async fn handle(&self, _r: &Request, w: &mut dyn AsyncStream) -> Result<(), handler::Error> {
-        let mut response = Response::new(status::from(status::OK));
-        response.set_body("<html>Hello world!</html>\n".into());
+    async fn handle(&self, r: &Request, w: &mut dyn AsyncStream) -> Result<(), handler::Error> {
+        let mut response = Response::new(status::from(status::NOT_FOUND));
+        response.set_body(format!("404 File not found: {}\n", r.path()));
         let buf = response.serialize();
         w.write_all(buf.as_bytes()).await.unwrap();
         Ok(())
@@ -50,7 +50,20 @@ async fn main() {
     info!("config: {:?}", config);
 
     let mut server = Server::new(config.server.listen_ip, config.server.port);
-    server.route_default(Box::new(MyHandler {}));
 
+    for route in &config.routes {
+        let handler: Box<dyn Handler> = match &route.handler {
+            config::Handler::File(params) => {
+                Box::new(hype::handlers::file::File::new(params.fs_path.clone()))
+            }
+            config::Handler::Web(params) => {
+                Box::new(hype::handlers::web::Web::new(params.fs_path.clone()))
+            }
+        };
+
+        server.route(route.location.clone(), handler).await;
+    }
+
+    server.route_default(Box::new(MyHandler {}));
     server.start().await.unwrap();
 }

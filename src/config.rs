@@ -9,7 +9,7 @@ pub struct FileHandlerParams {
 #[derive(Debug)]
 pub enum Handler {
     File(FileHandlerParams),
-    App(String),
+    Web(FileHandlerParams),
 }
 
 #[derive(Debug)]
@@ -101,8 +101,13 @@ impl Config {
                 if !location.is_string() {
                     return Err("location should be a string".into());
                 }
-                if !handler.is_string() || handler.as_str().unwrap() != "file" {
-                    return Err("handler should be one of 'file' or 'path'".into());
+                if !handler.is_string()
+                    || (handler.as_str().unwrap() != "file" && handler.as_str().unwrap() != "web")
+                {
+                    return Err(format!(
+                        "handler not recognized: {}",
+                        handler.as_str().unwrap().to_string()
+                    ));
                 }
                 if !fs_path.is_string() {
                     return Err("path should be a valid filesystem path".into());
@@ -110,9 +115,15 @@ impl Config {
 
                 config.routes.push(Route {
                     location: location.as_str().unwrap().to_string(),
-                    handler: Handler::File(FileHandlerParams {
-                        fs_path: fs_path.as_str().unwrap().to_string(),
-                    }),
+                    handler: match handler.as_str().unwrap() {
+                        "file" => Handler::File(FileHandlerParams {
+                            fs_path: fs_path.as_str().unwrap().to_string(),
+                        }),
+                        "web" => Handler::Web(FileHandlerParams {
+                            fs_path: fs_path.as_str().unwrap().to_string(),
+                        }),
+                        _ => return Err("bad handler type".into()),
+                    },
                 })
             }
         }

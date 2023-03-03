@@ -4,8 +4,8 @@ server:
     - log_level: INFO
 routes:
     - location: /emdr
-      handler: file
-      fs_path: /home/mmuthanna/git/experiments/emdr
+      handler: web
+      fs_path: /Users/mmuthanna/git/experiments/emdr
     - location: /hype
       handler: file
-      fs_path: /home/mmuthanna/git/hype
+      fs_path: /Users/mmuthanna/git/hype
