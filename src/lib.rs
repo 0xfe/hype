@@ -5,6 +5,7 @@ extern crate lazy_static;
 extern crate log;
 
 pub mod config;
+pub mod content_types;
 pub mod cookie;
 pub mod handler;
 pub mod handlers;

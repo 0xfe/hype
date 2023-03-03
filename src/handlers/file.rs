@@ -11,6 +11,7 @@ use tokio::{
 };
 
 use crate::{
+    content_types,
     handler::{self, AsyncStream, Handler},
     request::Request,
     response::Response,
@@ -26,18 +27,7 @@ impl File {
     pub fn new(base_fs_path: String) -> File {
         File {
             base_fs_path,
-            content_types: [
-                ("html", "text/html"),
-                ("htm", "text/html"),
-                ("txt", "text/plain"),
-                ("js", "text/javascript"),
-                ("png", "image/png"),
-                ("jpg", "image/jpeg"),
-                ("jpeg", "image/jpeg"),
-                ("svg", "image/svg+xml"),
-            ]
-            .into_iter()
-            .collect(),
+            content_types: content_types::BY_EXT.clone(),
         }
     }
 
