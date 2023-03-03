@@ -1,4 +1,4 @@
-use std::collections::HashSet;
+use std::{collections::HashSet, error, fmt};
 
 use chrono::{DateTime, Utc};
 
@@ -22,24 +22,49 @@ pub struct Cookie {
     flags: HashSet<Flag>,
 }
 
+#[derive(Debug, Clone)]
+pub enum CookieError {
+    BadHeader,
+    MissingCookieLine,
+    MissingCookieFields,
+    MalformedAttribute(String),
+}
+
+impl fmt::Display for CookieError {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        let e = match self {
+            Self::BadHeader => "could not parse header fields".to_string(),
+            Self::MissingCookieLine => "no cookie in header line".to_string(),
+            Self::MissingCookieFields => "malformed cookie line".to_string(),
+            Self::MalformedAttribute(extra) => {
+                format!("malformed cookie attribute: {}", extra)
+            }
+        };
+
+        write!(f, "CookieError: {}", e)
+    }
+}
+
+impl error::Error for CookieError {}
+
 impl TryFrom<&str> for Cookie {
-    type Error = String;
+    type Error = CookieError;
 
     fn try_from(buf: &str) -> Result<Self, Self::Error> {
         // Separate Cookie: or Set-Cookie: from request/response header
         let kv: Vec<&str> = buf.split(':').collect();
         if kv.len() != 2 {
-            return Err(String::from("could not parse header fields"));
+            return Err(CookieError::BadHeader);
         }
 
         let parts: Vec<&str> = kv[1].trim().split(';').map(|c| c.trim()).collect();
         if parts.len() == 0 {
-            return Err(String::from("could not parse cookie line"));
+            return Err(CookieError::MissingCookieLine);
         }
 
         let cookie_kv: Vec<&str> = parts[0].split('=').map(|c| c.trim()).collect();
         if cookie_kv.len() != 2 {
-            return Err(String::from("bad cookie key/value"));
+            return Err(CookieError::MissingCookieFields);
         }
 
         let mut cookie = Cookie::new(cookie_kv[0], cookie_kv[1]);
@@ -68,7 +93,7 @@ impl TryFrom<&str> for Cookie {
                     _ => {
                         let attrs: Vec<&str> = part.split('=').map(|c| c.trim()).collect();
                         if attrs.len() != 2 {
-                            return Err(format!("could not parse attribute: {}", part));
+                            return Err(CookieError::MalformedAttribute(part.to_string()));
                         }
 
                         match attrs[0].to_lowercase().as_str() {
@@ -76,8 +101,9 @@ impl TryFrom<&str> for Cookie {
                                 cookie.push_flag(Flag::Domain(attrs[1].into()));
                             }
                             "expires" => {
-                                let date = DateTime::parse_from_rfc2822(attrs[1])
-                                    .or(Err("could not parse cookie expiry"))?;
+                                let date = DateTime::parse_from_rfc2822(attrs[1]).or(Err(
+                                    CookieError::MalformedAttribute("expiry".to_string()),
+                                ))?;
 
                                 cookie.push_flag(Flag::Expires(date.with_timezone::<Utc>(&Utc)));
                             }
@@ -87,7 +113,7 @@ impl TryFrom<&str> for Cookie {
                                 ));
                             }
                             _ => {
-                                return Err(format!("unrecognized cookie attribute: {}", attrs[0]));
+                                return Err(CookieError::MalformedAttribute(attrs[0].to_string()));
                             }
                         }
                     }

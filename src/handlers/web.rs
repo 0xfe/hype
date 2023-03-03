@@ -33,6 +33,10 @@ impl Web {
         }
     }
 
+    pub fn set_index(&mut self, file: String) {
+        self.index_files = vec![file];
+    }
+
     async fn write_response<'b>(
         w: &mut dyn AsyncStream,
         status: status::Code<'b>,

@@ -47,7 +47,7 @@ async fn main() {
     let config = Config::from_str(input).expect("bad configuration file");
 
     info!("Starting hype...");
-    info!("config: {:?}", config);
+    debug!("config: {:?}", config);
 
     let mut server = Server::new(config.server.listen_ip, config.server.port);
 
@@ -57,7 +57,9 @@ async fn main() {
                 Box::new(hype::handlers::file::File::new(params.fs_path.clone()))
             }
             config::Handler::Web(params) => {
-                Box::new(hype::handlers::web::Web::new(params.fs_path.clone()))
+                let mut web_handler = hype::handlers::web::Web::new(params.webroot.clone());
+                web_handler.set_index(params.index.clone());
+                Box::new(web_handler)
             }
         };
 

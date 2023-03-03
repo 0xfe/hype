@@ -7,9 +7,15 @@ pub struct FileHandlerParams {
 }
 
 #[derive(Debug)]
+pub struct WebHandlerParams {
+    pub webroot: String,
+    pub index: String,
+}
+
+#[derive(Debug)]
 pub enum Handler {
     File(FileHandlerParams),
-    Web(FileHandlerParams),
+    Web(WebHandlerParams),
 }
 
 #[derive(Debug)]
@@ -94,9 +100,6 @@ impl Config {
                 let handler = r
                     .get("handler")
                     .ok_or("missing handler parameter".to_string())?;
-                let fs_path = r
-                    .get("fs_path")
-                    .ok_or("missing fs_path parameter for file handler".to_string())?;
 
                 if !location.is_string() {
                     return Err("location should be a string".into());
@@ -109,18 +112,31 @@ impl Config {
                         handler.as_str().unwrap().to_string()
                     ));
                 }
-                if !fs_path.is_string() {
-                    return Err("path should be a valid filesystem path".into());
-                }
 
                 config.routes.push(Route {
                     location: location.as_str().unwrap().to_string(),
                     handler: match handler.as_str().unwrap() {
                         "file" => Handler::File(FileHandlerParams {
-                            fs_path: fs_path.as_str().unwrap().to_string(),
+                            fs_path: r
+                                .get("fs_path")
+                                .unwrap_or(&Value::from("."))
+                                .as_str()
+                                .unwrap_or(".")
+                                .to_string(),
                         }),
-                        "web" => Handler::Web(FileHandlerParams {
-                            fs_path: fs_path.as_str().unwrap().to_string(),
+                        "web" => Handler::Web(WebHandlerParams {
+                            webroot: r
+                                .get("webroot")
+                                .unwrap_or(&Value::from("."))
+                                .as_str()
+                                .unwrap_or(".")
+                                .to_string(),
+                            index: r
+                                .get("index")
+                                .unwrap_or(&Value::from("index.html"))
+                                .as_str()
+                                .unwrap_or("index.html")
+                                .to_string(),
                         }),
                         _ => return Err("bad handler type".into()),
                     },

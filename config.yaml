@@ -5,7 +5,8 @@ server:
 routes:
     - location: /emdr
       handler: web
-      fs_path: /Users/mmuthanna/git/experiments/emdr
+      webroot: /Users/mmuthanna/git/experiments/emdr
+      index: index.html
     - location: /hype
       handler: file
       fs_path: /Users/mmuthanna/git/hype

@@ -61,14 +61,17 @@ $ cargo test -- --nocapture
 ## TODO
 
 -   Config file like lighttpd -- keep it simple, reverse proxy support
+    -   access log
+    -   index file
+    -   server name / host header (with wildcards: \*.example.com)
 -   Use templating + #include to make file browser look better
     -   templating engine with https://crates.io/crates/tera
 -   Transfer-Encoding: chunked, gzip (note Content-Encoding and Accept-Encoding too)
 -   Match Host headers, bad request (400) if multiple headers
+-   Errors should be derived from error::Error -- see cookie.rs
 -   TLS support
 -   json handling (is it needed ??) -- serde_json
 -   CGI interface
-
 -   Housekeeping
 -   end-to-end tests with reqwest
 
