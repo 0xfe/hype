@@ -87,7 +87,7 @@ impl Server {
 
         // Fell through here, no handlers match
         let mut response = Response::new(status::from(status::NOT_FOUND));
-        response.set_header("Content-Type".into(), "text/plain".into());
+        response.set_header("Content-Type", "text/plain");
         response.set_body("Hype: no route handlers installed.".into());
         let buf = response.serialize();
         stream.write_all(buf.as_bytes()).await.unwrap();

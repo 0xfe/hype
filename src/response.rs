@@ -70,8 +70,8 @@ impl Response {
         self
     }
 
-    pub fn set_header(&mut self, key: String, value: String) -> &mut Self {
-        self.headers.insert(key, value);
+    pub fn set_header(&mut self, key: impl Into<String>, value: impl Into<String>) -> &mut Self {
+        self.headers.insert(key.into(), value.into());
         self
     }
 
@@ -89,7 +89,7 @@ impl Response {
         let status_line = format!("HTTP/1.1 {} {}", self.status.code, self.status.text);
         let length = self.body.len();
         if length > 0 {
-            self.set_header("Content-Length".into(), length.to_string());
+            self.set_header("Content-Length", length.to_string());
         }
 
         let headers: String = self

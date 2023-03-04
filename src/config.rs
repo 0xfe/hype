@@ -6,6 +6,7 @@ use serde_yaml::{Deserializer, Value};
 #[derive(Debug)]
 pub struct FileHandlerParams {
     pub fs_path: String,
+    pub trailing_slashes: bool,
 }
 
 #[derive(Debug)]
@@ -13,6 +14,7 @@ pub struct WebHandlerParams {
     pub webroot: String,
     pub index: String,
     pub hosts: Vec<String>,
+    pub trailing_slashes: bool,
 }
 
 #[derive(Debug)]
@@ -144,6 +146,11 @@ impl Config {
                                 .as_str()
                                 .unwrap_or(".")
                                 .to_string(),
+                            trailing_slashes: r
+                                .get("trailing_slashes")
+                                .unwrap_or(&Value::from(true))
+                                .as_bool()
+                                .unwrap_or(true),
                         }),
                         "web" => Handler::Web(WebHandlerParams {
                             webroot: r
@@ -166,6 +173,11 @@ impl Config {
                                 .iter()
                                 .map(|v| v.as_str().unwrap_or("").to_string())
                                 .collect(),
+                            trailing_slashes: r
+                                .get("trailing_slashes")
+                                .unwrap_or(&Value::from(true))
+                                .as_bool()
+                                .unwrap_or(true),
                         }),
                         _ => {
                             return Err(ConfigError::MalformedField(format!(

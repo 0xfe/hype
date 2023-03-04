@@ -1,17 +1,30 @@
 #![allow(dead_code)]
 
-use std::fmt;
+use std::{error, fmt};
 
 use async_trait::async_trait;
 use tokio::{io::AsyncWrite, net::TcpStream};
 
 use crate::request::Request;
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum Error {
     Done,
     Failed(String),
 }
+
+impl fmt::Display for Error {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        let e = match self {
+            Error::Done => "Done".to_string(),
+            Error::Failed(msg) => format!("Failed: {}", msg),
+        };
+
+        write!(f, "Handler error: {}", e)
+    }
+}
+
+impl error::Error for Error {}
 
 pub trait AsyncStream: AsyncWrite + Unpin + Send + Sync {}
 

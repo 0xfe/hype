@@ -7,6 +7,7 @@ routes:
       handler: web
       webroot: /Users/mmuthanna/git/experiments/emdr
       index: index.html
+      trailing_slashes: true
       hosts:
           - 127.0.0.1:8000
           - www.example.com
