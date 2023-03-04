@@ -22,6 +22,7 @@ pub struct Web {
     base_fs_path: String,
     content_types: HashMap<&'static str, &'static str>,
     index_files: Vec<String>,
+    hosts: Vec<String>,
 }
 
 impl Web {
@@ -30,6 +31,7 @@ impl Web {
             base_fs_path,
             content_types: content_types::BY_EXT.clone(),
             index_files: vec!["index.html".into(), "index.htm".into()],
+            hosts: vec![],
         }
     }
 
@@ -97,6 +99,12 @@ impl Web {
             )))?;
 
         let abs_fs_path = String::from(abs_fs_path);
+
+        if let Some(host) = r.host() {
+            if !self.hosts.contains(host) {
+                warn!("host does not match: {} vs {:?}", host, self.hosts);
+            }
+        }
 
         if metadata.is_dir() {
             for index in &self.index_files {

@@ -66,6 +66,7 @@ $ cargo test -- --nocapture
     -   server name / host header (with wildcards: \*.example.com)
 -   Use templating + #include to make file browser look better
     -   templating engine with https://crates.io/crates/tera
+-   Figure out solution for trailing '/' -- 301 permanent redirect
 -   Transfer-Encoding: chunked, gzip (note Content-Encoding and Accept-Encoding too)
 -   Match Host headers, bad request (400) if multiple headers
 -   Errors should be derived from error::Error -- see cookie.rs
