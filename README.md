@@ -69,7 +69,9 @@ $ cargo test -- --nocapture
 -   Transfer-Encoding: chunked, gzip (note Content-Encoding and Accept-Encoding too)
 -   Match Host headers, bad request (400) if multiple headers
 -   Errors should be derived from error::Error -- see cookie.rs
+-   fix case sensitivity in headers
 -   TLS support
+-   reverse proxy feature
 -   json handling (is it needed ??) -- serde_json
 -   CGI interface
 -   Housekeeping

@@ -144,6 +144,10 @@ impl Request {
         return self.url.as_ref().unwrap().path().to_string();
     }
 
+    pub fn host(&self) -> Option<&String> {
+        self.headers.get("Host")
+    }
+
     pub fn path(&self) -> String {
         if let Some(handler_path) = &self.handler_path {
             return self

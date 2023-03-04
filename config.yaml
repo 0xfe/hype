@@ -1,12 +1,20 @@
 server:
     - listen_ip: 127.0.0.1
-    - port: 8000
-    - log_level: INFO
+      port: 8000
+      log_level: INFO
 routes:
     - location: /emdr
       handler: web
       webroot: /Users/mmuthanna/git/experiments/emdr
       index: index.html
-    - location: /hype
+      hosts:
+          - 127.0.0.1:8000
+          - www.example.com
+          - "*.example.com"
+    - location: /emdr2
+      handler: web
+      webroot: /Users/mmuthanna/git/experiments/emdr
+      index: index.html
+    - location: /files
       handler: file
       fs_path: /Users/mmuthanna/git/hype

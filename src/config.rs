@@ -12,6 +12,7 @@ pub struct FileHandlerParams {
 pub struct WebHandlerParams {
     pub webroot: String,
     pub index: String,
+    pub hosts: Vec<String>,
 }
 
 #[derive(Debug)]
@@ -80,11 +81,9 @@ impl Config {
         for document in Deserializer::from_str(config_str.as_ref()) {
             let value = Value::deserialize(document).unwrap();
 
-            let server = value
+            let server_seq = value
                 .get("server")
-                .ok_or(ConfigError::MissingField("server".into()))?;
-
-            let server_seq = server
+                .ok_or(ConfigError::MissingField("server".into()))?
                 .as_sequence()
                 .ok_or(ConfigError::MalformedField("server".into()))?;
 
@@ -114,11 +113,9 @@ impl Config {
                 }
             }
 
-            let routes = value
+            let routes_seq = value
                 .get("routes")
-                .ok_or(ConfigError::MissingField("routes".into()))?;
-
-            let routes_seq = routes
+                .ok_or(ConfigError::MissingField("routes".into()))?
                 .as_sequence()
                 .ok_or(ConfigError::MalformedField("routes".into()))?;
 
@@ -161,6 +158,14 @@ impl Config {
                                 .as_str()
                                 .unwrap_or("index.html")
                                 .to_string(),
+                            hosts: r
+                                .get("hosts")
+                                .unwrap_or(&Value::from(Vec::<Value>::new()))
+                                .as_sequence()
+                                .unwrap_or(&vec![])
+                                .iter()
+                                .map(|v| v.as_str().unwrap_or("").to_string())
+                                .collect(),
                         }),
                         _ => {
                             return Err(ConfigError::MalformedField(format!(
