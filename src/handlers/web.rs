@@ -11,7 +11,7 @@ use tokio::{
 };
 
 use crate::{
-    content_types,
+    config, content_types,
     handler::{self, AsyncStream, Handler},
     request::Request,
     response::Response,
@@ -23,6 +23,7 @@ pub struct Web {
     content_types: HashMap<&'static str, &'static str>,
     index_files: Vec<String>,
     hosts: Vec<String>,
+    trailing_slashes: bool,
 }
 
 impl Web {
@@ -32,6 +33,17 @@ impl Web {
             content_types: content_types::BY_EXT.clone(),
             index_files: vec!["index.html".into(), "index.htm".into()],
             hosts: vec![],
+            trailing_slashes: true,
+        }
+    }
+
+    pub fn from(params: &config::WebHandlerParams) -> Self {
+        Web {
+            base_fs_path: params.webroot.clone(),
+            content_types: content_types::BY_EXT.clone(),
+            index_files: vec![params.index.clone()],
+            hosts: params.hosts.clone(),
+            trailing_slashes: params.trailing_slashes,
         }
     }
 
@@ -101,8 +113,11 @@ impl Web {
         let abs_fs_path = String::from(abs_fs_path);
 
         if let Some(host) = r.host() {
-            if !self.hosts.contains(host) {
-                warn!("host does not match: {} vs {:?}", host, self.hosts);
+            if !self.hosts.is_empty() && !self.hosts.contains(host) {
+                return Err(handler::Error::Failed(format!(
+                    "host {} does not match: {:?}",
+                    host, self.hosts
+                )));
             }
         }
 
@@ -143,7 +158,7 @@ impl Handler for Web {
                 w,
                 status::NOT_FOUND,
                 "text/plain".into(),
-                format!("404 NOT FOUND - {:?}", err),
+                format!("404 NOT FOUND - {}", err),
             )
             .await
             .or(Err(handler::Error::Failed(

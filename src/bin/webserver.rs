@@ -8,6 +8,7 @@ use env_logger::Env;
 use hype::{
     config::{self, Config},
     handler::{self, AsyncStream, Handler},
+    handlers,
     request::Request,
     response::Response,
     server::Server,
@@ -54,13 +55,9 @@ async fn main() {
     for route in &config.routes {
         let handler: Box<dyn Handler> = match &route.handler {
             config::Handler::File(params) => {
-                Box::new(hype::handlers::file::File::new(params.fs_path.clone()))
+                Box::new(handlers::file::File::new(params.fs_path.clone()))
             }
-            config::Handler::Web(params) => {
-                let mut web_handler = hype::handlers::web::Web::new(params.webroot.clone());
-                web_handler.set_index(params.index.clone());
-                Box::new(web_handler)
-            }
+            config::Handler::Web(params) => Box::new(handlers::web::Web::from(params)),
         };
 
         server.route(route.location.clone(), handler).await;
