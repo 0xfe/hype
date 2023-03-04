@@ -91,7 +91,7 @@ impl Web {
         &self,
         r: &Request,
         w: &mut dyn AsyncStream,
-    ) -> Result<(), handler::Error> {
+    ) -> Result<handler::Ok, handler::Error> {
         let mut abs_fs_path = PathBuf::new();
         abs_fs_path.push(self.base_fs_path.as_str());
 
@@ -103,7 +103,7 @@ impl Web {
             "could not parse request path".into(),
         ))?;
 
-        info!("Serving path: {}", abs_fs_path);
+        info!("Serving FS path {} at location {}", abs_fs_path, r.path());
         let metadata = fs::metadata(abs_fs_path)
             .await
             .or(Err(handler::Error::Failed(
@@ -122,6 +122,11 @@ impl Web {
         }
 
         if metadata.is_dir() {
+            if self.trailing_slashes && !r.abs_path().ends_with("/") {
+                info!("Redirecting {} to {}", r.abs_path(), r.abs_path() + "/");
+                return Ok(handler::Ok::Redirect(r.abs_path() + "/"));
+            }
+
             for index in &self.index_files {
                 let path = PathBuf::from(&abs_fs_path).join(index);
 
@@ -133,7 +138,7 @@ impl Web {
                     )
                     .await
                     .or(Err(handler::Error::Failed("could not open file".into())))?;
-                    return Ok(());
+                    return Ok(handler::Ok::Done);
                 }
             }
 
@@ -144,30 +149,43 @@ impl Web {
                 .or(Err(handler::Error::Failed("could not open file".into())))?;
         }
 
-        Ok(())
+        Ok(handler::Ok::Done)
     }
 }
 
 #[async_trait]
 impl Handler for Web {
-    async fn handle(&self, r: &Request, w: &mut dyn AsyncStream) -> Result<(), handler::Error> {
+    async fn handle(
+        &self,
+        r: &Request,
+        w: &mut dyn AsyncStream,
+    ) -> Result<handler::Ok, handler::Error> {
         let result = self.handle_path(r, w).await;
 
-        if let Err(err) = &result {
-            Web::write_response(
-                w,
-                status::NOT_FOUND,
-                "text/plain".into(),
-                format!("404 NOT FOUND - {}", err),
-            )
-            .await
-            .or(Err(handler::Error::Failed(
-                "could not write to stream".into(),
-            )))?;
+        return match result {
+            Ok(handler::Ok::Done) => Ok(handler::Ok::Done),
+            Ok(handler::Ok::Redirect(to)) => {
+                let mut response = Response::new(status::from(status::MOVED_PERMANENTLY));
+                response.set_header("Location", to);
+                w.write_all(response.serialize().as_bytes()).await.or(Err(
+                    handler::Error::Failed("could not write to stream".into()),
+                ))?;
+                Ok(handler::Ok::Done)
+            }
+            Err(handler::Error::Failed(msg)) => {
+                Web::write_response(
+                    w,
+                    status::NOT_FOUND,
+                    "text/plain".into(),
+                    format!("404 NOT FOUND - {}", msg),
+                )
+                .await
+                .or(Err(handler::Error::Failed(
+                    "could not write to stream".into(),
+                )))?;
 
-            return result;
-        }
-
-        Ok(())
+                Err(handler::Error::Failed(msg))
+            }
+        };
     }
 }

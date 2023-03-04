@@ -111,7 +111,7 @@ impl File {
         &self,
         r: &Request,
         w: &mut dyn AsyncStream,
-    ) -> Result<(), handler::Error> {
+    ) -> Result<handler::Ok, handler::Error> {
         let mut abs_fs_path = PathBuf::new();
         abs_fs_path.push(self.base_fs_path.as_str());
 
@@ -150,13 +150,17 @@ impl File {
                 .or(Err(handler::Error::Failed("could not open file".into())))?;
         }
 
-        Ok(())
+        Ok(handler::Ok::Done)
     }
 }
 
 #[async_trait]
 impl Handler for File {
-    async fn handle(&self, r: &Request, w: &mut dyn AsyncStream) -> Result<(), handler::Error> {
+    async fn handle(
+        &self,
+        r: &Request,
+        w: &mut dyn AsyncStream,
+    ) -> Result<handler::Ok, handler::Error> {
         let result = self.handle_path(r, w).await;
 
         if let Err(err) = &result {
@@ -174,6 +178,6 @@ impl Handler for File {
             return result;
         }
 
-        Ok(())
+        Ok(handler::Ok::Done)
     }
 }

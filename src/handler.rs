@@ -9,14 +9,18 @@ use crate::request::Request;
 
 #[derive(Debug, Clone)]
 pub enum Error {
-    Done,
     Failed(String),
+}
+
+#[derive(Debug, Clone)]
+pub enum Ok {
+    Done,
+    Redirect(String),
 }
 
 impl fmt::Display for Error {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         let e = match self {
-            Error::Done => "Done".to_string(),
             Error::Failed(msg) => format!("Failed: {}", msg),
         };
 
@@ -33,7 +37,7 @@ impl AsyncStream for TcpStream {}
 
 #[async_trait]
 pub trait Handler: Send + Sync {
-    async fn handle(&self, r: &Request, w: &mut dyn AsyncStream) -> Result<(), Error>;
+    async fn handle(&self, r: &Request, w: &mut dyn AsyncStream) -> Result<Ok, Error>;
 }
 
 impl std::fmt::Debug for dyn Handler {

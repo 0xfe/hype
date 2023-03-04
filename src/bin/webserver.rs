@@ -21,12 +21,16 @@ struct MyHandler {}
 
 #[async_trait]
 impl Handler for MyHandler {
-    async fn handle(&self, r: &Request, w: &mut dyn AsyncStream) -> Result<(), handler::Error> {
+    async fn handle(
+        &self,
+        r: &Request,
+        w: &mut dyn AsyncStream,
+    ) -> Result<handler::Ok, handler::Error> {
         let mut response = Response::new(status::from(status::NOT_FOUND));
         response.set_body(format!("404 File not found: {}\n", r.path()));
         let buf = response.serialize();
         w.write_all(buf.as_bytes()).await.unwrap();
-        Ok(())
+        Ok(handler::Ok::Done)
     }
 }
 

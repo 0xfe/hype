@@ -25,12 +25,16 @@ impl Stack {
 
 #[async_trait]
 impl Handler for Stack {
-    async fn handle(&self, r: &Request, w: &mut dyn AsyncStream) -> Result<(), handler::Error> {
+    async fn handle(
+        &self,
+        r: &Request,
+        w: &mut dyn AsyncStream,
+    ) -> Result<handler::Ok, handler::Error> {
         for handler in &self.handlers {
             match handler.handle(r, w).await {
-                Ok(_) => {}
-                Err(handler::Error::Done) => {
-                    break;
+                Ok(handler::Ok::Done) => {}
+                Ok(handler::Ok::Redirect(_)) => {
+                    todo!();
                 }
                 Err(handler::Error::Failed(message)) => {
                     info!("Handler failed: {}", message);
@@ -39,6 +43,6 @@ impl Handler for Stack {
             }
         }
 
-        Ok(())
+        Ok(handler::Ok::Done)
     }
 }
