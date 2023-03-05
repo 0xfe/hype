@@ -44,9 +44,10 @@ impl Handler for Rewriter {
             response.set_header("Location", location);
             let buf = response.serialize();
             w.write_all(buf.as_bytes()).await.unwrap();
+            return Ok(handler::Ok::Done);
         }
 
-        Ok(handler::Ok::Done)
+        Ok(handler::Ok::Next)
     }
 }
 

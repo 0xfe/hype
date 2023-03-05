@@ -68,7 +68,7 @@ $ cargo test -- --nocapture
 -   L7 load balancer
     -   Roundrobin, weighted RR, and sticky RR with cookies
     -   Healthchecking
--   gRPC API
+-   gRPC API - https://github.com/hyperium/tonic
 -   TLS support
 -   reverse proxy feature
 -   json handling (is it needed ??) -- serde_json
