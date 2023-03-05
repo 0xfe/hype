@@ -32,7 +32,7 @@ Content-Length: 23
 
 merchantID=2003&foo=bar"##;
 
-    let request = Request::from(buf.to_string(), "http://localhost".into()).unwrap();
+    let request = Request::from(buf.to_string(), "http://localhost").unwrap();
     let mut stream: Vec<u8> = vec![];
 
     h.handle(&request, &mut stream).await.unwrap();

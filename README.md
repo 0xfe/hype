@@ -60,27 +60,36 @@ $ cargo test -- --nocapture
 
 ## TODO
 
--   Figure out solution for trailing '/' -- 301 permanent redirect
--   Config file like lighttpd -- keep it simple, reverse proxy support
-    -   access log
-    -   index file
-    -   server name / host header (with wildcards: \*.example.com)
+-   Implement access log
+-   URL rewrite middleware
 -   Use templating + #include to make file browser look better
     -   templating engine with https://crates.io/crates/tera
 -   Transfer-Encoding: chunked, gzip (note Content-Encoding and Accept-Encoding too)
--   Match Host headers, bad request (400) if multiple headers
+-   L7 load balancer
+    -   Roundrobin, weighted RR, and sticky RR with cookies
+    -   Healthchecking
+-   gRPC API
 -   TLS support
 -   reverse proxy feature
 -   json handling (is it needed ??) -- serde_json
 
 ### Issues / Housekeeping
 
+-   Move redirection to URL rewriting middleware
 -   Errors should be derived from error::Error -- see cookie.rs
 -   Fix case sensitivity in headers
+-   Support multiple headers with the same key
+    -   bad request (400) if multiple host headers
 -   Add end-to-end tests with reqwest
 
 ### Done
 
+-   Config file like lighttpd -- keep it simple, reverse proxy support
+    -   access log
+    -   index file
+    -   server name / host header (with wildcards: \*.example.com)
+-   Figure out solution for trailing '/' -- 301 permanent redirect
+-   Match Host headers, bad request (400) if multiple headers
 -   API to fetch cookies from request header
 -   Implement Cookie::try_from(...) to parse from string
 -   Implement TryFrom trait for request and cookie

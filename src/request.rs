@@ -83,10 +83,10 @@ impl Request {
         self.handler_path = Some(handler);
     }
 
-    pub fn from(buf: String, base_url: String) -> Result<Self, String> {
-        let mut parser = Parser::new(base_url);
+    pub fn from(buf: impl Into<String>, base_url: impl Into<String>) -> Result<Self, String> {
+        let mut parser = Parser::new(base_url.into());
         parser
-            .parse_buf(buf.as_bytes())
+            .parse_buf(buf.into().as_bytes())
             .or(Err("could not parse buffer"))?;
         parser.parse_eof().or(Err("could not parse buffer"))?;
         Ok(parser.get_request())
