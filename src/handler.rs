@@ -14,8 +14,9 @@ pub enum Error {
 
 #[derive(Debug, Clone)]
 pub enum Ok {
-    Done,
+    Next,
     Redirect(String),
+    Done,
 }
 
 impl fmt::Display for Error {

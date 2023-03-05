@@ -32,7 +32,10 @@ impl Handler for Stack {
     ) -> Result<handler::Ok, handler::Error> {
         for handler in &self.handlers {
             match handler.handle(r, w).await {
-                Ok(handler::Ok::Done) => {}
+                Ok(handler::Ok::Done) => {
+                    break;
+                }
+                Ok(handler::Ok::Next) => {}
                 Ok(handler::Ok::Redirect(_)) => {
                     todo!();
                 }

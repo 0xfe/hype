@@ -43,7 +43,7 @@ impl Handler for LogHandler {
         _: &mut dyn AsyncStream,
     ) -> Result<handler::Ok, handler::Error> {
         info!("Request: {:?}", r);
-        Ok(handler::Ok::Done)
+        Ok(handler::Ok::Next)
     }
 }
 

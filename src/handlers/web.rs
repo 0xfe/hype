@@ -159,7 +159,6 @@ impl Handler for Web {
         let result = self.handle_path(r, w).await;
 
         return match result {
-            Ok(handler::Ok::Done) => Ok(handler::Ok::Done),
             Ok(handler::Ok::Redirect(to)) => {
                 let mut response = Response::new(status::from(status::MOVED_PERMANENTLY));
                 response.set_header("Location", to);
@@ -168,6 +167,7 @@ impl Handler for Web {
                 ))?;
                 Ok(handler::Ok::Done)
             }
+            Ok(ok) => Ok(ok),
             Err(handler::Error::Failed(msg)) => {
                 Web::write_response(
                     w,
