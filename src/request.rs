@@ -10,7 +10,7 @@ enum State {
     InBody,
 }
 
-#[derive(Debug, Clone, Copy, Eq, PartialEq)]
+#[derive(Debug, Clone, Copy, Eq, PartialEq, Hash)]
 pub enum Method {
     GET,
     POST,
@@ -42,6 +42,8 @@ lazy_static! {
         ("TRACE", Method::TRACE),
         ("PATCH", Method::PATCH),
     ]);
+
+    static ref METHODS_AS_STR: HashMap<Method, &'static str> = VALID_METHODS.iter().map(|(k, v)| (*v, *k)).collect();
 }
 
 #[derive(Debug, PartialEq)]
@@ -165,6 +167,32 @@ impl Request {
 
     pub fn method(&self) -> Method {
         return self.method;
+    }
+
+    pub fn serialize(&self) -> String {
+        let mut r = format!(
+            "{} {} HTTP/1.1\r\n",
+            METHODS_AS_STR.get(&self.method).unwrap(),
+            self.abs_path()
+        );
+
+        r.push_str(
+            self.headers
+                .iter()
+                .map(|(k, v)| format!("{}: {}", k, v))
+                .collect::<Vec<String>>()
+                .join("\r\n")
+                .as_str(),
+        );
+
+        r.push_str("\r\n");
+
+        if !self.body.is_empty() {
+            r.push_str(format!("Content-Length: {}\r\n\r\n", self.body.chars().count()).as_str());
+            r.push_str(self.body.as_str());
+        }
+
+        r
     }
 }
 

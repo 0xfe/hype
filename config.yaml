@@ -25,3 +25,6 @@ routes:
     - location: /files
       handler: file
       fs_path: /Users/mmuthanna/git/hype
+    - location: /lb
+      handler: lb
+      backend: google.com

@@ -1,9 +1,12 @@
 #![allow(dead_code)]
 
-use std::{error, fmt};
+use std::{error, fmt, io::Cursor};
 
 use async_trait::async_trait;
-use tokio::{io::AsyncWrite, net::TcpStream};
+use tokio::{
+    io::{AsyncRead, AsyncWrite},
+    net::TcpStream,
+};
 
 use crate::request::Request;
 
@@ -32,9 +35,24 @@ impl fmt::Display for Error {
 impl error::Error for Error {}
 
 pub trait AsyncStream: AsyncWrite + Unpin + Send + Sync {}
+pub trait AsyncReadStream: AsyncRead + Unpin + Send + Sync {}
+pub trait AsyncWriteStream: AsyncWrite + Unpin + Send + Sync {}
+pub trait AsyncRWStream: AsyncWrite + AsyncRead + Unpin + Send + Sync {}
 
 impl AsyncStream for Vec<u8> {} // for tests
+impl AsyncWriteStream for Vec<u8> {} // for tests
+
 impl AsyncStream for TcpStream {}
+impl AsyncRWStream for TcpStream {}
+impl AsyncReadStream for TcpStream {}
+impl AsyncWriteStream for TcpStream {}
+
+impl AsyncReadStream for tokio::net::tcp::OwnedReadHalf {}
+impl AsyncWriteStream for tokio::net::tcp::OwnedWriteHalf {}
+
+impl AsyncRWStream for Cursor<Vec<u8>> {}
+impl AsyncReadStream for Cursor<Vec<u8>> {}
+impl AsyncWriteStream for Cursor<Vec<u8>> {}
 
 #[async_trait]
 pub trait Handler: Send + Sync {
