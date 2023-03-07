@@ -1,3 +1,5 @@
+use hype::parser;
+use hype::parser::*;
 use hype::request::*;
 
 fn parse(
@@ -8,7 +10,7 @@ fn parse(
     Result<(), ParseError>,
 ) {
     println!("Parsing buffer:\n{}", buf);
-    let mut parser = Parser::new("http://localhost".into());
+    let mut parser = Parser::new("http://localhost".into(), parser::State::StartRequest);
     let result1 = parser.parse_buf(String::from(buf).as_bytes());
     let result2 = parser.parse_eof();
     if result1 == Ok(()) && result2 == Ok(()) {

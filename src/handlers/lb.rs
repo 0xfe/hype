@@ -2,12 +2,15 @@ use std::{
     error::{self},
     fmt,
     net::SocketAddr,
+    sync::Arc,
 };
 
 use tokio::{
     io::{self, AsyncReadExt, AsyncWriteExt},
     join,
     net::{TcpSocket, TcpStream},
+    sync::Mutex,
+    task::JoinError,
 };
 
 use crate::{
@@ -22,6 +25,7 @@ pub enum LbError {
     SendError(io::Error),
     RecvError(io::Error),
     ResponseError,
+    InternalError(JoinError),
 }
 
 impl fmt::Display for LbError {
@@ -31,6 +35,7 @@ impl fmt::Display for LbError {
             LbError::SendError(err) => write!(f, "could not send data to backend: {}", err),
             LbError::RecvError(err) => write!(f, "could not receive data from backend: {}", err),
             LbError::ResponseError => write!(f, "could not parse response"),
+            LbError::InternalError(err) => write!(f, "could not spawn tasks: {}", err),
         }
     }
 }
@@ -38,8 +43,8 @@ impl fmt::Display for LbError {
 impl error::Error for LbError {}
 
 pub struct BackendState {
-    writer: Option<Box<dyn AsyncWriteStream>>,
-    reader: Option<Box<dyn AsyncReadStream>>,
+    writer: Option<Arc<Mutex<Box<dyn AsyncWriteStream>>>>,
+    reader: Option<Arc<Mutex<Box<dyn AsyncReadStream>>>>,
 }
 
 impl BackendState {
@@ -52,8 +57,8 @@ impl BackendState {
 
     pub fn set_stream(&mut self, stream: TcpStream) {
         let (reader, writer) = stream.into_split();
-        self.reader = Some(Box::new(reader));
-        self.writer = Some(Box::new(writer));
+        self.reader = Some(Arc::new(Mutex::new(Box::new(reader))));
+        self.writer = Some(Arc::new(Mutex::new(Box::new(writer))));
     }
 }
 
@@ -96,27 +101,37 @@ impl Backend {
 
         let data = req.serialize();
 
-        let f1 = self
-            .state
-            .writer
-            .as_mut()
-            .unwrap()
-            .write_all(data.as_bytes());
+        let writer = Arc::clone(&self.state.writer.as_ref().unwrap());
+        let reader = Arc::clone(&self.state.reader.as_ref().unwrap());
 
-        let mut response_bytes = String::new();
+        let handle1 = tokio::spawn(async move {
+            writer.lock().await.write_all(data.as_bytes()).await?;
+            println!("HANDLER1 DONE");
+            writer.lock().await.flush().await
+        });
 
-        let f2 = self
-            .state
-            .reader
-            .as_mut()
-            .unwrap()
-            .read_to_string(&mut response_bytes);
+        let handle2 = tokio::spawn(async move {
+            let mut response_bytes = String::new();
+            reader
+                .lock()
+                .await
+                .read_to_string(&mut response_bytes)
+                .await?;
 
-        let (e1, e2) = join!(f1, f2);
+            println!("HANDLER2 DONE");
+            Ok(response_bytes)
+        });
 
-        e1.map_err(|e| LbError::SendError(e))?;
-        e2.map_err(|e| LbError::RecvError(e))?;
+        let (e1, e2) = join!(handle1, handle2);
 
+        e1.map_err(|e| LbError::InternalError(e))?
+            .map_err(|e| LbError::SendError(e))?;
+
+        let response_bytes = e2
+            .map_err(|e| LbError::InternalError(e))?
+            .map_err(|e| LbError::RecvError(e))?;
+
+        println!("{}", response_bytes);
         Ok(Response::from(response_bytes).or(Err(LbError::ResponseError))?)
     }
 }
@@ -154,7 +169,8 @@ mod tests {
 
     #[tokio::test]
     async fn it_works() {
-        let backend = Backend::new("142.251.33.174:80"); // google.com
+        // let backend = Backend::new("142.251.33.174:80"); // google.com
+        let backend = Backend::new("127.0.0.1:8080"); // google.com
         let mut lb = Lb::new(Policy::RR, vec![backend]);
 
         let r = r##"GET / HTTP/1.1

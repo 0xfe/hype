@@ -9,7 +9,7 @@ fn it_works_with_body() {
     assert_eq!(
         response.serialize(),
         "HTTP/1.1 200 OK\r
-Content-Length: 32\r
+content-length: 32\r
 \r
 <HTML><b>Hello world!</b></HTML>"
     );

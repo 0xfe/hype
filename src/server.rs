@@ -6,7 +6,13 @@ use tokio::{
     sync::RwLock,
 };
 
-use crate::{handler::Handler, request::Parser, response::Response, router::Matcher, status};
+use crate::{
+    handler::Handler,
+    parser::{self, Parser},
+    response::Response,
+    router::Matcher,
+    status,
+};
 
 use std::sync::Arc;
 
@@ -33,7 +39,7 @@ impl Server {
         default_handler: Option<Arc<Box<dyn Handler>>>,
     ) {
         info!("Connection received from {:?}", stream.peer_addr().unwrap());
-        let mut parser = Parser::new(base_url);
+        let mut parser = Parser::new(base_url, parser::State::StartRequest);
 
         loop {
             let mut buf = [0u8; 16];

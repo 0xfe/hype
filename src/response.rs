@@ -47,7 +47,7 @@ impl Response {
             }
 
             let header: Vec<String> = line.split(':').map(|l| l.trim().to_string()).collect();
-            headers.insert(header[0].clone(), header[1].clone());
+            headers.insert(header[0].clone().to_lowercase(), header[1].clone());
         }
 
         Ok(Response {
@@ -73,7 +73,7 @@ impl Response {
     }
 
     pub fn set_header(&mut self, key: impl Into<String>, value: impl Into<String>) -> &mut Self {
-        self.headers.insert(key.into(), value.into());
+        self.headers.insert(key.into().to_lowercase(), value.into());
         self
     }
 

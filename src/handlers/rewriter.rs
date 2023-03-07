@@ -73,7 +73,7 @@ merchantID=2003&foo=bar"##;
 
         assert_eq!(
             std::str::from_utf8(&stream).unwrap(),
-            "HTTP/1.1 301 Moved Permanently\r\nLocation: /foo/bar/\r\n\r\n"
+            "HTTP/1.1 301 Moved Permanently\r\nlocation: /foo/bar/\r\n\r\n"
         );
     }
 

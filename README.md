@@ -60,30 +60,30 @@ $ cargo test -- --nocapture
 
 ## TODO
 
--   Implement access log
--   URL rewrite middleware
--   Use templating + #include to make file browser look better
-    -   templating engine with https://crates.io/crates/tera
--   Transfer-Encoding: chunked, gzip (note Content-Encoding and Accept-Encoding too)
--   L7 load balancer
+-   L7 load balancer (in progress)
     -   Roundrobin, weighted RR, and sticky RR with cookies
     -   Healthchecking
+-   Transfer-Encoding: chunked, gzip (note Content-Encoding and Accept-Encoding too)
+-   Implement access log
+-   Use templating + #include to make file browser look better
+    -   templating engine with https://crates.io/crates/tera
 -   gRPC API - https://github.com/hyperium/tonic
 -   TLS support
--   reverse proxy feature
 -   json handling (is it needed ??) -- serde_json
 
 ### Issues / Housekeeping
 
+-   Fix case sensitivity in headers
 -   Move redirection to URL rewriting middleware
 -   Errors should be derived from error::Error -- see cookie.rs
--   Fix case sensitivity in headers
 -   Support multiple headers with the same key
     -   bad request (400) if multiple host headers
 -   Add end-to-end tests with reqwest
 
 ### Done
 
+-   Basic loadbalancer framework
+-   URL rewrite middleware
 -   Config file like lighttpd -- keep it simple, reverse proxy support
     -   access log
     -   index file
