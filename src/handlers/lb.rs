@@ -5,7 +5,7 @@ use std::{
 };
 
 use tokio::{
-    io::{AsyncReadExt, AsyncWriteExt},
+    io::{self, AsyncReadExt, AsyncWriteExt},
     join,
     net::{TcpSocket, TcpStream},
 };
@@ -16,11 +16,11 @@ use crate::{
     response::Response,
 };
 
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub enum LbError {
     ConnectionError,
-    SendError,
-    RecvError,
+    SendError(io::Error),
+    RecvError(io::Error),
     ResponseError,
 }
 
@@ -28,8 +28,8 @@ impl fmt::Display for LbError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
             LbError::ConnectionError => write!(f, "couldnot connect to backend"),
-            LbError::SendError => write!(f, "could not send data to backend"),
-            LbError::RecvError => write!(f, "could not receive data from backend"),
+            LbError::SendError(err) => write!(f, "could not send data to backend: {}", err),
+            LbError::RecvError(err) => write!(f, "could not receive data from backend: {}", err),
             LbError::ResponseError => write!(f, "could not parse response"),
         }
     }
@@ -114,8 +114,8 @@ impl Backend {
 
         let (e1, e2) = join!(f1, f2);
 
-        e1.or(Err(LbError::SendError))?;
-        e2.or(Err(LbError::RecvError))?;
+        e1.map_err(|e| LbError::SendError(e))?;
+        e2.map_err(|e| LbError::RecvError(e))?;
 
         Ok(Response::from(response_bytes).or(Err(LbError::ResponseError))?)
     }
@@ -134,11 +134,8 @@ pub struct Lb {
 }
 
 impl Lb {
-    pub fn new(backends: Vec<Backend>) -> Self {
-        Lb {
-            policy: Policy::RR,
-            backends,
-        }
+    pub fn new(policy: Policy, backends: Vec<Backend>) -> Self {
+        Lb { policy, backends }
     }
 
     pub async fn send_request(&mut self, req: &Request) -> Result<Response, LbError> {
@@ -148,5 +145,25 @@ impl Lb {
             Policy::RR => self.backends[0].send_request(req).await,
             _ => self.backends[0].send_request(req).await,
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[tokio::test]
+    async fn it_works() {
+        let backend = Backend::new("142.251.33.174:80"); // google.com
+        let mut lb = Lb::new(Policy::RR, vec![backend]);
+
+        let r = r##"GET / HTTP/1.1
+Accept-Encoding: identity
+Host: google.com"##;
+
+        let req = Request::from(r, "http://google.com").unwrap();
+        let response = lb.send_request(&req).await.unwrap();
+
+        println!("{:?}", response);
     }
 }

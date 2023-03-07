@@ -24,8 +24,10 @@ impl Response {
             return Err("Can't parse response, no data.".into());
         }
 
-        let status_parts: Vec<String> =
-            lines[0].split_whitespace().map(|s| s.to_string()).collect();
+        let status_parts: Vec<String> = lines[0]
+            .splitn(3, char::is_whitespace)
+            .map(|s| s.to_string())
+            .collect();
         if status_parts.len() < 3 {
             return Err("Bad status line".into());
         }
