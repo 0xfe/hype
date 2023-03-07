@@ -4,6 +4,7 @@ use crate::{cookie::Cookie, status};
 
 #[derive(Debug)]
 pub struct Response {
+    pub version: String,
     pub status: status::Status,
     pub headers: HashMap<String, String>,
     pub cookies: Vec<Cookie>,
@@ -51,6 +52,7 @@ impl Response {
         }
 
         Ok(Response {
+            version: "HTTP/1.1".into(),
             status,
             headers,
             cookies: vec![],
@@ -60,6 +62,7 @@ impl Response {
 
     pub fn new(status: status::Status) -> Response {
         Response {
+            version: "HTTP/1.1".to_string(),
             status,
             headers: HashMap::new(),
             cookies: vec![],

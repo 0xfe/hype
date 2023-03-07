@@ -65,6 +65,10 @@ impl Request {
         self.handler_path = Some(handler);
     }
 
+    pub fn set_body(&mut self, body: String) {
+        self.body = body;
+    }
+
     pub fn from(buf: impl Into<String>, base_url: impl Into<String>) -> Result<Self, String> {
         let mut parser = Parser::new(base_url.into(), parser::State::StartRequest);
         parser
