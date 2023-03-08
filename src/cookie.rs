@@ -2,7 +2,7 @@ use std::{collections::HashSet, error, fmt};
 
 use chrono::{DateTime, Utc};
 
-#[derive(Debug, Eq, PartialEq, Hash)]
+#[derive(Debug, Eq, PartialEq, Hash, Clone)]
 pub enum Flag {
     Domain(String),
     Expires(DateTime<Utc>),
@@ -15,7 +15,7 @@ pub enum Flag {
     SameSiteNone,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Cookie {
     name: String,
     value: String,

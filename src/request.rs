@@ -2,7 +2,7 @@ use std::collections::HashMap;
 
 use url::Url;
 
-use crate::parser::{self, Parser};
+use crate::parser::{self, Message, Parser};
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Hash)]
 pub enum Method {
@@ -44,6 +44,16 @@ pub struct Request {
     pub body: String,
 }
 
+impl From<Message> for Request {
+    fn from(value: Message) -> Self {
+        if let Message::Request(r) = value {
+            return r;
+        }
+
+        panic!("value is not a request")
+    }
+}
+
 impl Request {
     pub fn new(base_url: String) -> Self {
         Request {
@@ -75,7 +85,7 @@ impl Request {
             .parse_buf(buf.into().as_bytes())
             .or(Err("could not parse buffer"))?;
         parser.parse_eof().or(Err("could not parse buffer"))?;
-        Ok(parser.get_request())
+        Ok(parser.get_message().into())
     }
 
     pub fn post_params(&mut self) -> Option<HashMap<String, String>> {

@@ -1,14 +1,24 @@
 use std::collections::HashMap;
 
-use crate::{cookie::Cookie, status};
+use crate::{cookie::Cookie, parser::Message, status};
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Response {
     pub version: String,
     pub status: status::Status,
     pub headers: HashMap<String, String>,
     pub cookies: Vec<Cookie>,
     pub body: String,
+}
+
+impl From<Message> for Response {
+    fn from(value: Message) -> Self {
+        if let Message::Response(r) = value {
+            return r;
+        }
+
+        panic!("value is not a response")
+    }
 }
 
 impl Response {

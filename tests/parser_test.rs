@@ -1,38 +1,77 @@
 use hype::parser;
 use hype::parser::*;
 use hype::request::*;
+use hype::response::Response;
 
 fn parse(
+    buf: &str,
+    start_state: parser::State,
+) -> (
+    Option<hype::parser::Message>,
+    Result<(), ParseError>,
+    Result<(), ParseError>,
+) {
+    println!("Parsing buffer:\n{}", buf);
+    let mut parser = Parser::new("http://localhost".into(), start_state);
+    let result1 = parser.parse_buf(String::from(buf).as_bytes());
+    let result2 = parser.parse_eof();
+    if result1 == Ok(()) && result2 == Ok(()) {
+        (Some(parser.get_message()), result1, result2)
+    } else {
+        (None, result1, result2)
+    }
+}
+
+fn parse_request(
     buf: &str,
 ) -> (
     Option<Request>,
     Result<(), ParseError>,
     Result<(), ParseError>,
 ) {
-    println!("Parsing buffer:\n{}", buf);
-    let mut parser = Parser::new("http://localhost".into(), parser::State::StartRequest);
-    let result1 = parser.parse_buf(String::from(buf).as_bytes());
-    let result2 = parser.parse_eof();
-    if result1 == Ok(()) && result2 == Ok(()) {
-        (Some(parser.get_request()), result1, result2)
-    } else {
-        (None, result1, result2)
-    }
+    let (message, r1, r2) = parse(buf, parser::State::StartRequest);
+    return (message.map(|m| m.into()), r1, r2);
 }
 
-fn assert_parse_result(
+fn parse_response(
+    buf: &str,
+) -> (
+    Option<Response>,
+    Result<(), ParseError>,
+    Result<(), ParseError>,
+) {
+    let (message, r1, r2) = parse(buf, parser::State::StartResponse);
+    return (message.map(|m| m.into()), r1, r2);
+}
+
+fn assert_parse_request_result(
     buf: &str,
     parse_buf_result: Result<(), ParseError>,
     parse_eof_result: Result<(), ParseError>,
 ) -> Option<Request> {
-    let (request, result1, result2) = parse(buf);
+    let (request, result1, result2) = parse_request(buf);
     assert_eq!(result1, parse_buf_result);
     assert_eq!(result2, parse_eof_result);
     request
 }
 
+fn assert_parse_response_result(
+    buf: &str,
+    parse_buf_result: Result<(), ParseError>,
+    parse_eof_result: Result<(), ParseError>,
+) -> Option<Response> {
+    let (response, result1, result2) = parse_response(buf);
+    assert_eq!(result1, parse_buf_result);
+    assert_eq!(result2, parse_eof_result);
+    response
+}
+
 fn assert_parse_ok(buf: &str) -> Option<Request> {
-    assert_parse_result(buf, Ok(()), Ok(()))
+    assert_parse_request_result(buf, Ok(()), Ok(()))
+}
+
+fn assert_parse_response_ok(buf: &str) -> Option<Response> {
+    assert_parse_response_result(buf, Ok(()), Ok(()))
 }
 
 #[test]
@@ -48,6 +87,22 @@ Content-Length: 20
     assert!(request.is_some());
     let request = request.unwrap();
     assert_eq!(request.method(), Method::POST);
+}
+
+#[test]
+fn it_works_response() {
+    let response = assert_parse_response_ok(
+        r##"HTTP/1.1 200 OK
+Host: localhost:4000
+Set-Cookie: foo=bar
+Content-Length: 20
+
+{"merchantID": "00"}"##,
+    );
+
+    assert!(response.is_some());
+    let response = response.unwrap();
+    assert_eq!(response.status.code, 200);
 }
 
 #[test]
@@ -80,7 +135,7 @@ fn get_request() {
 
 #[test]
 fn invalid_method() {
-    assert_parse_result(
+    assert_parse_request_result(
         "BIT / HTTP/1.1\n",
         Err(ParseError::InvalidMethod("BIT".into())),
         Ok(()),

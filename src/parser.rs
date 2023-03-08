@@ -41,7 +41,7 @@ pub enum ParseError {
     UnexpectedEOF,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum Message {
     None,
     Request(Request),
@@ -155,6 +155,7 @@ impl Parser {
             .collect::<Vec<&str>>();
 
         if parts.len() != 3 {
+            println!("PARTS: {:?}", parts);
             return Err(ParseError::BadStatusLine(status_line.into()));
         }
 
@@ -175,9 +176,11 @@ impl Parser {
         let mut result: Result<(), ParseError> = Ok(());
         let header_line = std::str::from_utf8(&self.buf[..]).unwrap();
 
-        let mut headers = &mut self.message.mut_request().headers;
+        let headers;
         if self.start_state == State::StartResponse {
             headers = &mut self.message.mut_response().headers;
+        } else {
+            headers = &mut self.message.mut_request().headers;
         }
 
         if header_line == "\r" || header_line == "" {
@@ -199,12 +202,14 @@ impl Parser {
 
         match self.state {
             State::StartRequest => result = Ok(()),
+            State::StartResponse => result = Ok(()),
             State::InMethod => {
                 result = self.commit_method();
                 self.update_state(State::InHeaders)?;
             }
             State::InStatusLine => {
                 result = self.commit_status_line();
+                self.update_state(State::InHeaders)?;
             }
             State::InHeaders => {
                 result = self.commit_header();
@@ -255,9 +260,11 @@ impl Parser {
     }
 
     pub fn is_complete(&self) -> bool {
-        let mut headers = &self.message.request().headers;
+        let headers;
         if self.start_state == State::StartResponse {
             headers = &self.message.response().headers;
+        } else {
+            headers = &self.message.request().headers;
         }
 
         self.state == State::InBody
@@ -284,7 +291,7 @@ impl Parser {
         Err(ParseError::UnexpectedEOF)
     }
 
-    pub fn get_request(&self) -> Request {
-        return self.message.request().clone();
+    pub fn get_message(&self) -> Message {
+        return self.message.clone();
     }
 }

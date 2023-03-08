@@ -9,6 +9,7 @@ use tokio::{
 use crate::{
     handler::Handler,
     parser::{self, Parser},
+    request::Request,
     response::Response,
     router::Matcher,
     status,
@@ -66,7 +67,7 @@ impl Server {
             }
         }
 
-        let mut request = parser.get_request();
+        let mut request: Request = parser.get_message().into();
         debug!("Request: {:?}", request);
 
         let mut path = String::from("/__bad_path__");
