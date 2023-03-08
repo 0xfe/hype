@@ -76,7 +76,16 @@ impl Response {
     }
 
     pub fn set_header(&mut self, key: impl Into<String>, value: impl Into<String>) -> &mut Self {
-        self.headers.insert(key.into().to_lowercase(), value.into());
+        let key = key.into().to_lowercase();
+        let value = value.into();
+
+        if key == "set-cookie" {
+            if let Ok(cookie) = Cookie::try_from(value.clone().as_str()) {
+                self.set_cookie(cookie);
+            }
+        }
+
+        self.headers.insert(key, value.into());
         self
     }
 

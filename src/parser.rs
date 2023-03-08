@@ -11,11 +11,11 @@ use crate::{
 #[derive(Debug, PartialEq, Eq, Hash, Clone)]
 pub enum State {
     StartRequest,
+    StartResponse,
     InMethod,
+    InStatusLine,
     InHeaders,
     InBody,
-    StartResponse,
-    InStatusLine,
 }
 
 lazy_static! {
@@ -42,24 +42,68 @@ pub enum ParseError {
 }
 
 #[derive(Debug)]
+pub enum Message {
+    None,
+    Request(Request),
+    Response(Response),
+}
+
+impl Message {
+    pub fn request(&self) -> &Request {
+        if let Message::Request(r) = self {
+            return r;
+        }
+
+        panic!("message is not a request")
+    }
+
+    pub fn mut_request(&mut self) -> &mut Request {
+        if let Message::Request(r) = self {
+            return r;
+        }
+
+        panic!("message is not a request")
+    }
+
+    pub fn response(&self) -> &Response {
+        if let Message::Response(r) = self {
+            return r;
+        }
+
+        panic!("message is not a response")
+    }
+
+    pub fn mut_response(&mut self) -> &mut Response {
+        if let Message::Response(r) = self {
+            return r;
+        }
+
+        panic!("message is not a response")
+    }
+}
+
+#[derive(Debug)]
 pub struct Parser {
     base_url: String,
     start_state: State,
     state: State,
     buf: Vec<u8>,
-    request: Request,
-    response: Response,
+    message: Message,
 }
 
 impl Parser {
     pub fn new(base_url: String, start_state: State) -> Parser {
+        let mut message = Message::Request(Request::new(base_url.clone()));
+        if start_state == State::StartResponse {
+            message = Message::Response(Response::new(status::from(status::OK)));
+        }
+
         Parser {
-            base_url: base_url.clone(),
+            base_url: base_url,
             start_state: start_state.clone(),
             state: start_state,
             buf: Vec::with_capacity(16384),
-            request: Request::new(base_url),
-            response: Response::new(status::from(status::OK)),
+            message,
         }
     }
 
@@ -86,7 +130,7 @@ impl Parser {
         }
 
         if let Some(method) = VALID_METHODS.get(&parts[0]) {
-            self.request.set_method(*method);
+            self.message.mut_request().set_method(*method);
         } else {
             return Err(ParseError::InvalidMethod(parts[0].into()));
         }
@@ -97,8 +141,8 @@ impl Parser {
             .join(parts[1])
             .or(Err(ParseError::InvalidPath(parts[1].into())))?;
 
-        self.request.version = parts[2].into();
-        self.request.url = Some(url);
+        self.message.mut_request().version = parts[2].into();
+        self.message.mut_request().url = Some(url);
 
         self.buf.clear();
         Ok(())
@@ -114,10 +158,10 @@ impl Parser {
             return Err(ParseError::BadStatusLine(status_line.into()));
         }
 
-        self.response.version = parts[0].into();
+        self.message.mut_response().version = parts[0].into();
 
         if let Ok(code) = parts[1].to_string().parse::<u16>() {
-            self.response.set_status(status::Status {
+            self.message.mut_response().set_status(status::Status {
                 code,
                 text: parts[2].to_string(),
             });
@@ -131,9 +175,9 @@ impl Parser {
         let mut result: Result<(), ParseError> = Ok(());
         let header_line = std::str::from_utf8(&self.buf[..]).unwrap();
 
-        let mut headers = &mut self.request.headers;
+        let mut headers = &mut self.message.mut_request().headers;
         if self.start_state == State::StartResponse {
-            headers = &mut self.response.headers;
+            headers = &mut self.message.mut_response().headers;
         }
 
         if header_line == "\r" || header_line == "" {
@@ -211,9 +255,9 @@ impl Parser {
     }
 
     pub fn is_complete(&self) -> bool {
-        let mut headers = &self.request.headers;
+        let mut headers = &self.message.request().headers;
         if self.start_state == State::StartResponse {
-            headers = &self.response.headers;
+            headers = &self.message.response().headers;
         }
 
         self.state == State::InBody
@@ -227,12 +271,12 @@ impl Parser {
 
     pub fn parse_eof(&mut self) -> Result<(), ParseError> {
         if self.state == State::InBody || self.state == State::InHeaders {
+            let body = std::str::from_utf8(&self.buf[..]).unwrap().to_string();
+
             if self.start_state == State::StartRequest {
-                self.request
-                    .set_body(std::str::from_utf8(&self.buf[..]).unwrap().into());
+                self.message.mut_request().set_body(body);
             } else {
-                self.response
-                    .set_body(std::str::from_utf8(&self.buf[..]).unwrap().into());
+                self.message.mut_response().set_body(body);
             }
             return Ok(());
         }
@@ -241,6 +285,6 @@ impl Parser {
     }
 
     pub fn get_request(&self) -> Request {
-        return self.request.clone();
+        return self.message.request().clone();
     }
 }
