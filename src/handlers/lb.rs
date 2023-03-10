@@ -109,7 +109,6 @@ impl Backend {
 
         let handle1 = tokio::spawn(async move {
             writer.lock().await.write_all(data.as_bytes()).await?;
-            println!("HANDLER1 DONE");
             writer.lock().await.flush().await
         });
 
@@ -142,9 +141,6 @@ impl Backend {
                 }
             }
 
-            //.read_to_string(&mut response_bytes) .await?;
-
-            println!("HANDLER2 DONE");
             Ok(parser.get_message())
         });
 
@@ -204,6 +200,8 @@ Host: google.com"##;
         let req = Request::from(r, "http://google.com").unwrap();
         let response = lb.send_request(&req).await.unwrap();
 
-        println!("{:?}", response);
+        assert_eq!(response.status.code, 200);
+        assert_eq!(response.status.text, "OK");
+        assert_eq!(response.headers.get("connection").unwrap(), "keep-alive");
     }
 }

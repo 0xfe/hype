@@ -156,7 +156,6 @@ impl Parser {
             .collect::<Vec<&str>>();
 
         if parts.len() != 3 {
-            println!("PARTS: {:?}", parts);
             return Err(ParseError::BadStatusLine(status_line.into()));
         }
 
@@ -165,7 +164,7 @@ impl Parser {
         if let Ok(code) = parts[1].to_string().parse::<u16>() {
             self.message.mut_response().set_status(status::Status {
                 code,
-                text: parts[2].to_string(),
+                text: parts[2].trim().to_string(),
             });
         }
 
