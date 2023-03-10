@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::{collections::HashMap, str::FromStr};
 
 use url::Url;
 
@@ -55,9 +55,9 @@ impl From<Message> for Request {
 }
 
 impl Request {
-    pub fn new(base_url: String) -> Self {
+    pub fn new(base_url: impl Into<String>) -> Self {
         Request {
-            base_url,
+            base_url: base_url.into(),
             handler_path: None,
             url: None,
             method: Method::GET,
@@ -77,6 +77,17 @@ impl Request {
 
     pub fn set_body(&mut self, body: String) {
         self.body = body;
+    }
+
+    pub fn set_path(&mut self, path: impl AsRef<str>) {
+        let mut url =
+            Url::from_str(&self.base_url).unwrap_or(Url::from_str("http://UNSET").unwrap());
+        url.set_path(path.as_ref());
+        self.url = Some(url);
+    }
+
+    pub fn push_header(&mut self, key: impl Into<String>, val: impl Into<String>) {
+        self.headers.insert(key.into().to_lowercase(), val.into());
     }
 
     pub fn from(buf: impl Into<String>, base_url: impl Into<String>) -> Result<Self, String> {
