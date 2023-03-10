@@ -15,6 +15,7 @@ use tokio::{
 
 use crate::{
     handler::{AsyncReadStream, AsyncWriteStream},
+    parser::{self, Parser},
     request::Request,
     response::Response,
 };
@@ -22,6 +23,7 @@ use crate::{
 #[derive(Debug)]
 pub enum LbError {
     ConnectionError,
+    ConnectionBroken,
     SendError(io::Error),
     RecvError(io::Error),
     ResponseError,
@@ -31,7 +33,8 @@ pub enum LbError {
 impl fmt::Display for LbError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
-            LbError::ConnectionError => write!(f, "couldnot connect to backend"),
+            LbError::ConnectionError => write!(f, "could not connect to backend"),
+            LbError::ConnectionBroken => write!(f, "connection broken"),
             LbError::SendError(err) => write!(f, "could not send data to backend: {}", err),
             LbError::RecvError(err) => write!(f, "could not receive data from backend: {}", err),
             LbError::ResponseError => write!(f, "could not parse response"),
@@ -111,15 +114,38 @@ impl Backend {
         });
 
         let handle2 = tokio::spawn(async move {
-            let mut response_bytes = String::new();
-            reader
-                .lock()
-                .await
-                .read_to_string(&mut response_bytes)
-                .await?;
+            let mut stream = reader.lock().await;
+
+            let mut parser = Parser::new("http://foo", parser::State::StartResponse);
+
+            loop {
+                let mut buf = [0u8; 16384];
+
+                match stream.read(&mut buf).await {
+                    Ok(0) => {
+                        parser.parse_eof().unwrap();
+                        break;
+                    }
+                    Ok(n) => {
+                        parser.parse_buf(&buf[..n]).unwrap();
+
+                        // Clients may leave the connection open, so check to see if we've
+                        // got a full request in. (Otherwise, we just block.)
+                        if parser.is_complete() {
+                            parser.parse_eof().unwrap();
+                            break;
+                        }
+                    }
+                    Err(e) => {
+                        return Err(LbError::RecvError(e));
+                    }
+                }
+            }
+
+            //.read_to_string(&mut response_bytes) .await?;
 
             println!("HANDLER2 DONE");
-            Ok(response_bytes)
+            Ok(parser.get_message())
         });
 
         let (e1, e2) = join!(handle1, handle2);
@@ -127,12 +153,10 @@ impl Backend {
         e1.map_err(|e| LbError::InternalError(e))?
             .map_err(|e| LbError::SendError(e))?;
 
-        let response_bytes = e2
-            .map_err(|e| LbError::InternalError(e))?
-            .map_err(|e| LbError::RecvError(e))?;
+        let message = e2.map_err(|e| LbError::InternalError(e))??;
 
-        println!("{}", response_bytes);
-        Ok(Response::from(response_bytes).or(Err(LbError::ResponseError))?)
+        // println!("{}", response_bytes);
+        Ok(message.into())
     }
 }
 

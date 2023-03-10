@@ -12,7 +12,7 @@ fn parse(
     Result<(), ParseError>,
 ) {
     println!("Parsing buffer:\n{}", buf);
-    let mut parser = Parser::new("http://localhost".into(), start_state);
+    let mut parser = Parser::new("http://localhost", start_state);
     let result1 = parser.parse_buf(String::from(buf).as_bytes());
     let result2 = parser.parse_eof();
     if result1 == Ok(()) && result2 == Ok(()) {

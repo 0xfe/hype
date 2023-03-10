@@ -92,7 +92,8 @@ pub struct Parser {
 }
 
 impl Parser {
-    pub fn new(base_url: String, start_state: State) -> Parser {
+    pub fn new(base_url: impl Into<String>, start_state: State) -> Parser {
+        let base_url = base_url.into();
         let mut message = Message::Request(Request::new(base_url.clone()));
         if start_state == State::StartResponse {
             message = Message::Response(Response::new(status::from(status::OK)));
