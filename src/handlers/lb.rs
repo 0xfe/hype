@@ -1,11 +1,16 @@
 use std::{
+    any::Any,
     error::{self},
     fmt,
     net::SocketAddr,
+    sync::Arc,
 };
 
+use async_trait::async_trait;
+use rand::Rng;
 use tokio::{
     io::{self},
+    sync::Mutex,
     task::JoinError,
 };
 
@@ -40,54 +45,109 @@ impl fmt::Display for LbError {
 
 impl error::Error for LbError {}
 
-pub struct Backend {
+#[async_trait]
+pub trait Backend {
+    async fn connect(&mut self) -> Result<(), crate::client::ClientError>;
+    async fn send_request(&mut self, req: &Request) -> Result<Response, ClientError>;
+    fn as_any(&self) -> &dyn Any;
+}
+
+pub struct HTTPBackend {
     address: SocketAddr,
     client: Option<ConnectedClient>,
 }
 
-impl Backend {
+impl HTTPBackend {
     pub fn new(address: impl Into<String>) -> Self {
         Self {
             address: address.into().parse().unwrap(),
             client: None,
         }
     }
+}
 
+#[async_trait]
+impl Backend for HTTPBackend {
     async fn connect(&mut self) -> Result<(), crate::client::ClientError> {
         self.client = Some(Client::new(&self.address.to_string()).connect().await?);
         Ok(())
     }
 
-    pub async fn send_request(&mut self, req: &Request) -> Result<Response, ClientError> {
+    async fn send_request(&mut self, req: &Request) -> Result<Response, ClientError> {
         self.connect().await?;
         self.client.as_mut().unwrap().send_request(req).await
+    }
+
+    fn as_any(&self) -> &dyn Any {
+        self
     }
 }
 
 pub enum Policy {
-    Test(Backend),
+    Test(Box<dyn Backend>),
     RR,
     WeightedRR,
     StickyRR,
+    Random,
 }
 
 pub struct Lb {
     policy: Policy,
-    backends: Vec<Backend>,
+    backends: Vec<Arc<Box<dyn Backend>>>,
 }
 
 impl Lb {
-    pub fn new(policy: Policy, backends: Vec<Backend>) -> Self {
-        Lb { policy, backends }
+    pub fn new(policy: Policy, backends: Vec<Box<dyn Backend>>) -> Self {
+        let mut arc_backends = vec![];
+        backends
+            .into_iter()
+            .for_each(|b| arc_backends.push(Arc::new(b)));
+        Lb {
+            policy,
+            backends: arc_backends,
+        }
     }
 
     pub async fn send_request(&mut self, req: &Request) -> Result<Response, ClientError> {
         info!("sending request {:?}", req);
+
+        let mut rng = rand::thread_rng();
+        let num_backends = self.backends.len();
+
         match &mut self.policy {
             Policy::Test(backend) => backend.send_request(req).await,
-            Policy::RR => self.backends[0].send_request(req).await,
-            _ => self.backends[0].send_request(req).await,
+            Policy::RR => {
+                Arc::get_mut(&mut self.backends[0])
+                    .unwrap()
+                    .send_request(req)
+                    .await
+            }
+            Policy::Random => {
+                Arc::get_mut(&mut self.backends[rng.gen_range(0..num_backends)])
+                    .unwrap()
+                    .send_request(req)
+                    .await
+            }
+            _ => {
+                panic!()
+            }
         }
+    }
+
+    pub fn get_backend(&self, i: usize) -> Result<&Box<dyn Backend>, String> {
+        if i > self.backends.len() {
+            return Err("invalid index".to_string());
+        }
+
+        Ok(self.backends[i].as_ref())
+    }
+
+    pub fn get_backend_mut(&mut self, i: usize) -> Result<&Box<dyn Backend>, String> {
+        if i > self.backends.len() {
+            return Err("invalid index".to_string());
+        }
+
+        Ok(Arc::get_mut(&mut self.backends[i]).unwrap())
     }
 }
 
@@ -98,8 +158,8 @@ mod tests {
     #[tokio::test]
     async fn it_works() {
         // let backend = Backend::new("142.251.33.174:80"); // google.com
-        let backend = Backend::new("127.0.0.1:8080");
-        let mut lb = Lb::new(Policy::RR, vec![backend]);
+        let backend = HTTPBackend::new("127.0.0.1:8080");
+        let mut lb = Lb::new(Policy::RR, vec![Box::new(backend)]);
 
         let r = r##"GET / HTTP/1.1
 Accept-Encoding: identity

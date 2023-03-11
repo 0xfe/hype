@@ -26,6 +26,7 @@ log = "0.4"
 env_logger = "0.10"
 async-trait = "0.1"
 url = "2.3"
+rand = "0.8"
 regex = "1"
 chrono = "0.4"
 serde = { version = "1.0", features = ["derive"] }
