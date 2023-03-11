@@ -52,10 +52,6 @@ impl Backend for MockBackend {
         // self.send_result.take().unwrap()
         Ok(Response::new(status::from(status::OK)))
     }
-
-    fn as_any(&self) -> &dyn Any {
-        self
-    }
 }
 
 #[tokio::test]
@@ -78,24 +74,16 @@ async fn it_works() {
         .await
         .unwrap();
 
-    fn get_backend(lb: &lb::Lb, i: usize) -> &MockBackend {
-        lb.get_backend(i)
-            .unwrap()
-            .as_any()
-            .downcast_ref::<MockBackend>()
-            .unwrap()
-    }
-
     println!(
         "backend0.send_request_attempts: {}",
-        get_backend(&lb, 0).send_request_attempts
+        lb.get_backend(0).unwrap().send_request_attempts
     );
     println!(
         "backend1.send_request_attempts: {}",
-        get_backend(&lb, 1).send_request_attempts
+        lb.get_backend(1).unwrap().send_request_attempts
     );
     println!(
         "backend2.send_request_attempts: {}",
-        get_backend(&lb, 2).send_request_attempts
+        lb.get_backend(2).unwrap().send_request_attempts
     );
 }

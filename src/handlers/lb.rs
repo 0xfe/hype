@@ -49,7 +49,6 @@ impl error::Error for LbError {}
 pub trait Backend {
     async fn connect(&mut self) -> Result<(), crate::client::ClientError>;
     async fn send_request(&mut self, req: &Request) -> Result<Response, ClientError>;
-    fn as_any(&self) -> &dyn Any;
 }
 
 pub struct HTTPBackend {
@@ -77,10 +76,6 @@ impl Backend for HTTPBackend {
         self.connect().await?;
         self.client.as_mut().unwrap().send_request(req).await
     }
-
-    fn as_any(&self) -> &dyn Any {
-        self
-    }
 }
 
 pub enum Policy {
@@ -91,13 +86,13 @@ pub enum Policy {
     Random,
 }
 
-pub struct Lb {
+pub struct Lb<T: Backend> {
     policy: Policy,
-    backends: Vec<Arc<Box<dyn Backend>>>,
+    backends: Vec<Arc<Box<T>>>,
 }
 
-impl Lb {
-    pub fn new(policy: Policy, backends: Vec<Box<dyn Backend>>) -> Self {
+impl<T: Backend> Lb<T> {
+    pub fn new(policy: Policy, backends: Vec<Box<T>>) -> Self {
         let mut arc_backends = vec![];
         backends
             .into_iter()
@@ -134,7 +129,7 @@ impl Lb {
         }
     }
 
-    pub fn get_backend(&self, i: usize) -> Result<&Box<dyn Backend>, String> {
+    pub fn get_backend(&self, i: usize) -> Result<&Box<T>, String> {
         if i > self.backends.len() {
             return Err("invalid index".to_string());
         }
@@ -142,7 +137,7 @@ impl Lb {
         Ok(self.backends[i].as_ref())
     }
 
-    pub fn get_backend_mut(&mut self, i: usize) -> Result<&Box<dyn Backend>, String> {
+    pub fn get_backend_mut(&mut self, i: usize) -> Result<&Box<T>, String> {
         if i > self.backends.len() {
             return Err("invalid index".to_string());
         }
