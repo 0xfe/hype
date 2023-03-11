@@ -1,4 +1,8 @@
-# hype is a web server from scratch
+# hype
+
+-   hype is a web server
+-   hype is an L7 load balancer
+-   hype is a think web framework
 
 ## Example
 

@@ -2,20 +2,15 @@ use std::{
     error::{self},
     fmt,
     net::SocketAddr,
-    sync::Arc,
 };
 
 use tokio::{
-    io::{self, AsyncReadExt, AsyncWriteExt},
-    join,
-    net::{TcpSocket, TcpStream},
-    sync::Mutex,
+    io::{self},
     task::JoinError,
 };
 
 use crate::{
-    handler::{AsyncReadStream, AsyncWriteStream},
-    parser::{self, Parser},
+    client::{Client, ClientError, ConnectedClient},
     request::Request,
     response::Response,
 };
@@ -45,114 +40,27 @@ impl fmt::Display for LbError {
 
 impl error::Error for LbError {}
 
-pub struct BackendState {
-    writer: Option<Arc<Mutex<Box<dyn AsyncWriteStream>>>>,
-    reader: Option<Arc<Mutex<Box<dyn AsyncReadStream>>>>,
-}
-
-impl BackendState {
-    pub fn new() -> Self {
-        Self {
-            reader: None,
-            writer: None,
-        }
-    }
-
-    pub fn set_stream(&mut self, stream: TcpStream) {
-        let (reader, writer) = stream.into_split();
-        self.reader = Some(Arc::new(Mutex::new(Box::new(reader))));
-        self.writer = Some(Arc::new(Mutex::new(Box::new(writer))));
-    }
-}
-
 pub struct Backend {
     address: SocketAddr,
-    state: BackendState,
+    client: Option<ConnectedClient>,
 }
 
 impl Backend {
     pub fn new(address: impl Into<String>) -> Self {
         Self {
             address: address.into().parse().unwrap(),
-            state: BackendState::new(),
+            client: None,
         }
     }
 
-    async fn connect(&mut self) -> Result<(), LbError> {
-        let stream;
-
-        if self.address.is_ipv4() {
-            let socket = TcpSocket::new_v4().or(Err(LbError::ConnectionError))?;
-            stream = socket
-                .connect(self.address)
-                .await
-                .or(Err(LbError::ConnectionError))?;
-        } else {
-            let socket = TcpSocket::new_v6().or(Err(LbError::ConnectionError))?;
-            stream = socket
-                .connect(self.address)
-                .await
-                .or(Err(LbError::ConnectionError))?;
-        }
-
-        self.state.set_stream(stream);
+    async fn connect(&mut self) -> Result<(), crate::client::ClientError> {
+        self.client = Some(Client::new(&self.address.to_string()).connect().await?);
         Ok(())
     }
 
-    pub async fn send_request(&mut self, req: &Request) -> Result<Response, LbError> {
+    pub async fn send_request(&mut self, req: &Request) -> Result<Response, ClientError> {
         self.connect().await?;
-
-        let data = req.serialize();
-
-        let writer = Arc::clone(&self.state.writer.as_ref().unwrap());
-        let reader = Arc::clone(&self.state.reader.as_ref().unwrap());
-
-        let handle1 = tokio::spawn(async move {
-            writer.lock().await.write_all(data.as_bytes()).await?;
-            writer.lock().await.flush().await
-        });
-
-        let handle2 = tokio::spawn(async move {
-            let mut stream = reader.lock().await;
-
-            let mut parser = Parser::new("http://foo", parser::State::StartResponse);
-
-            loop {
-                let mut buf = [0u8; 16384];
-
-                match stream.read(&mut buf).await {
-                    Ok(0) => {
-                        parser.parse_eof().unwrap();
-                        break;
-                    }
-                    Ok(n) => {
-                        parser.parse_buf(&buf[..n]).unwrap();
-
-                        // Clients may leave the connection open, so check to see if we've
-                        // got a full request in. (Otherwise, we just block.)
-                        if parser.is_complete() {
-                            parser.parse_eof().unwrap();
-                            break;
-                        }
-                    }
-                    Err(e) => {
-                        return Err(LbError::RecvError(e));
-                    }
-                }
-            }
-
-            Ok(parser.get_message())
-        });
-
-        let (e1, e2) = join!(handle1, handle2);
-
-        e1.map_err(|e| LbError::InternalError(e))?
-            .map_err(|e| LbError::SendError(e))?;
-
-        let message = e2.map_err(|e| LbError::InternalError(e))??;
-
-        // println!("{}", response_bytes);
-        Ok(message.into())
+        self.client.as_mut().unwrap().send_request(req).await
     }
 }
 
@@ -173,7 +81,7 @@ impl Lb {
         Lb { policy, backends }
     }
 
-    pub async fn send_request(&mut self, req: &Request) -> Result<Response, LbError> {
+    pub async fn send_request(&mut self, req: &Request) -> Result<Response, ClientError> {
         info!("sending request {:?}", req);
         match &mut self.policy {
             Policy::Test(backend) => backend.send_request(req).await,
@@ -190,7 +98,7 @@ mod tests {
     #[tokio::test]
     async fn it_works() {
         // let backend = Backend::new("142.251.33.174:80"); // google.com
-        let backend = Backend::new("127.0.0.1:8080"); // google.com
+        let backend = Backend::new("127.0.0.1:8080");
         let mut lb = Lb::new(Policy::RR, vec![backend]);
 
         let r = r##"GET / HTTP/1.1
