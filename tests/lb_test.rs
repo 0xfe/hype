@@ -1,5 +1,3 @@
-use std::any::Any;
-
 use async_trait::async_trait;
 
 use hype::{
@@ -18,7 +16,6 @@ struct MockBackend {
     connect_attempts: usize,
     send_request_attempts: usize,
     requests: Vec<Request>,
-    send_result: Option<Result<Response, client::ClientError>>,
 }
 
 impl MockBackend {
@@ -28,12 +25,8 @@ impl MockBackend {
             connect_attempts: 0,
             send_request_attempts: 0,
             requests: vec![],
-            send_result: Some(Ok(Response::new(status::from(status::OK)))),
+            // send_result: Some(Ok(Response::new(status::from(status::OK)))),
         }
-    }
-
-    fn set_send_result(&mut self, result: Result<Response, client::ClientError>) {
-        self.send_result = Some(result);
     }
 }
 
@@ -56,9 +49,9 @@ impl Backend for MockBackend {
 
 #[tokio::test]
 async fn it_works() {
-    let backend1 = Box::new(MockBackend::new("b1"));
-    let backend2 = Box::new(MockBackend::new("b2"));
-    let backend3 = Box::new(MockBackend::new("b3"));
+    let backend1 = MockBackend::new("b1");
+    let backend2 = MockBackend::new("b2");
+    let backend3 = MockBackend::new("b3");
 
     let mut lb = lb::Lb::new(lb::Policy::Random, vec![backend1, backend2, backend3]);
 

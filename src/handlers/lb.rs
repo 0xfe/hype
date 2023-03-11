@@ -1,16 +1,13 @@
 use std::{
-    any::Any,
     error::{self},
     fmt,
     net::SocketAddr,
-    sync::Arc,
 };
 
 use async_trait::async_trait;
 use rand::Rng;
 use tokio::{
     io::{self},
-    sync::Mutex,
     task::JoinError,
 };
 
@@ -88,18 +85,14 @@ pub enum Policy {
 
 pub struct Lb<T: Backend> {
     policy: Policy,
-    backends: Vec<Arc<Box<T>>>,
+    backends: Vec<T>,
 }
 
 impl<T: Backend> Lb<T> {
-    pub fn new(policy: Policy, backends: Vec<Box<T>>) -> Self {
-        let mut arc_backends = vec![];
-        backends
-            .into_iter()
-            .for_each(|b| arc_backends.push(Arc::new(b)));
+    pub fn new(policy: Policy, backends: Vec<T>) -> Self {
         Lb {
             policy,
-            backends: arc_backends,
+            backends: backends,
         }
     }
 
@@ -111,15 +104,9 @@ impl<T: Backend> Lb<T> {
 
         match &mut self.policy {
             Policy::Test(backend) => backend.send_request(req).await,
-            Policy::RR => {
-                Arc::get_mut(&mut self.backends[0])
-                    .unwrap()
-                    .send_request(req)
-                    .await
-            }
+            Policy::RR => self.backends[0].send_request(req).await,
             Policy::Random => {
-                Arc::get_mut(&mut self.backends[rng.gen_range(0..num_backends)])
-                    .unwrap()
+                self.backends[rng.gen_range(0..num_backends)]
                     .send_request(req)
                     .await
             }
@@ -129,20 +116,20 @@ impl<T: Backend> Lb<T> {
         }
     }
 
-    pub fn get_backend(&self, i: usize) -> Result<&Box<T>, String> {
+    pub fn get_backend(&self, i: usize) -> Result<&T, String> {
         if i > self.backends.len() {
             return Err("invalid index".to_string());
         }
 
-        Ok(self.backends[i].as_ref())
+        Ok(&self.backends[i])
     }
 
-    pub fn get_backend_mut(&mut self, i: usize) -> Result<&Box<T>, String> {
+    pub fn get_backend_mut(&mut self, i: usize) -> Result<&mut T, String> {
         if i > self.backends.len() {
             return Err("invalid index".to_string());
         }
 
-        Ok(Arc::get_mut(&mut self.backends[i]).unwrap())
+        Ok(&mut self.backends[i])
     }
 }
 
@@ -154,7 +141,7 @@ mod tests {
     async fn it_works() {
         // let backend = Backend::new("142.251.33.174:80"); // google.com
         let backend = HTTPBackend::new("127.0.0.1:8080");
-        let mut lb = Lb::new(Policy::RR, vec![Box::new(backend)]);
+        let mut lb = Lb::new(Policy::RR, vec![backend]);
 
         let r = r##"GET / HTTP/1.1
 Accept-Encoding: identity
