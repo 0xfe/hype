@@ -3,7 +3,7 @@ use std::{error, fmt, net::SocketAddr, sync::Arc};
 use tokio::{
     io::{self, AsyncReadExt, AsyncWriteExt},
     join,
-    net::TcpSocket,
+    net::{lookup_host, TcpSocket},
     sync::Mutex,
     task::JoinError,
 };
@@ -17,6 +17,7 @@ use crate::{
 
 #[derive(Debug)]
 pub enum ClientError {
+    LookupError(String),
     ConnectionError,
     ConnectionBroken,
     SendError(io::Error),
@@ -29,6 +30,7 @@ pub enum ClientError {
 impl fmt::Display for ClientError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
+            ClientError::LookupError(address) => write!(f, "could not lookup address: {}", address),
             ClientError::ConnectionError => write!(f, "could not connect to backend"),
             ClientError::ConnectionBroken => write!(f, "connection broken"),
             ClientError::SendError(err) => write!(f, "could not send data to backend: {}", err),
@@ -48,29 +50,43 @@ impl Client {}
 
 #[derive(Debug)]
 pub struct Client {
-    address: SocketAddr,
+    address: String,
 }
 
 impl Client {
     pub fn new(address: impl Into<String>) -> Self {
         return Self {
-            address: address.into().parse().unwrap(),
+            address: address.into(),
         };
     }
 
     pub async fn connect(&mut self) -> Result<ConnectedClient, ClientError> {
         let stream;
 
-        if self.address.is_ipv4() {
+        let addresses: Vec<SocketAddr> = lookup_host(&self.address)
+            .await
+            .map_err(|e| ClientError::LookupError(format!("{}: {}", self.address.clone(), e)))?
+            .collect();
+
+        if addresses.len() == 0 {
+            return Err(ClientError::LookupError(format!(
+                "no hosts found for {}",
+                self.address
+            )));
+        }
+
+        let address = addresses[0];
+
+        if address.is_ipv4() {
             let socket = TcpSocket::new_v4().or(Err(ClientError::ConnectionError))?;
             stream = socket
-                .connect(self.address)
+                .connect(address)
                 .await
                 .or(Err(ClientError::ConnectionError))?;
         } else {
             let socket = TcpSocket::new_v6().or(Err(ClientError::ConnectionError))?;
             stream = socket
-                .connect(self.address)
+                .connect(address)
                 .await
                 .or(Err(ClientError::ConnectionError))?;
         }

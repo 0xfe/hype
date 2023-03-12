@@ -71,8 +71,8 @@ async fn main() {
 
 ## TODO
 
-    -   Healthchecking
-
+-   LB handler
+-   Healthchecking
 -   Transfer-Encoding: chunked, gzip (note Content-Encoding and Accept-Encoding too)
 -   Implement access log
 -   Use templating + #include to make file browser look better

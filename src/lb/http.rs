@@ -56,7 +56,7 @@ mod tests {
     #[tokio::test]
     async fn it_works() {
         // let backend = Backend::new("142.251.33.174:80"); // google.com
-        let backend = HttpBackend::new("127.0.0.1:8080");
+        let backend = HttpBackend::new("localhost:8080");
         let mut lb = Http::new(vec![backend], RRPicker::new());
 
         let r = r##"GET / HTTP/1.1

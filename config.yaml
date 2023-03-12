@@ -27,4 +27,5 @@ routes:
       fs_path: /Users/mmuthanna/git/hype
     - location: /lb
       handler: lb
-      backend: google.com
+      policy: weighted_rr
+      backends: google.com
