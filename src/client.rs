@@ -1,11 +1,10 @@
 use std::{error, fmt, net::SocketAddr, sync::Arc};
 
 use tokio::{
-    io::{self, AsyncReadExt, AsyncWriteExt},
+    io::{AsyncReadExt, AsyncWriteExt},
     join,
     net::{lookup_host, TcpSocket},
     sync::Mutex,
-    task::JoinError,
 };
 
 use crate::{
@@ -15,15 +14,15 @@ use crate::{
     response::Response,
 };
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum ClientError {
     LookupError(String),
     ConnectionError,
     ConnectionBroken,
-    SendError(io::Error),
-    RecvError(io::Error),
+    SendError(String),
+    RecvError(String),
     ResponseError,
-    InternalError(JoinError),
+    InternalError(String),
     OtherError(String),
 }
 
@@ -138,7 +137,7 @@ impl ConnectedClient {
                         }
                     }
                     Err(e) => {
-                        return Err(ClientError::RecvError(e));
+                        return Err(ClientError::RecvError(e.to_string()));
                     }
                 }
             }
@@ -148,10 +147,10 @@ impl ConnectedClient {
 
         let (e1, e2) = join!(handle1, handle2);
 
-        e1.map_err(|e| ClientError::InternalError(e))?
-            .map_err(|e| ClientError::SendError(e))?;
+        e1.map_err(|e| ClientError::InternalError(e.to_string()))?
+            .map_err(|e| ClientError::SendError(e.to_string()))?;
 
-        let message = e2.map_err(|e| ClientError::InternalError(e))??;
+        let message = e2.map_err(|e| ClientError::InternalError(e.to_string()))??;
 
         Ok(message.into())
     }
