@@ -2,7 +2,7 @@ use async_trait::async_trait;
 
 use hype::{
     client,
-    handlers::lb::{self, Backend},
+    handlers::lb::{self, Backend, RRPicker, RandomPicker},
     request::Request,
     response::Response,
     status,
@@ -48,35 +48,49 @@ impl Backend for MockBackend {
 }
 
 #[tokio::test]
-async fn it_works() {
-    let backend1 = MockBackend::new("b1");
-    let backend2 = MockBackend::new("b2");
-    let backend3 = MockBackend::new("b3");
+async fn random_policy() {
+    let backends = vec![
+        MockBackend::new("b1"),
+        MockBackend::new("b2"),
+        MockBackend::new("b3"),
+    ];
 
-    let mut lb = lb::Lb::new(lb::Policy::Random, vec![backend1, backend2, backend3]);
+    let mut lb = lb::Lb::new(backends, RandomPicker::new());
 
-    println!("boo");
+    for _ in 0..20 {
+        lb.send_request(&Request::new("http://localhost:8000"))
+            .await
+            .unwrap();
+    }
 
-    lb.send_request(&Request::new("http://localhost:8000"))
-        .await
-        .unwrap();
-    lb.send_request(&Request::new("http://localhost:8000"))
-        .await
-        .unwrap();
-    lb.send_request(&Request::new("http://localhost:8000"))
-        .await
-        .unwrap();
+    let total_requests: usize = (0..3)
+        .map(|i| lb.get_backend(i).unwrap().send_request_attempts)
+        .sum();
 
-    println!(
-        "backend0.send_request_attempts: {}",
-        lb.get_backend(0).unwrap().send_request_attempts
-    );
-    println!(
-        "backend1.send_request_attempts: {}",
-        lb.get_backend(1).unwrap().send_request_attempts
-    );
-    println!(
-        "backend2.send_request_attempts: {}",
-        lb.get_backend(2).unwrap().send_request_attempts
-    );
+    assert_eq!(total_requests, 20)
+}
+
+#[tokio::test]
+async fn rr_policy() {
+    let backends = vec![
+        MockBackend::new("b1"),
+        MockBackend::new("b2"),
+        MockBackend::new("b3"),
+        MockBackend::new("b4"),
+    ];
+
+    let mut lb = lb::Lb::new(backends, RRPicker::new());
+
+    for _ in 0..20 {
+        lb.send_request(&Request::new("http://localhost:8000"))
+            .await
+            .unwrap();
+    }
+
+    let total_requests: usize = (0..4)
+        .map(|i| lb.get_backend(i).unwrap().send_request_attempts)
+        .sum();
+
+    assert_eq!(total_requests, 20);
+    (0..4).for_each(|i| assert_eq!(lb.get_backend(i).unwrap().send_request_attempts, 5));
 }

@@ -5,7 +5,7 @@ use std::{
 };
 
 use async_trait::async_trait;
-use rand::Rng;
+use rand::{rngs::ThreadRng, Rng};
 use tokio::{
     io::{self},
     task::JoinError,
@@ -75,6 +75,55 @@ impl Backend for HTTPBackend {
     }
 }
 
+pub trait BackendPicker<T: Backend> {
+    fn pick_backend(&mut self, backends: &Vec<T>) -> usize;
+}
+
+pub struct RRPicker {
+    last_index: Option<usize>,
+}
+
+impl RRPicker {
+    pub fn new() -> Self {
+        Self { last_index: None }
+    }
+}
+
+impl<T: Backend> BackendPicker<T> for RRPicker {
+    fn pick_backend(&mut self, backends: &Vec<T>) -> usize {
+        if let Some(last_index) = self.last_index {
+            if last_index >= backends.len() - 1 {
+                self.last_index = Some(0);
+                return 0;
+            } else {
+                self.last_index = Some(last_index + 1);
+                return last_index + 1;
+            }
+        }
+
+        self.last_index = Some(0);
+        0
+    }
+}
+
+pub struct RandomPicker {
+    rng: ThreadRng,
+}
+
+impl RandomPicker {
+    pub fn new() -> Self {
+        Self {
+            rng: rand::thread_rng(),
+        }
+    }
+}
+
+impl<T: Backend> BackendPicker<T> for RandomPicker {
+    fn pick_backend(&mut self, backends: &Vec<T>) -> usize {
+        self.rng.gen_range(0..backends.len())
+    }
+}
+
 pub enum Policy {
     Test(Box<dyn Backend>),
     RR,
@@ -83,37 +132,22 @@ pub enum Policy {
     Random,
 }
 
-pub struct Lb<T: Backend> {
-    policy: Policy,
+impl Policy {}
+
+pub struct Lb<T: Backend, Picker: BackendPicker<T>> {
     backends: Vec<T>,
+    picker: Picker,
 }
 
-impl<T: Backend> Lb<T> {
-    pub fn new(policy: Policy, backends: Vec<T>) -> Self {
-        Lb {
-            policy,
-            backends: backends,
-        }
+impl<T: Backend, Picker: BackendPicker<T>> Lb<T, Picker> {
+    pub fn new(backends: Vec<T>, picker: Picker) -> Self {
+        Lb { backends, picker }
     }
 
     pub async fn send_request(&mut self, req: &Request) -> Result<Response, ClientError> {
         info!("sending request {:?}", req);
-
-        let mut rng = rand::thread_rng();
-        let num_backends = self.backends.len();
-
-        match &mut self.policy {
-            Policy::Test(backend) => backend.send_request(req).await,
-            Policy::RR => self.backends[0].send_request(req).await,
-            Policy::Random => {
-                self.backends[rng.gen_range(0..num_backends)]
-                    .send_request(req)
-                    .await
-            }
-            _ => {
-                panic!()
-            }
-        }
+        let index = self.picker.pick_backend(&self.backends);
+        self.backends[index].send_request(req).await
     }
 
     pub fn get_backend(&self, i: usize) -> Result<&T, String> {
@@ -141,7 +175,7 @@ mod tests {
     async fn it_works() {
         // let backend = Backend::new("142.251.33.174:80"); // google.com
         let backend = HTTPBackend::new("127.0.0.1:8080");
-        let mut lb = Lb::new(Policy::RR, vec![backend]);
+        let mut lb = Lb::new(vec![backend], RRPicker::new());
 
         let r = r##"GET / HTTP/1.1
 Accept-Encoding: identity
