@@ -29,7 +29,7 @@ pub struct Server {
     port: u16,
     base_url: String,
     handlers: Arc<RwLock<Vec<(Matcher, Box<dyn Handler>)>>>,
-    default_handler: Option<Arc<Box<dyn Handler>>>,
+    default_handler: Option<Arc<RwLock<Box<dyn Handler>>>>,
 }
 
 impl Server {
@@ -37,7 +37,7 @@ impl Server {
         mut stream: TcpStream,
         base_url: String,
         handlers: Arc<RwLock<Vec<(Matcher, Box<dyn Handler>)>>>,
-        default_handler: Option<Arc<Box<dyn Handler>>>,
+        default_handler: Option<Arc<RwLock<Box<dyn Handler>>>>,
     ) {
         info!("Connection received from {:?}", stream.peer_addr().unwrap());
         let mut parser = Parser::new(base_url, parser::State::StartRequest);
@@ -75,7 +75,7 @@ impl Server {
             path = url.path().into()
         }
 
-        for handler in handlers.read().await.iter() {
+        for handler in handlers.write().await.iter_mut() {
             if let Some(matched_path) = handler.0.matches(&path) {
                 request.set_handler_path(String::from(matched_path.to_string_lossy()));
                 if let Err(error) = handler.1.handle(&request, &mut stream).await {
@@ -86,7 +86,7 @@ impl Server {
         }
 
         if let Some(handler) = default_handler {
-            if let Err(error) = handler.handle(&request, &mut stream).await {
+            if let Err(error) = handler.write().await.handle(&request, &mut stream).await {
                 error!("Error from handler {:?}: {:?}", handler, error);
             }
             return;
@@ -113,7 +113,7 @@ impl Server {
     }
 
     pub fn route_default(&mut self, handler: Box<dyn Handler>) {
-        self.default_handler = Some(Arc::new(handler));
+        self.default_handler = Some(Arc::new(RwLock::new(handler)));
     }
 
     pub async fn route(&self, path: String, handler: Box<dyn Handler>) {
@@ -130,7 +130,7 @@ impl Server {
             let (socket, _) = listener.accept().await.unwrap();
             let base_url = self.base_url.clone();
             let handlers = Arc::clone(&self.handlers);
-            let default_handler: Option<Arc<Box<dyn Handler>>> = self
+            let default_handler: Option<Arc<RwLock<Box<dyn Handler>>>> = self
                 .default_handler
                 .as_ref()
                 .and_then(|h| Some(Arc::clone(&h)));

@@ -38,7 +38,7 @@ struct LogHandler {}
 #[async_trait]
 impl Handler for LogHandler {
     async fn handle(
-        &self,
+        &mut self,
         r: &Request,
         _: &mut dyn AsyncStream,
     ) -> Result<handler::Ok, handler::Error> {
@@ -109,7 +109,7 @@ impl MyHandler {
 #[async_trait]
 impl Handler for MyHandler {
     async fn handle(
-        &self,
+        &mut self,
         r: &Request,
         w: &mut dyn AsyncStream,
     ) -> Result<handler::Ok, handler::Error> {

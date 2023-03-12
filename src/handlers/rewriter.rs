@@ -32,7 +32,7 @@ impl Rewriter {
 #[async_trait]
 impl Handler for Rewriter {
     async fn handle(
-        &self,
+        &mut self,
         r: &Request,
         w: &mut dyn AsyncStream,
     ) -> Result<handler::Ok, handler::Error> {
@@ -64,7 +64,7 @@ Content-Length: 23
 
 merchantID=2003&foo=bar"##;
 
-        let rewriter = Rewriter::new("(.*)([^/]$)", "$1$2/").unwrap();
+        let mut rewriter = Rewriter::new("(.*)([^/]$)", "$1$2/").unwrap();
         let request = Request::from(r, "http://localhost").unwrap();
         let mut stream: Vec<u8> = vec![];
 
@@ -86,7 +86,7 @@ Content-Length: 23
 
 merchantID=2003&foo=bar"##;
 
-        let rewriter = Rewriter::new("(.*)([^/]$)", "$1$2/").unwrap();
+        let mut rewriter = Rewriter::new("(.*)([^/]$)", "$1$2/").unwrap();
         let request = Request::from(r, "http://localhost").unwrap();
         let mut stream: Vec<u8> = vec![];
 

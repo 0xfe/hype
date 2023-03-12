@@ -17,7 +17,7 @@ struct ErrorPage {}
 #[async_trait]
 impl Handler for ErrorPage {
     async fn handle(
-        &self,
+        &mut self,
         _r: &hype::request::Request,
         w: &mut dyn hype::handler::AsyncStream,
     ) -> Result<handler::Ok, handler::Error> {

@@ -17,7 +17,7 @@ struct MyHandler {}
 #[async_trait]
 impl Handler for MyHandler {
     async fn handle(
-        &self,
+        &mut self,
         _r: &Request,
         w: &mut dyn AsyncStream,
     ) -> Result<handler::Ok, handler::Error> {

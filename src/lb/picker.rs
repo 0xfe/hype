@@ -1,6 +1,9 @@
 use std::{error, fmt};
 
-use rand::{rngs::ThreadRng, Rng};
+use rand::{
+    rngs::{StdRng, ThreadRng},
+    Rng, SeedableRng,
+};
 
 use super::backend::Backend;
 
@@ -23,7 +26,7 @@ impl fmt::Display for PickerError {
 
 impl error::Error for PickerError {}
 
-pub trait Picker<T: Backend> {
+pub trait Picker<T: Backend>: Send + Sync {
     fn pick_backend(&mut self, backends: &Vec<T>) -> Result<usize, PickerError>;
 }
 
@@ -55,13 +58,13 @@ impl<T: Backend> Picker<T> for RRPicker {
 }
 
 pub struct RandomPicker {
-    rng: ThreadRng,
+    rng: StdRng,
 }
 
 impl RandomPicker {
     pub fn new() -> Self {
         Self {
-            rng: rand::thread_rng(),
+            rng: StdRng::from_entropy(),
         }
     }
 }
