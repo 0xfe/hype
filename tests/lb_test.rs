@@ -2,7 +2,11 @@ use async_trait::async_trait;
 
 use hype::{
     client,
-    handlers::lb::{self, Backend, RRPicker, RandomPicker},
+    lb::{
+        backend::Backend,
+        lb,
+        picker::{RRPicker, RandomPicker},
+    },
     request::Request,
     response::Response,
     status,
