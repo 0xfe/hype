@@ -14,12 +14,12 @@ pub trait Backend {
     async fn send_request(&mut self, req: &Request) -> Result<Response, ClientError>;
 }
 
-pub struct HTTPBackend {
+pub struct HttpBackend {
     address: SocketAddr,
     client: Option<ConnectedClient>,
 }
 
-impl HTTPBackend {
+impl HttpBackend {
     pub fn new(address: impl Into<String>) -> Self {
         Self {
             address: address.into().parse().unwrap(),
@@ -29,7 +29,7 @@ impl HTTPBackend {
 }
 
 #[async_trait]
-impl Backend for HTTPBackend {
+impl Backend for HttpBackend {
     async fn connect(&mut self) -> Result<(), crate::client::ClientError> {
         self.client = Some(Client::new(&self.address.to_string()).connect().await?);
         Ok(())

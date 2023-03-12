@@ -1,3 +1,3 @@
 pub mod backend;
-pub mod lb;
+pub mod http;
 pub mod picker;

@@ -4,7 +4,7 @@ use hype::{
     client,
     lb::{
         backend::Backend,
-        lb,
+        http,
         picker::{RRPicker, RandomPicker},
     },
     request::Request,
@@ -59,7 +59,7 @@ async fn random_policy() {
         MockBackend::new("b3"),
     ];
 
-    let mut lb = lb::Lb::new(backends, RandomPicker::new());
+    let mut lb = http::Http::new(backends, RandomPicker::new());
 
     for _ in 0..20 {
         lb.send_request(&Request::new("http://localhost:8000"))
@@ -83,7 +83,7 @@ async fn rr_policy() {
         MockBackend::new("b4"),
     ];
 
-    let mut lb = lb::Lb::new(backends, RRPicker::new());
+    let mut lb = http::Http::new(backends, RRPicker::new());
 
     for _ in 0..20 {
         lb.send_request(&Request::new("http://localhost:8000"))

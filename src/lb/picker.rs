@@ -50,3 +50,23 @@ impl<T: Backend> Picker<T> for RandomPicker {
         self.rng.gen_range(0..backends.len())
     }
 }
+
+pub struct WeightedRRPicker {
+    rng: ThreadRng,
+    weights: Vec<u16>,
+}
+
+impl WeightedRRPicker {
+    pub fn new(weights: Vec<u16>) -> Self {
+        Self {
+            weights,
+            rng: rand::thread_rng(),
+        }
+    }
+}
+
+impl<T: Backend> Picker<T> for WeightedRRPicker {
+    fn pick_backend(&mut self, backends: &Vec<T>) -> usize {
+        self.rng.gen_range(0..backends.len())
+    }
+}

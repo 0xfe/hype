@@ -2,24 +2,14 @@ use crate::{client::ClientError, request::Request, response::Response};
 
 use super::{backend::Backend, picker::Picker};
 
-pub enum Policy {
-    Test(Box<dyn Backend>),
-    RR,
-    WeightedRR,
-    StickyRR,
-    Random,
-}
-
-impl Policy {}
-
-pub struct Lb<T: Backend, P: Picker<T>> {
+pub struct Http<T: Backend, P: Picker<T>> {
     backends: Vec<T>,
     picker: P,
 }
 
-impl<T: Backend, P: Picker<T>> Lb<T, P> {
+impl<T: Backend, P: Picker<T>> Http<T, P> {
     pub fn new(backends: Vec<T>, picker: P) -> Self {
-        Lb { backends, picker }
+        Self { backends, picker }
     }
 
     pub async fn send_request(&mut self, req: &Request) -> Result<Response, ClientError> {
@@ -47,15 +37,15 @@ impl<T: Backend, P: Picker<T>> Lb<T, P> {
 
 #[cfg(test)]
 mod tests {
-    use crate::lb::{backend::HTTPBackend, picker::RRPicker};
+    use crate::lb::{backend::HttpBackend, picker::RRPicker};
 
     use super::*;
 
     #[tokio::test]
     async fn it_works() {
         // let backend = Backend::new("142.251.33.174:80"); // google.com
-        let backend = HTTPBackend::new("127.0.0.1:8080");
-        let mut lb = Lb::new(vec![backend], RRPicker::new());
+        let backend = HttpBackend::new("127.0.0.1:8080");
+        let mut lb = Http::new(vec![backend], RRPicker::new());
 
         let r = r##"GET / HTTP/1.1
 Accept-Encoding: identity
