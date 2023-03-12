@@ -2,7 +2,38 @@
 
 -   hype is a web server
 -   hype is an L7 load balancer
--   hype is a think web framework
+-   hype is a tiny web framework
+
+## Features implemented so far
+
+-   Handler and middleware API for web apps
+-   Simple pattern based request routing
+-   L7 loadbalancing with multiple backend selection policies
+-   Handler to serve files from directories
+
+## To run
+
+Start with debug logging.
+
+```
+$ RUST_LOG=debug cargo run --bin {app, hello}
+```
+
+## Run tests
+
+```
+# Run all tests
+$ cargo test
+
+# Run specific tests
+$ cargo test parser
+
+# Run all tests in file
+# cargo test --test request_test
+
+# Show standard output
+$ cargo test -- --nocapture
+```
 
 ## Example
 
@@ -38,35 +69,10 @@ async fn main() {
 
 ```
 
-## To run
-
-Start with debug logging.
-
-```
-$ RUST_LOG=debug cargo run --bin {app, hello}
-```
-
-## Run tests
-
-```
-# Run all tests
-$ cargo test
-
-# Run specific tests
-$ cargo test parser
-
-# Run all tests in file
-# cargo test --test request_test
-
-# Show standard output
-$ cargo test -- --nocapture
-```
-
 ## TODO
 
--   L7 load balancer (in progress)
-    -   Roundrobin, weighted RR, and sticky RR with cookies
     -   Healthchecking
+
 -   Transfer-Encoding: chunked, gzip (note Content-Encoding and Accept-Encoding too)
 -   Implement access log
 -   Use templating + #include to make file browser look better
@@ -86,6 +92,10 @@ $ cargo test -- --nocapture
 
 ### Done
 
+-   L7 load balancer (in progress)
+    -   Implemented random backend picker
+    -   Implemented Roundrobin picker
+    -   Implemented Weighted RR picker
 -   Basic loadbalancer framework
 -   URL rewrite middleware
 -   Config file like lighttpd -- keep it simple, reverse proxy support

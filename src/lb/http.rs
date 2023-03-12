@@ -13,7 +13,19 @@ impl<T: Backend, P: Picker<T>> Http<T, P> {
     }
 
     pub async fn send_request(&mut self, req: &Request) -> Result<Response, ClientError> {
-        let index = self.picker.pick_backend(&self.backends);
+        let index = self
+            .picker
+            .pick_backend(&self.backends)
+            .map_err(|e| ClientError::OtherError(format!("could not pick backend: {}", e)))?;
+
+        if index > self.backends.len() {
+            return Err(ClientError::OtherError(format!(
+                "picker returned invalid index: {}, num backends: {}",
+                index,
+                self.backends.len()
+            )));
+        }
+
         debug!("LB: sending request to backend {}: {:?}", index, req);
         self.backends[index].send_request(req).await
     }

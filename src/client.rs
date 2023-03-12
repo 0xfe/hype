@@ -23,6 +23,7 @@ pub enum ClientError {
     RecvError(io::Error),
     ResponseError,
     InternalError(JoinError),
+    OtherError(String),
 }
 
 impl fmt::Display for ClientError {
@@ -36,6 +37,7 @@ impl fmt::Display for ClientError {
             }
             ClientError::ResponseError => write!(f, "could not parse response"),
             ClientError::InternalError(err) => write!(f, "could not spawn tasks: {}", err),
+            ClientError::OtherError(err) => write!(f, "could not send request: {}", err),
         }
     }
 }
