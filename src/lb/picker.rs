@@ -1,9 +1,9 @@
-use std::{error, fmt};
-
-use rand::{
-    rngs::{StdRng, ThreadRng},
-    Rng, SeedableRng,
+use std::{
+    error, fmt,
+    sync::{Arc, Mutex},
 };
+
+use rand::{rngs::StdRng, Rng, SeedableRng};
 
 use super::backend::Backend;
 
@@ -27,58 +27,61 @@ impl fmt::Display for PickerError {
 impl error::Error for PickerError {}
 
 pub trait Picker<T: Backend>: Send + Sync {
-    fn pick_backend(&mut self, backends: &Vec<T>) -> Result<usize, PickerError>;
+    fn pick_backend(&self, backends: &Vec<T>) -> Result<usize, PickerError>;
 }
 
 pub struct RRPicker {
-    last_index: Option<usize>,
+    last_index: Arc<Mutex<Option<usize>>>,
 }
 
 impl RRPicker {
     pub fn new() -> Self {
-        Self { last_index: None }
+        Self {
+            last_index: Arc::new(Mutex::new(None)),
+        }
     }
 }
 
 impl<T: Backend> Picker<T> for RRPicker {
-    fn pick_backend(&mut self, backends: &Vec<T>) -> Result<usize, PickerError> {
-        if let Some(last_index) = self.last_index {
+    fn pick_backend(&self, backends: &Vec<T>) -> Result<usize, PickerError> {
+        let mut last_index_guard = self.last_index.lock().unwrap();
+        if let Some(last_index) = *last_index_guard {
             if last_index >= backends.len() - 1 {
-                self.last_index = Some(0);
+                *last_index_guard = Some(0);
                 return Ok(0);
             } else {
-                self.last_index = Some(last_index + 1);
+                *last_index_guard = Some(last_index + 1);
                 return Ok(last_index + 1);
             }
         }
 
-        self.last_index = Some(0);
+        *last_index_guard = Some(0);
         Ok(0)
     }
 }
 
 pub struct RandomPicker {
-    rng: StdRng,
+    rng: Arc<Mutex<StdRng>>,
 }
 
 impl RandomPicker {
     pub fn new() -> Self {
         Self {
-            rng: StdRng::from_entropy(),
+            rng: Arc::new(Mutex::new(StdRng::from_entropy())),
         }
     }
 }
 
 impl<T: Backend> Picker<T> for RandomPicker {
-    fn pick_backend(&mut self, backends: &Vec<T>) -> Result<usize, PickerError> {
-        Ok(self.rng.gen_range(0..backends.len()))
+    fn pick_backend(&self, backends: &Vec<T>) -> Result<usize, PickerError> {
+        Ok(self.rng.lock().unwrap().gen_range(0..backends.len()))
     }
 }
 
 pub struct WeightedRRPicker {
     cumulative_weights: Vec<usize>,
-    last_index: Option<usize>,
-    last_inner_index: Option<usize>,
+    last_index: Arc<Mutex<Option<usize>>>,
+    last_inner_index: Arc<Mutex<Option<usize>>>,
 }
 
 impl WeightedRRPicker {
@@ -98,14 +101,17 @@ impl WeightedRRPicker {
 
         Self {
             cumulative_weights: weights,
-            last_index: None,
-            last_inner_index: None,
+            last_index: Arc::new(Mutex::new(None)),
+            last_inner_index: Arc::new(Mutex::new(None)),
         }
     }
 }
 
 impl<T: Backend> Picker<T> for WeightedRRPicker {
-    fn pick_backend(&mut self, backends: &Vec<T>) -> Result<usize, PickerError> {
+    fn pick_backend(&self, backends: &Vec<T>) -> Result<usize, PickerError> {
+        let mut li = self.last_index.lock().unwrap();
+        let mut li_i = self.last_inner_index.lock().unwrap();
+
         if backends.len() != self.cumulative_weights.len() {
             return Err(PickerError::InconsistentLength(
                 backends.len(),
@@ -113,31 +119,29 @@ impl<T: Backend> Picker<T> for WeightedRRPicker {
             ));
         }
 
-        if let Some(last_index) = self.last_index {
-            let last_inner_index = self
-                .last_inner_index
-                .expect("inner index should not be None");
+        if let Some(last_index) = *li {
+            let last_inner_index = (*li_i).expect("inner index should not be None");
 
             let last_inner_max = self.cumulative_weights[last_index];
 
             if last_inner_index < last_inner_max - 1 {
-                self.last_inner_index = Some(last_inner_index + 1);
+                *li_i = Some(last_inner_index + 1);
                 return Ok(last_index);
             } else {
-                self.last_inner_index = Some(0);
+                *li_i = Some(0);
             }
 
             if last_index >= backends.len() - 1 {
-                self.last_index = Some(0);
+                *li = Some(0);
                 return Ok(0);
             } else {
-                self.last_index = Some(last_index + 1);
+                *li = Some(last_index + 1);
                 return Ok(last_index + 1);
             }
         }
 
-        self.last_index = Some(0);
-        self.last_inner_index = Some(0);
+        *li = Some(0);
+        *li_i = Some(0);
         Ok(0)
     }
 }
