@@ -77,18 +77,22 @@ async fn random_policy() {
             .unwrap();
     }
 
-    let total_requests: usize = (0..3)
-        .map(|i| get_stats(&lb, i).send_request_attempts)
-        .sum();
+    let results = futures::future::join_all((0..3).map(|i| get_stats(&lb, i))).await;
+    let total_requests: usize = results.iter().map(|r| r.send_request_attempts).sum();
 
     assert_eq!(total_requests, 20)
 }
 
-fn get_stats<P: Picker<MockBackend>>(
+async fn get_stats<P: Picker<MockBackend>>(
     lb: &http::Http<MockBackend, P>,
     i: usize,
 ) -> MockBackendStats {
-    return (*lb.get_backend(i).unwrap().stats.lock().unwrap()).clone();
+    // return (*lb.get_backend(i).unwrap().stats.lock().unwrap()).clone();
+    return lb.get_backends().read().await[i]
+        .stats
+        .lock()
+        .unwrap()
+        .clone();
 }
 
 #[tokio::test]
@@ -108,12 +112,14 @@ async fn rr_policy() {
             .unwrap();
     }
 
-    let total_requests: usize = (0..4)
-        .map(|i| get_stats(&lb, i).send_request_attempts)
-        .sum();
+    let results = futures::future::join_all((0..4).map(|i| get_stats(&lb, i))).await;
+    let total_requests: usize = results.iter().map(|r| r.send_request_attempts).sum();
 
     assert_eq!(total_requests, 20);
-    (0..4).for_each(|i| assert_eq!(get_stats(&lb, i).send_request_attempts, 5));
+
+    results
+        .iter()
+        .for_each(|r| assert_eq!(r.send_request_attempts, 5));
 }
 
 #[tokio::test]
@@ -133,22 +139,13 @@ async fn weighted_rr_policy() {
             .unwrap();
     }
 
-    let total_requests: usize = (0..4)
-        .map(|i| get_stats(&lb, i).send_request_attempts)
-        .sum();
+    let results = futures::future::join_all((0..4).map(|i| get_stats(&lb, i))).await;
+    let total_requests: usize = results.iter().map(|r| r.send_request_attempts).sum();
 
     assert_eq!(total_requests, 20);
 
-    (0..4).for_each(|i| {
-        println!(
-            "attempts for {}: {}",
-            i,
-            get_stats(&lb, i).send_request_attempts
-        )
-    });
-
-    assert_eq!(get_stats(&lb, 0).send_request_attempts, 6);
-    assert_eq!(get_stats(&lb, 1).send_request_attempts, 4);
-    assert_eq!(get_stats(&lb, 2).send_request_attempts, 2);
-    assert_eq!(get_stats(&lb, 3).send_request_attempts, 8);
+    assert_eq!(results[0].send_request_attempts, 6);
+    assert_eq!(results[1].send_request_attempts, 4);
+    assert_eq!(results[2].send_request_attempts, 2);
+    assert_eq!(results[3].send_request_attempts, 8);
 }

@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use async_trait::async_trait;
-use tokio::{io::AsyncWriteExt, sync::Mutex};
+use tokio::{io::AsyncWriteExt, sync::RwLock};
 
 use crate::{
     handler::{self, AsyncStream, Handler},
@@ -10,13 +10,13 @@ use crate::{
 };
 
 pub struct Lb<P: Picker<HttpBackend>> {
-    lb: Arc<Mutex<Http<HttpBackend, P>>>,
+    lb: Arc<RwLock<Http<HttpBackend, P>>>,
 }
 
 impl<P: Picker<HttpBackend>> Lb<P> {
     pub fn new(backends: Vec<HttpBackend>, picker: P) -> Self {
         return Self {
-            lb: Arc::new(Mutex::new(Http::new(backends, picker))),
+            lb: Arc::new(RwLock::new(Http::new(backends, picker))),
         };
     }
 }
@@ -30,7 +30,7 @@ impl<P: Picker<HttpBackend> + Sync + Send> Handler for Lb<P> {
     ) -> Result<handler::Ok, handler::Error> {
         let mut response = self
             .lb
-            .lock()
+            .read()
             .await
             .send_request(r)
             .await

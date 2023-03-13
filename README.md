@@ -73,6 +73,7 @@ async fn main() {
 
 -   LB handler
 -   Healthchecking
+-   Implement TCP Keepalive
 -   Transfer-Encoding: chunked, gzip (note Content-Encoding and Accept-Encoding too)
 -   Implement access log
 -   Use templating + #include to make file browser look better

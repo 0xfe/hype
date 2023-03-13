@@ -82,6 +82,22 @@ impl Message {
     }
 }
 
+pub struct RequestParser {}
+
+impl RequestParser {
+    pub fn new() -> Parser {
+        return Parser::new("http://no_base_url", State::StartRequest);
+    }
+}
+
+pub struct ResponseParser {}
+
+impl ResponseParser {
+    pub fn new() -> Parser {
+        return Parser::new("http://no_base_url", State::StartResponse);
+    }
+}
+
 #[derive(Debug)]
 pub struct Parser {
     base_url: String,
