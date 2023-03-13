@@ -157,7 +157,7 @@ impl File {
 #[async_trait]
 impl Handler for File {
     async fn handle(
-        &mut self,
+        &self,
         r: &Request,
         w: &mut dyn AsyncStream,
     ) -> Result<handler::Ok, handler::Error> {

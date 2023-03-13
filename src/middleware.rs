@@ -26,11 +26,11 @@ impl Stack {
 #[async_trait]
 impl Handler for Stack {
     async fn handle(
-        &mut self,
+        &self,
         r: &Request,
         w: &mut dyn AsyncStream,
     ) -> Result<handler::Ok, handler::Error> {
-        for handler in self.handlers.iter_mut() {
+        for handler in self.handlers.iter() {
             match handler.handle(r, w).await {
                 Ok(handler::Ok::Done) => {
                     break;

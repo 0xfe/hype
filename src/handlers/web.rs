@@ -152,7 +152,7 @@ impl Web {
 #[async_trait]
 impl Handler for Web {
     async fn handle(
-        &mut self,
+        &self,
         r: &Request,
         w: &mut dyn AsyncStream,
     ) -> Result<handler::Ok, handler::Error> {

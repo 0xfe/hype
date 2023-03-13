@@ -56,7 +56,7 @@ impl AsyncWriteStream for Cursor<Vec<u8>> {}
 
 #[async_trait]
 pub trait Handler: Send + Sync {
-    async fn handle(&mut self, r: &Request, w: &mut dyn AsyncStream) -> Result<Ok, Error>;
+    async fn handle(&self, r: &Request, w: &mut dyn AsyncStream) -> Result<Ok, Error>;
 }
 
 impl std::fmt::Debug for dyn Handler {

@@ -11,7 +11,7 @@ struct MyHandler {}
 
 #[async_trait]
 impl Handler for MyHandler {
-    async fn handle(&mut self, _: &Request, w: &mut dyn AsyncStream) -> Result<handler::Ok, Error> {
+    async fn handle(&self, _: &Request, w: &mut dyn AsyncStream) -> Result<handler::Ok, Error> {
         let mut response = Response::new(status::from(status::OK));
         response.set_header("foo", "bar");
         response.set_body("hello world!\n".into());
@@ -23,7 +23,7 @@ impl Handler for MyHandler {
 
 #[tokio::test]
 async fn it_works() {
-    let mut h = Box::new(MyHandler {});
+    let h = Box::new(MyHandler {});
 
     let buf = r##"POST / HTTP/1.1
 Host: localhost:4000

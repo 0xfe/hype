@@ -23,7 +23,7 @@ impl Redirect {
 #[async_trait]
 impl Handler for Redirect {
     async fn handle(
-        &mut self,
+        &self,
         _r: &Request,
         w: &mut dyn AsyncStream,
     ) -> Result<handler::Ok, handler::Error> {
