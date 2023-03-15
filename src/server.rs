@@ -47,7 +47,7 @@ impl Server {
             let mut parser = Parser::new(&base_url, parser::State::StartRequest);
 
             done = loop {
-                let mut buf = [0u8; 16];
+                let mut buf = [0u8; 16384];
 
                 match stream.read(&mut buf).await {
                     Ok(0) => {
