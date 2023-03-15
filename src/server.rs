@@ -40,64 +40,73 @@ impl Server {
         default_handler: Option<Arc<RwLock<Box<dyn Handler>>>>,
     ) {
         info!("Connection received from {:?}", stream.peer_addr().unwrap());
-        let mut parser = Parser::new(base_url, parser::State::StartRequest);
 
-        loop {
-            let mut buf = [0u8; 16];
+        let mut done = false;
 
-            match stream.read(&mut buf).await {
-                Ok(0) => {
-                    parser.parse_eof().unwrap();
-                    break;
-                }
-                Ok(n) => {
-                    parser.parse_buf(&buf[..n]).unwrap();
+        while !done {
+            let mut parser = Parser::new(&base_url, parser::State::StartRequest);
 
-                    // Clients may leave the connection open, so check to see if we've
-                    // got a full request in. (Otherwise, we just block.)
-                    if parser.is_complete() {
+            done = loop {
+                let mut buf = [0u8; 16];
+
+                match stream.read(&mut buf).await {
+                    Ok(0) => {
+                        debug!("read {} bytes", 0);
                         parser.parse_eof().unwrap();
-                        break;
+                        break false;
+                    }
+                    Ok(n) => {
+                        debug!("read {} bytes", n);
+                        parser.parse_buf(&buf[..n]).unwrap();
+
+                        // Clients may leave the connection open, so check to see if we've
+                        // got a full request in. (Otherwise, we just block.)
+                        if parser.is_complete() {
+                            debug!("request received, keeping client connection open");
+                            parser.parse_eof().unwrap();
+                            break false;
+                        }
+                    }
+                    Err(e) => {
+                        debug!("connection closed by client");
+                        warn!("Connection broken: {:?}", e);
+                        break true;
                     }
                 }
-                Err(e) => {
-                    warn!("Connection broken: {:?}", e);
-                    break;
+            };
+
+            let mut request: Request = parser.get_message().into();
+            debug!("Request: {:?}", request);
+
+            let mut path = String::from("/__bad_path__");
+            if let Some(url) = &request.url {
+                path = url.path().into()
+            }
+
+            for handler in handlers.write().await.iter_mut() {
+                if let Some(matched_path) = handler.0.matches(&path) {
+                    request.set_handler_path(String::from(matched_path.to_string_lossy()));
+                    if let Err(error) = handler.1.handle(&request, &mut stream).await {
+                        error!("Error from handler {:?}: {:?}", handler, error);
+                    }
+                    continue;
                 }
             }
-        }
 
-        let mut request: Request = parser.get_message().into();
-        debug!("Request: {:?}", request);
-
-        let mut path = String::from("/__bad_path__");
-        if let Some(url) = &request.url {
-            path = url.path().into()
-        }
-
-        for handler in handlers.write().await.iter_mut() {
-            if let Some(matched_path) = handler.0.matches(&path) {
-                request.set_handler_path(String::from(matched_path.to_string_lossy()));
-                if let Err(error) = handler.1.handle(&request, &mut stream).await {
+            if let Some(handler) = &default_handler {
+                if let Err(error) = handler.write().await.handle(&request, &mut stream).await {
                     error!("Error from handler {:?}: {:?}", handler, error);
                 }
-                return;
+                continue;
             }
-        }
 
-        if let Some(handler) = default_handler {
-            if let Err(error) = handler.write().await.handle(&request, &mut stream).await {
-                error!("Error from handler {:?}: {:?}", handler, error);
-            }
-            return;
+            // Fell through here, no handlers match
+            let mut response = Response::new(status::from(status::NOT_FOUND));
+            response.set_header("Content-Type", "text/plain");
+            response.set_body("Hype: no route handlers installed.".into());
+            let buf = response.serialize();
+            stream.write_all(buf.as_bytes()).await.unwrap();
         }
-
-        // Fell through here, no handlers match
-        let mut response = Response::new(status::from(status::NOT_FOUND));
-        response.set_header("Content-Type", "text/plain");
-        response.set_body("Hype: no route handlers installed.".into());
-        let buf = response.serialize();
-        stream.write_all(buf.as_bytes()).await.unwrap();
     }
 
     pub fn new(address: String, port: u16) -> Self {

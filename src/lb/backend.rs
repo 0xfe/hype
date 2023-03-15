@@ -69,6 +69,7 @@ impl Backend for PersistentHttpBackend {
         let mut client = self.client.write().await;
 
         if client.is_some() && !client.as_ref().unwrap().is_closed() {
+            debug!("reusing existing connection");
             return Ok(());
         }
 

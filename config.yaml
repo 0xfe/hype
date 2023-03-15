@@ -25,7 +25,3 @@ routes:
     - location: /files
       handler: file
       fs_path: /Users/mmuthanna/git/hype
-    - location: /lb
-      handler: lb
-      policy: weighted_rr
-      backends: google.com
