@@ -135,8 +135,6 @@ impl Response {
             self.body
         );
 
-        debug!("Serializing to:\n{}", buf);
-
         buf
     }
 }

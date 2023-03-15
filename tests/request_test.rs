@@ -10,6 +10,7 @@ fn it_works_with_body() {
         request.serialize(),
         "GET /foobar HTTP/1.1\r
 host: localhost:8080\r
+\r
 "
     );
 }
@@ -24,6 +25,7 @@ fn it_works_with_cookies() {
         request.serialize(),
         "GET /foobar HTTP/1.1\r
 cookie: foo=bar; id=blah\r
+\r
 "
     );
 }

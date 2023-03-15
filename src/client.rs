@@ -19,6 +19,7 @@ pub enum ClientError {
     LookupError(String),
     ConnectionError,
     ConnectionBroken,
+    ConnectionClosed,
     SendError(String),
     RecvError(String),
     ResponseError,
@@ -32,6 +33,7 @@ impl fmt::Display for ClientError {
             ClientError::LookupError(address) => write!(f, "could not lookup address: {}", address),
             ClientError::ConnectionError => write!(f, "could not connect to backend"),
             ClientError::ConnectionBroken => write!(f, "connection broken"),
+            ClientError::ConnectionClosed => write!(f, "connection closed"),
             ClientError::SendError(err) => write!(f, "could not send data to backend: {}", err),
             ClientError::RecvError(err) => {
                 write!(f, "could not receive data from backend: {}", err)
@@ -94,6 +96,7 @@ impl Client {
         Ok(ConnectedClient {
             writer: Some(Arc::new(Mutex::new(Box::new(writer)))),
             reader: Some(Arc::new(Mutex::new(Box::new(reader)))),
+            closed: false,
         })
     }
 }
@@ -101,11 +104,17 @@ impl Client {
 pub struct ConnectedClient {
     writer: Option<Arc<Mutex<Box<dyn AsyncWriteStream>>>>,
     reader: Option<Arc<Mutex<Box<dyn AsyncReadStream>>>>,
+    closed: bool,
 }
 
 impl ConnectedClient {
     pub async fn send_request(&mut self, req: &Request) -> Result<Response, ClientError> {
+        if self.closed {
+            return Err(ClientError::ConnectionClosed);
+        }
+
         let data = req.serialize();
+        debug!("Sending request:\n{}", data);
 
         let writer = Arc::clone(&self.writer.as_ref().unwrap());
         let reader = Arc::clone(&self.reader.as_ref().unwrap());
@@ -117,6 +126,7 @@ impl ConnectedClient {
             let mut stream = reader.lock().await;
 
             let mut parser = parser::Parser::new("http://foo", parser::State::StartResponse);
+            let mut closed = false;
 
             loop {
                 let mut buf = [0u8; 16384];
@@ -124,10 +134,12 @@ impl ConnectedClient {
                 match stream.read(&mut buf).await {
                     Ok(0) => {
                         parser.parse_eof().unwrap();
+                        closed = true;
                         break;
                     }
                     Ok(n) => {
                         parser.parse_buf(&buf[..n]).unwrap();
+                        debug!("{}", String::from_utf8_lossy(&buf[..]));
 
                         // Clients may leave the connection open, so check to see if we've
                         // got a full request in. (Otherwise, we just block.)
@@ -142,7 +154,7 @@ impl ConnectedClient {
                 }
             }
 
-            Ok(parser.get_message())
+            Ok((closed, parser.get_message()))
         });
 
         let (e1, e2) = join!(handle1, handle2);
@@ -150,8 +162,13 @@ impl ConnectedClient {
         e1.map_err(|e| ClientError::InternalError(e.to_string()))?
             .map_err(|e| ClientError::SendError(e.to_string()))?;
 
-        let message = e2.map_err(|e| ClientError::InternalError(e.to_string()))??;
+        let (closed, message) = e2.map_err(|e| ClientError::InternalError(e.to_string()))??;
 
+        self.closed = closed;
         Ok(message.into())
+    }
+
+    pub fn is_closed(&self) -> bool {
+        return self.closed;
     }
 }

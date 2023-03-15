@@ -195,6 +195,8 @@ impl Request {
         if !self.body.is_empty() {
             r.push_str(format!("Content-Length: {}\r\n\r\n", self.body.chars().count()).as_str());
             r.push_str(self.body.as_str());
+        } else {
+            r.push_str("\r\n");
         }
 
         r
