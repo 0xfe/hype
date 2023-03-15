@@ -9,7 +9,7 @@ use tokio::{
 
 use crate::{
     handler::{AsyncReadStream, AsyncWriteStream},
-    parser,
+    parser::{self, Message},
     request::Request,
     response::Response,
 };
@@ -20,6 +20,7 @@ pub enum ClientError {
     ConnectionError,
     ConnectionBroken,
     ConnectionClosed,
+    ShutdownError(String),
     SendError(String),
     RecvError(String),
     ResponseError,
@@ -34,6 +35,7 @@ impl fmt::Display for ClientError {
             ClientError::ConnectionError => write!(f, "could not connect to backend"),
             ClientError::ConnectionBroken => write!(f, "connection broken"),
             ClientError::ConnectionClosed => write!(f, "connection closed"),
+            ClientError::ShutdownError(err) => write!(f, "error while closing socket: {}", err),
             ClientError::SendError(err) => write!(f, "could not send data to backend: {}", err),
             ClientError::RecvError(err) => {
                 write!(f, "could not receive data from backend: {}", err)
@@ -119,14 +121,20 @@ impl ConnectedClient {
         let writer = Arc::clone(&self.writer.as_ref().unwrap());
         let reader = Arc::clone(&self.reader.as_ref().unwrap());
 
-        let handle1 =
-            tokio::spawn(async move { writer.lock().await.write_all(data.as_bytes()).await });
+        let handle1 = tokio::spawn(async move {
+            let result = writer
+                .lock()
+                .await
+                .write_all(data.as_bytes())
+                .await
+                .map_err(|e| ClientError::SendError(e.to_string()));
+            (result, writer)
+        });
 
         let handle2 = tokio::spawn(async move {
             let mut stream = reader.lock().await;
 
             let mut parser = parser::Parser::new("http://foo", parser::State::StartResponse);
-            let mut closed = false;
 
             loop {
                 let mut buf = [0u8; 16384];
@@ -134,8 +142,7 @@ impl ConnectedClient {
                 match stream.read(&mut buf).await {
                     Ok(0) => {
                         parser.parse_eof().unwrap();
-                        closed = true;
-                        break;
+                        break Ok(());
                     }
                     Ok(n) => {
                         parser.parse_buf(&buf[..n]).unwrap();
@@ -145,27 +152,49 @@ impl ConnectedClient {
                         // got a full request in. (Otherwise, we just block.)
                         if parser.is_complete() {
                             parser.parse_eof().unwrap();
-                            break;
+                            break Ok(());
                         }
                     }
                     Err(e) => {
-                        return Err(ClientError::RecvError(e.to_string()));
+                        debug!("read error: {}", e);
+                        break Err(ClientError::RecvError(e.to_string()));
                     }
                 }
-            }
+            }?;
 
-            Ok((closed, parser.get_message()))
+            Ok(parser.get_message()) as Result<Message, ClientError>
         });
 
-        let (e1, e2) = join!(handle1, handle2);
+        let (result1, result2) = join!(handle1, handle2);
 
-        e1.map_err(|e| ClientError::InternalError(e.to_string()))?
-            .map_err(|e| ClientError::SendError(e.to_string()))?;
+        let (e1, writer) = result1.map_err(|e| {
+            self.closed = true;
+            ClientError::InternalError(e.to_string())
+        })?;
 
-        let (closed, message) = e2.map_err(|e| ClientError::InternalError(e.to_string()))??;
+        let message = result2.map_err(|e| {
+            self.closed = true;
+            ClientError::InternalError(e.to_string())
+        })?;
 
-        self.closed = closed;
-        Ok(message.into())
+        if e1.is_err() || message.is_err() {
+            self.closed = true;
+            writer
+                .lock()
+                .await
+                .shutdown()
+                .await
+                .map_err(|e| ClientError::ShutdownError(e.to_string()))?;
+
+            if let Err(e) = e1 {
+                return Err(e);
+            };
+            if let Err(e) = message {
+                return Err(e);
+            };
+        }
+
+        Ok(message.unwrap().into())
     }
 
     pub fn is_closed(&self) -> bool {
