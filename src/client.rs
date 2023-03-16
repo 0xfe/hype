@@ -4,7 +4,7 @@ use tokio::{
     io::{AsyncReadExt, AsyncWriteExt},
     join,
     net::{lookup_host, TcpSocket},
-    sync::Mutex,
+    sync::{Mutex, RwLock},
 };
 
 use crate::{
@@ -96,16 +96,16 @@ impl Client {
 
         let (reader, writer) = stream.into_split();
         Ok(ConnectedClient {
-            writer: Some(Arc::new(Mutex::new(Box::new(writer)))),
-            reader: Some(Arc::new(Mutex::new(Box::new(reader)))),
+            writer: Arc::new(Mutex::new(Box::new(writer))),
+            reader: Arc::new(Mutex::new(Box::new(reader))),
             closed: false,
         })
     }
 }
 
 pub struct ConnectedClient {
-    writer: Option<Arc<Mutex<Box<dyn AsyncWriteStream>>>>,
-    reader: Option<Arc<Mutex<Box<dyn AsyncReadStream>>>>,
+    writer: Arc<Mutex<Box<dyn AsyncWriteStream>>>,
+    reader: Arc<Mutex<Box<dyn AsyncReadStream>>>,
     closed: bool,
 }
 
@@ -118,8 +118,8 @@ impl ConnectedClient {
         let data = req.serialize();
         debug!("Sending request:\n{}", data);
 
-        let writer = Arc::clone(&self.writer.as_ref().unwrap());
-        let reader = Arc::clone(&self.reader.as_ref().unwrap());
+        let writer = Arc::clone(&self.writer);
+        let reader = Arc::clone(&self.reader);
 
         let handle1 = tokio::spawn(async move {
             let result = writer

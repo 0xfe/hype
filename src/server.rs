@@ -1,5 +1,6 @@
 #![allow(non_snake_case)]
 
+use rand::{thread_rng, Rng};
 use tokio::{
     io::{AsyncReadExt, AsyncWriteExt},
     net::{TcpListener, TcpStream},
@@ -39,13 +40,22 @@ impl Server {
         handlers: Arc<RwLock<Vec<(Matcher, Box<dyn Handler>)>>>,
         default_handler: Option<Arc<RwLock<Box<dyn Handler>>>>,
     ) {
-        info!("Connection received from {:?}", stream.peer_addr().unwrap());
+        let connection_id: String = thread_rng()
+            .sample_iter(&rand::distributions::Alphanumeric)
+            .take(16)
+            .map(char::from)
+            .collect();
+
+        info!(
+            "Connection ID {} received from {:?}",
+            connection_id,
+            stream.peer_addr().unwrap()
+        );
 
         let mut done = false;
 
         while !done {
             let mut parser = Parser::new(&base_url, parser::State::StartRequest);
-
             done = loop {
                 let mut buf = [0u8; 16384];
 
@@ -76,6 +86,7 @@ impl Server {
             };
 
             let mut request: Request = parser.get_message().into();
+            request.push_header("X-Hype-Connection-ID", &connection_id);
             debug!("Request: {:?}", request);
 
             let mut path = String::from("/__bad_path__");
