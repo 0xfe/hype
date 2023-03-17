@@ -6,6 +6,7 @@ extern crate log;
 
 pub mod client;
 pub mod config;
+pub mod conntrack;
 pub mod content_types;
 pub mod cookie;
 pub mod handler;
