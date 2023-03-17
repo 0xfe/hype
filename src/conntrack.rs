@@ -1,11 +1,24 @@
-use std::{collections::HashMap, sync::Arc};
+use std::{collections::HashMap, fmt, sync::Arc};
 
 use rand::{thread_rng, Rng};
 use tokio::{net::TcpStream, sync::RwLock};
 
 #[derive(Debug, Clone, Hash, Eq, PartialEq)]
-pub struct ConnId(String);
+pub struct ConnId(pub String);
 
+impl fmt::Display for ConnId {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{}", self.0)
+    }
+}
+
+impl From<ConnId> for String {
+    fn from(val: ConnId) -> Self {
+        val.0
+    }
+}
+
+#[derive(Debug)]
 pub struct ConnTracker {
     conns: Arc<RwLock<HashMap<ConnId, Conn>>>,
 }
@@ -17,25 +30,26 @@ impl ConnTracker {
         }
     }
 
-    pub async fn push_stream(&mut self, stream: TcpStream) {
+    pub async fn push_stream(&mut self, stream: TcpStream) -> ConnId {
         let conn = Conn::new(stream);
-        self.conns.write().await.insert(conn.id().clone(), conn);
+        let id = conn.id().clone();
+        self.conns.write().await.insert(id.clone(), conn);
+        id
     }
 
-    pub async fn stream(&self, id: impl Into<String>) -> Result<Arc<RwLock<TcpStream>>, String> {
-        let id = ConnId(id.into());
-
+    pub async fn stream(&self, id: &ConnId) -> Result<Arc<RwLock<TcpStream>>, String> {
         Ok(self
             .conns
             .read()
             .await
-            .get(&id)
+            .get(id)
             .ok_or(format!("could not get conn {}", id.0))?
             .stream()
             .await)
     }
 }
 
+#[derive(Debug)]
 struct Conn {
     id: ConnId,
     stream: Arc<RwLock<TcpStream>>,

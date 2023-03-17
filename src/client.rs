@@ -4,7 +4,7 @@ use tokio::{
     io::{AsyncReadExt, AsyncWriteExt},
     join,
     net::{lookup_host, TcpSocket},
-    sync::{Mutex, RwLock},
+    sync::Mutex,
 };
 
 use crate::{
