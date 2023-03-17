@@ -69,11 +69,14 @@ async fn main() {
 
 ```
 
+## In Progress
+
+-   Implement TCP Keepalive
+-   Implement connection tracking
+
 ## TODO
 
--   LB handler
 -   Healthchecking
--   Implement TCP Keepalive
 -   Transfer-Encoding: chunked, gzip (note Content-Encoding and Accept-Encoding too)
 -   Implement access log
 -   Use templating + #include to make file browser look better
@@ -93,6 +96,7 @@ async fn main() {
 
 ### Done
 
+-   LB handler
 -   L7 load balancer (in progress)
     -   Implemented random backend picker
     -   Implemented Roundrobin picker
