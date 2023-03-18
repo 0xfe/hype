@@ -31,11 +31,14 @@ impl Backend for HttpBackend {
             let mut client = c.write().await;
 
             if let Some(client) = &mut *client {
-                client.send_request(req).await
-            } else {
-                *client = Some(Client::new(&self.address.to_string()).connect().await?);
-                client.as_mut().unwrap().send_request(req).await
+                let r = client.send_request(req).await;
+                if r.is_ok() {
+                    return r;
+                }
             }
+
+            *client = Some(Client::new(&self.address.to_string()).connect().await?);
+            client.as_mut().unwrap().send_request(req).await
         } else {
             Client::new(&self.address.to_string())
                 .connect()

@@ -1,4 +1,4 @@
-use std::{error, fmt, net::SocketAddr, sync::Arc};
+use std::{error, fmt, net::SocketAddr, result, sync::Arc};
 
 use tokio::{
     io::{AsyncReadExt, AsyncWriteExt},
@@ -98,7 +98,7 @@ impl Client {
         Ok(ConnectedClient {
             writer: Arc::new(Mutex::new(Box::new(writer))),
             reader: Arc::new(Mutex::new(Box::new(reader))),
-            closed: false,
+            closed: Arc::new(Mutex::new(false)),
         })
     }
 }
@@ -106,12 +106,12 @@ impl Client {
 pub struct ConnectedClient {
     writer: Arc<Mutex<Box<dyn AsyncWriteStream>>>,
     reader: Arc<Mutex<Box<dyn AsyncReadStream>>>,
-    closed: bool,
+    closed: Arc<Mutex<bool>>,
 }
 
 impl ConnectedClient {
     pub async fn send_request(&mut self, req: &Request) -> Result<Response, ClientError> {
-        if self.closed {
+        if *self.closed.lock().await {
             return Err(ClientError::ConnectionClosed);
         }
 
@@ -167,18 +167,16 @@ impl ConnectedClient {
 
         let (result1, result2) = join!(handle1, handle2);
 
-        let (e1, writer) = result1.map_err(|e| {
-            self.closed = true;
-            ClientError::InternalError(e.to_string())
-        })?;
+        if result1.is_err() || result2.is_err() {
+            *self.closed.lock().await = true;
+        }
 
-        let message = result2.map_err(|e| {
-            self.closed = true;
-            ClientError::InternalError(e.to_string())
-        })?;
+        let (e1, writer) = result1.map_err(|e| ClientError::InternalError(e.to_string()))?;
+
+        let message = result2.map_err(|e| ClientError::InternalError(e.to_string()))?;
 
         if e1.is_err() || message.is_err() {
-            self.closed = true;
+            *self.closed.lock().await = true;
             writer
                 .lock()
                 .await
@@ -197,7 +195,7 @@ impl ConnectedClient {
         Ok(message.unwrap().into())
     }
 
-    pub fn is_closed(&self) -> bool {
-        return self.closed;
+    pub async fn is_closed(&self) -> bool {
+        return *self.closed.lock().await;
     }
 }
