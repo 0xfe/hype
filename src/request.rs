@@ -2,7 +2,10 @@ use std::{collections::HashMap, str::FromStr};
 
 use url::Url;
 
-use crate::parser::{self, Message, Parser};
+use crate::{
+    conntrack::Conn,
+    parser::{self, Message, Parser},
+};
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Hash)]
 pub enum Method {
@@ -42,6 +45,7 @@ pub struct Request {
     pub version: String,
     pub headers: HashMap<String, String>,
     pub body: String,
+    pub conn: Option<Conn>,
 }
 
 impl From<Message> for Request {
@@ -64,6 +68,7 @@ impl Request {
             version: String::new(),
             headers: HashMap::new(),
             body: String::new(),
+            conn: None,
         }
     }
 
@@ -77,6 +82,14 @@ impl Request {
 
     pub fn set_body(&mut self, body: String) {
         self.body = body;
+    }
+
+    pub fn set_conn(&mut self, conn: Conn) {
+        self.conn = Some(conn)
+    }
+
+    pub fn conn(&self) -> Option<Conn> {
+        self.conn.clone()
     }
 
     pub fn set_path(&mut self, path: impl AsRef<str>) {

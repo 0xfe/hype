@@ -7,7 +7,7 @@ use tokio::{
 };
 
 use crate::{
-    conntrack::{ConnId, ConnTracker},
+    conntrack::{Conn, ConnTracker},
     handler::Handler,
     parser::{self, Parser},
     request::Request,
@@ -29,8 +29,7 @@ struct Stream {
     base_url: String,
     handlers: Arc<RwLock<Vec<(Matcher, Box<dyn Handler>)>>>,
     default_handler: Option<Arc<RwLock<Box<dyn Handler>>>>,
-    conns: Arc<RwLock<ConnTracker>>,
-    conn_id: ConnId,
+    conn: Conn,
 }
 
 #[derive(Debug)]
@@ -58,19 +57,12 @@ impl Server {
     }
 
     async fn process_stream(stream: Stream) {
-        let s1 = stream
-            .conns
-            .read()
-            .await
-            .stream(&stream.conn_id)
-            .await
-            .unwrap();
-
+        let s1 = stream.conn.stream().await;
         let mut s = s1.write().await;
 
         info!(
             "Connection ID {} received from {:?}",
-            &stream.conn_id,
+            &stream.conn.id(),
             s.peer_addr().unwrap()
         );
 
@@ -108,7 +100,8 @@ impl Server {
             };
 
             let mut request: Request = parser.get_message().into();
-            request.push_header("X-Hype-Connection-ID", stream.conn_id.clone());
+            request.push_header("X-Hype-Connection-ID", stream.conn.id().clone());
+            request.set_conn(stream.conn.clone());
             debug!("Request: {:?}", request);
 
             let mut path = String::from("/__bad_path__");
@@ -158,8 +151,7 @@ impl Server {
 
         loop {
             let (socket, _) = listener.accept().await.unwrap();
-            let conns = Arc::clone(&self.conns);
-            let id = conns.write().await.push_stream(socket).await;
+            let conn = self.conns.write().await.push_stream(socket).await;
 
             let base_url = self.base_url.clone();
             let handlers = Arc::clone(&self.handlers);
@@ -170,8 +162,7 @@ impl Server {
 
             tokio::spawn(async move {
                 Server::process_stream(Stream {
-                    conns: conns.clone(),
-                    conn_id: id,
+                    conn,
                     base_url,
                     handlers,
                     default_handler,

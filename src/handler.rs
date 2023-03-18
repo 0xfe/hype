@@ -8,7 +8,7 @@ use tokio::{
     net::TcpStream,
 };
 
-use crate::request::Request;
+use crate::{conntrack::ConnId, request::Request};
 
 #[derive(Debug, Clone)]
 pub enum Error {
@@ -56,6 +56,10 @@ impl AsyncWriteStream for Cursor<Vec<u8>> {}
 
 #[async_trait]
 pub trait Handler: Send + Sync {
+    async fn new_connection(&self, _id: ConnId) -> Result<(), Error> {
+        Ok(())
+    }
+
     async fn handle(&self, r: &Request, w: &mut dyn AsyncStream) -> Result<Ok, Error>;
 }
 

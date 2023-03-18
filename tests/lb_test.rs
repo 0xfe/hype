@@ -18,7 +18,6 @@ extern crate log;
 
 #[derive(Debug, Clone)]
 struct MockBackendStats {
-    connect_attempts: usize,
     send_request_attempts: usize,
     requests: Vec<Request>,
 }
@@ -34,7 +33,6 @@ impl MockBackend {
         MockBackend {
             id: id.into(),
             stats: Arc::new(Mutex::new(MockBackendStats {
-                connect_attempts: 0,
                 send_request_attempts: 0,
                 requests: vec![],
             })),
@@ -45,11 +43,6 @@ impl MockBackend {
 
 #[async_trait]
 impl Backend for MockBackend {
-    async fn connect(&self) -> Result<(), client::ClientError> {
-        self.stats.lock().unwrap().connect_attempts += 1;
-        Ok(())
-    }
-
     async fn send_request(&self, req: &Request) -> Result<Response, client::ClientError> {
         println!("id: {}, request: {:?}", self.id, req);
         let mut stats = self.stats.lock().unwrap();

@@ -45,14 +45,14 @@ impl<T: Backend, P: Picker<T>> Http<T, P> {
 
 #[cfg(test)]
 mod tests {
-    use crate::lb::{backend::PersistentHttpBackend, picker::RRPicker};
+    use crate::lb::{backend::HttpBackend, picker::RRPicker};
 
     use super::*;
 
     #[tokio::test]
     async fn it_works() {
         // let backend = Backend::new("142.251.33.174:80"); // google.com
-        let backend = PersistentHttpBackend::new("127.0.0.1:8080");
+        let backend = HttpBackend::new("127.0.0.1:8080");
         let lb = Http::new(vec![backend], RRPicker::new());
 
         let r = r##"GET / HTTP/1.1
