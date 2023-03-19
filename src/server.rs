@@ -1,7 +1,8 @@
 #![allow(non_snake_case)]
 
+use futures::future::poll_fn;
 use tokio::{
-    io::{AsyncReadExt, AsyncWriteExt},
+    io::{AsyncReadExt, AsyncWriteExt, ReadBuf},
     net::TcpListener,
     sync::RwLock,
 };
@@ -60,40 +61,49 @@ impl Server {
         let s1 = stream.conn.stream();
         let mut s = s1.write().await;
 
+        // These are used for poll_peek below. They probably could just be a byte.
+        let mut poll_buf = [0u8; 10];
+        let mut poll_buf = ReadBuf::new(&mut poll_buf);
+
         info!(
             "Connection ID {} received from {:?}",
             &stream.conn.id(),
             s.peer_addr().unwrap()
         );
 
-        let mut done = false;
-
-        while !done {
+        'top: loop {
             let mut parser = Parser::new(&stream.base_url, parser::State::StartRequest);
-            done = loop {
+
+            // We're trying to keep the connection open here, and keep parsing requests until
+            // the socket is closed.
+            while !parser.is_complete() {
                 let mut buf = [0u8; 16384];
+
+                // This blocks until the socket is readable. The peek() or ready() don't block. We
+                // need poll_fn to get a Context type (cx).
+                if let Err(e) = poll_fn(|cx| s.poll_peek(cx, &mut poll_buf)).await {
+                    debug!("connection closed: {:?}", e);
+                    break 'top;
+                }
 
                 match s.read(&mut buf).await {
                     Ok(0) => {
+                        // No data read, but it's possible the socket is still open.
                         debug!("read {} bytes", 0);
-                        // let _ = parser.parse_eof().unwrap();
-                        break false;
                     }
                     Ok(n) => {
                         debug!("read {} bytes", n);
                         parser.parse_buf(&buf[..n]).unwrap();
-                        if parser.is_complete() {
-                            break false;
-                        }
                     }
                     Err(e) => {
-                        debug!("connection closed by client");
-                        warn!("Connection broken: {:?}", e);
-                        break true;
+                        // Socket is closed, exit this method right away.
+                        debug!("connection closed: {:?}", e);
+                        break 'top;
                     }
                 }
-            };
+            }
 
+            // If we're here, then the parser has parsed a full request payload.
             let mut request: Request = parser.get_message().into();
             request.push_header("X-Hype-Connection-ID", stream.conn.id().clone());
             request.set_conn(stream.conn.clone());
@@ -128,6 +138,8 @@ impl Server {
             let buf = response.serialize();
             s.write_all(buf.as_bytes()).await.unwrap();
         }
+
+        // If we're here, then the connection is closed, there's nothing to do.
     }
 
     pub fn route_default(&mut self, handler: Box<dyn Handler>) {

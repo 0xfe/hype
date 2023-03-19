@@ -267,11 +267,6 @@ impl Parser {
     }
 
     fn commit_chunksize(&mut self) -> Result<(), ParseError> {
-        debug!(
-            "CHUNKSIZE: {:?} - {:?}",
-            &self.buf,
-            str::from_utf8(&self.buf)
-        );
         self.expected_chunk_size = usize::from_str_radix(
             str::from_utf8(&self.buf)
                 .or(Err(ParseError::InvalidChunkSize))?
@@ -400,6 +395,7 @@ impl Parser {
     }
 
     pub fn is_complete(&self) -> bool {
+        debug!("STATE: {:?}", self.state);
         return self.state == State::ParseComplete;
     }
 
@@ -423,7 +419,6 @@ impl Parser {
             return Ok(());
         }
 
-        println!("STATE: {:?}", self.state);
         Err(ParseError::UnexpectedEOF)
     }
 
