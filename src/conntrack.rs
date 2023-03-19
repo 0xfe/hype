@@ -46,8 +46,7 @@ impl ConnTracker {
             .await
             .get(id)
             .ok_or(format!("could not get conn {}", id.0))?
-            .stream()
-            .await)
+            .stream())
     }
 }
 
@@ -83,7 +82,7 @@ impl Conn {
         &self.id
     }
 
-    pub async fn stream(&self) -> Arc<RwLock<TcpStream>> {
+    pub fn stream(&self) -> Arc<RwLock<TcpStream>> {
         Arc::clone(&self.stream)
     }
 

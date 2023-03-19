@@ -71,8 +71,8 @@ async fn main() {
 
 ## In Progress
 
+-   Rewrite host header for load balancer
 -   Implement TCP Keepalive
--   Implement connection tracking
 
 ## TODO
 
@@ -87,8 +87,6 @@ async fn main() {
 
 ### Issues / Housekeeping
 
--   Fix case sensitivity in headers
--   Move redirection to URL rewriting middleware
 -   Errors should be derived from error::Error -- see cookie.rs
 -   Support multiple headers with the same key
     -   bad request (400) if multiple host headers
@@ -96,7 +94,11 @@ async fn main() {
 
 ### Done
 
+-   Implement chunked transfer-encoding
+-   Implement connection tracking
 -   LB handler
+-   Fix case sensitivity in headers
+-   Move redirection to URL rewriting middleware
 -   L7 load balancer (in progress)
     -   Implemented random backend picker
     -   Implemented Roundrobin picker

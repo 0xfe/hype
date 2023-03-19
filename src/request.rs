@@ -108,7 +108,6 @@ impl Request {
         parser
             .parse_buf(buf.into().as_bytes())
             .or(Err("could not parse buffer"))?;
-        parser.parse_eof().or(Err("could not parse buffer"))?;
         Ok(parser.get_message().into())
     }
 

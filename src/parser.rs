@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+use std::str;
 
 use url::Url;
 
@@ -16,6 +17,11 @@ pub enum State {
     InStatusLine,
     InHeaders,
     InBody,
+    InChunkedBodySize,
+    InChunkedBodyContent,
+    InChunkComplete,
+    EndChunkedBody,
+    ParseComplete,
 }
 
 lazy_static! {
@@ -25,6 +31,11 @@ lazy_static! {
         (State::InStatusLine, vec![State::StartResponse]),
         (State::InHeaders, vec![State::InMethod, State::InStatusLine]),
         (State::InBody, vec![State::InHeaders]),
+        (State::InChunkedBodySize, vec![State::InHeaders, State::InChunkComplete]),
+        (State::InChunkedBodyContent, vec![State::InChunkedBodySize]),
+        (State::InChunkComplete, vec![State::InChunkedBodyContent]),
+        (State::EndChunkedBody, vec![State::InChunkComplete, State::InChunkedBodySize]),
+        (State::ParseComplete, vec![State::EndChunkedBody, State::InBody, State::InHeaders]),
     ]);
 
 }
@@ -32,12 +43,14 @@ lazy_static! {
 #[derive(Debug, PartialEq)]
 pub enum ParseError {
     UnexpectedState,
-    InvalidStateTransition,
+    InvalidStateTransition(State, State),
     BadMethodLine(String),
     BadHeaderLine(String),
     BadStatusLine(String),
     InvalidMethod(String),
     InvalidPath(String),
+    InvalidChunkSize,
+    NonNumericChunkSize,
     UnexpectedEOF,
 }
 
@@ -105,6 +118,10 @@ pub struct Parser {
     state: State,
     buf: Vec<u8>,
     message: Message,
+    expected_chunk_size: usize,
+    expected_content_length: usize,
+    chunk_pos: usize,
+    body: Vec<u8>,
 }
 
 impl Parser {
@@ -120,7 +137,11 @@ impl Parser {
             start_state: start_state.clone(),
             state: start_state,
             buf: Vec::with_capacity(16384),
+            body: Vec::with_capacity(16384),
             message,
+            expected_chunk_size: 0,
+            expected_content_length: 0,
+            chunk_pos: 0,
         }
     }
 
@@ -130,7 +151,10 @@ impl Parser {
             .unwrap()
             .contains(&self.state)
         {
-            return Err(ParseError::InvalidStateTransition);
+            return Err(ParseError::InvalidStateTransition(
+                self.state.clone(),
+                target_state.clone(),
+            ));
         }
 
         self.state = target_state;
@@ -200,10 +224,39 @@ impl Parser {
         }
 
         if header_line == "\r" || header_line == "" {
-            result = self.update_state(State::InBody);
+            let mut has_body = false;
+            let mut new_state = State::InBody;
+
+            if let Some(length) = headers.get("content-length") {
+                if length.parse::<usize>().unwrap_or(0) != 0 {
+                    has_body = true;
+                }
+            }
+
+            if let Some(encoding) = headers.get("transfer-encoding") {
+                let parts: Vec<&str> = encoding.split(',').map(|p| p.trim()).collect();
+                if parts.contains(&"chunked") {
+                    debug!("expecting chunked encoding");
+                    new_state = State::InChunkedBodySize;
+                    has_body = true;
+                }
+            }
+
+            if has_body {
+                result = self.update_state(new_state);
+            } else {
+                self.parse_eof()?;
+                self.buf.clear();
+                return Ok(());
+            }
         } else {
             if let Some((k, v)) = header_line.split_once(':') {
-                headers.insert(k.to_string().to_lowercase(), v.trim().into());
+                let key = k.to_lowercase();
+                if key == "content-length" {
+                    self.expected_content_length = v.trim().parse::<usize>().unwrap_or(0);
+                }
+
+                headers.insert(key, v.trim().into());
             } else {
                 result = Err(ParseError::BadHeaderLine(header_line.into()));
             }
@@ -211,6 +264,25 @@ impl Parser {
 
         self.buf.clear();
         result
+    }
+
+    fn commit_chunksize(&mut self) -> Result<(), ParseError> {
+        debug!(
+            "CHUNKSIZE: {:?} - {:?}",
+            &self.buf,
+            str::from_utf8(&self.buf)
+        );
+        self.expected_chunk_size = usize::from_str_radix(
+            str::from_utf8(&self.buf)
+                .or(Err(ParseError::InvalidChunkSize))?
+                .trim(),
+            16,
+        )
+        .or(Err(ParseError::NonNumericChunkSize))?;
+
+        self.chunk_pos = 0;
+        self.buf.clear();
+        Ok(())
     }
 
     fn commit_line(&mut self) -> Result<(), ParseError> {
@@ -243,7 +315,21 @@ impl Parser {
         Ok(())
     }
 
+    fn consume_body(&mut self, b: u8) -> Result<(), ParseError> {
+        self.body.push(b);
+        Ok(())
+    }
+
     pub fn parse_buf(&mut self, buf: &[u8]) -> Result<(), ParseError> {
+        // Fast path for body
+        if self.state == State::InBody {
+            self.body.extend(buf);
+            if self.body.len() >= self.expected_content_length {
+                self.parse_eof()?;
+            }
+            return Ok(());
+        }
+
         for c in buf {
             let ch = *c as char;
             match self.state {
@@ -266,9 +352,47 @@ impl Parser {
                         self.consume(*c)?;
                     }
                 }
-                State::InBody => {
-                    self.consume(*c)?;
+                State::InChunkedBodySize => {
+                    if ch == '\n' {
+                        self.commit_chunksize()?;
+                        if self.expected_chunk_size == 0 {
+                            self.update_state(State::EndChunkedBody)?;
+                        } else {
+                            self.update_state(State::InChunkedBodyContent)?;
+                        }
+                    } else if ch.is_ascii_hexdigit() {
+                        self.consume(*c)?;
+                    }
+
+                    // skip anything else
                 }
+                State::InChunkedBodyContent => {
+                    self.consume_body(*c)?;
+                    self.chunk_pos += 1;
+
+                    if self.chunk_pos == self.expected_chunk_size {
+                        self.update_state(State::InChunkComplete)?;
+                        self.buf.clear();
+                    }
+                }
+                State::InChunkComplete => {
+                    if ch == '\n' {
+                        self.update_state(State::InChunkedBodySize)?;
+                    }
+                }
+                State::InBody => {
+                    self.consume_body(*c)?;
+                    if self.body.len() == self.expected_content_length {
+                        self.parse_eof()?;
+                    }
+                }
+                State::EndChunkedBody => {
+                    if ch == '\n' {
+                        self.parse_eof()?;
+                        break;
+                    }
+                }
+                State::ParseComplete => {}
             }
         }
 
@@ -276,34 +400,30 @@ impl Parser {
     }
 
     pub fn is_complete(&self) -> bool {
-        let headers;
-        if self.start_state == State::StartResponse {
-            headers = &self.message.response().headers;
-        } else {
-            headers = &self.message.request().headers;
-        }
-
-        self.state == State::InBody
-            && self.buf.len()
-                == headers
-                    .get("content-length")
-                    .unwrap_or(&"0".into())
-                    .parse::<usize>()
-                    .unwrap()
+        return self.state == State::ParseComplete;
     }
 
-    pub fn parse_eof(&mut self) -> Result<(), ParseError> {
-        if self.state == State::InBody || self.state == State::InHeaders {
-            let body = std::str::from_utf8(&self.buf[..]).unwrap().to_string();
-
-            if self.start_state == State::StartRequest {
-                self.message.mut_request().set_body(body);
-            } else {
-                self.message.mut_response().set_body(body);
-            }
+    fn parse_eof(&mut self) -> Result<(), ParseError> {
+        if self.state == State::ParseComplete {
             return Ok(());
         }
 
+        if self.state == State::InBody
+            || self.state == State::InHeaders
+            || self.state == State::EndChunkedBody
+        {
+            let body = String::from_utf8_lossy(&self.body[..]);
+
+            if self.start_state == State::StartRequest {
+                self.message.mut_request().set_body(body.into_owned());
+            } else {
+                self.message.mut_response().set_body(body.into_owned());
+            }
+            self.update_state(State::ParseComplete)?;
+            return Ok(());
+        }
+
+        println!("STATE: {:?}", self.state);
         Err(ParseError::UnexpectedEOF)
     }
 

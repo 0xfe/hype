@@ -57,7 +57,7 @@ impl Server {
     }
 
     async fn process_stream(stream: Stream) {
-        let s1 = stream.conn.stream().await;
+        let s1 = stream.conn.stream();
         let mut s = s1.write().await;
 
         info!(
@@ -76,18 +76,13 @@ impl Server {
                 match s.read(&mut buf).await {
                     Ok(0) => {
                         debug!("read {} bytes", 0);
-                        parser.parse_eof().unwrap();
+                        // let _ = parser.parse_eof().unwrap();
                         break false;
                     }
                     Ok(n) => {
                         debug!("read {} bytes", n);
                         parser.parse_buf(&buf[..n]).unwrap();
-
-                        // Clients may leave the connection open, so check to see if we've
-                        // got a full request in. (Otherwise, we just block.)
                         if parser.is_complete() {
-                            debug!("request received, keeping client connection open");
-                            parser.parse_eof().unwrap();
                             break false;
                         }
                     }

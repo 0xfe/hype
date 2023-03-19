@@ -1,4 +1,4 @@
-use std::{error, fmt, net::SocketAddr, result, sync::Arc};
+use std::{error, fmt, net::SocketAddr, sync::Arc};
 
 use tokio::{
     io::{AsyncReadExt, AsyncWriteExt},
@@ -141,17 +141,15 @@ impl ConnectedClient {
 
                 match stream.read(&mut buf).await {
                     Ok(0) => {
-                        parser.parse_eof().unwrap();
                         break Ok(());
                     }
                     Ok(n) => {
+                        debug!("{}", String::from_utf8_lossy(&buf[..n]));
                         parser.parse_buf(&buf[..n]).unwrap();
-                        debug!("{}", String::from_utf8_lossy(&buf[..]));
 
                         // Clients may leave the connection open, so check to see if we've
                         // got a full request in. (Otherwise, we just block.)
                         if parser.is_complete() {
-                            parser.parse_eof().unwrap();
                             break Ok(());
                         }
                     }

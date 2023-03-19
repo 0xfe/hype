@@ -31,15 +31,18 @@ impl Backend for HttpBackend {
             let mut client = c.write().await;
 
             if let Some(client) = &mut *client {
+                debug!("reusing client for {}", &self.address);
                 let r = client.send_request(req).await;
                 if r.is_ok() {
                     return r;
                 }
             }
 
+            debug!("creating new client for {}", &self.address);
             *client = Some(Client::new(&self.address.to_string()).connect().await?);
             client.as_mut().unwrap().send_request(req).await
         } else {
+            debug!("creating new client for {}", &self.address);
             Client::new(&self.address.to_string())
                 .connect()
                 .await?
