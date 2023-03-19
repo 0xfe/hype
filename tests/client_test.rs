@@ -6,10 +6,10 @@ async fn it_works() {
 Accept-Encoding: identity
 Host: google.com"##;
 
-    let mut client = Client::new("localhost:8080");
+    let mut client = Client::new("google.com:80");
     let mut client = client.connect().await.unwrap();
 
-    let req = Request::from(r, "http://localhost:8080").unwrap();
+    let req = Request::from(r, "http://google.com").unwrap();
     let result = client.send_request(&req).await.unwrap();
 
     println!("result: {:?}", result);
