@@ -44,7 +44,7 @@ async fn main() {
     }
 
     info!("Starting hype:fileserver at path '{}'", args[1]);
-    let mut server = Server::new("127.0.0.1".into(), 4000);
+    let mut server = Server::new("127.0.0.1", 4000);
     server
         .route(
             "/files".to_string(),

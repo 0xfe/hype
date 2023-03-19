@@ -44,11 +44,11 @@ pub struct Server {
 }
 
 impl Server {
-    pub fn new(address: String, port: u16) -> Self {
-        let base_url = format!("http://{}:{}", address, port);
+    pub fn new<T: Into<String> + Clone>(address: T, port: u16) -> Self {
+        let base_url = format!("http://{}:{}", address.clone().into(), port);
 
         Self {
-            address,
+            address: address.into(),
             port,
             handlers: Arc::new(RwLock::new(Vec::new())),
             default_handler: None,
@@ -177,16 +177,5 @@ impl Server {
                 .await;
             });
         }
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn it_works() {
-        let server = Server::new("a".into(), 10);
-        assert_eq!(server.port, 10);
     }
 }

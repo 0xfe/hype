@@ -37,7 +37,7 @@ async fn main() {
     env_logger::Builder::from_env(Env::default().default_filter_or("info")).init();
 
     info!("Starting hype...");
-    let mut server = Server::new("127.0.0.1".into(), 4000);
+    let mut server = Server::new("127.0.0.1", 4000);
     server.route_default(Box::new(MyHandler {}));
 
     server.start().await.unwrap();

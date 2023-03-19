@@ -130,7 +130,7 @@ async fn main() {
     env_logger::Builder::from_env(Env::default().default_filter_or("info")).init();
 
     info!("Starting hype...");
-    let mut server = Server::new("127.0.0.1".into(), 4000);
+    let mut server = Server::new("127.0.0.1", 4000);
     let app = Arc::new(Mutex::new(App::new()));
 
     let mut stack = middleware::Stack::new();
