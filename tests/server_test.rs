@@ -33,10 +33,11 @@ impl Handler for MyHandler {
 async fn it_works() {
     let mut server = Server::new(HOST, PORT);
     server.route_default(Box::new(MyHandler {}));
+    let ready = server.start_notifier();
+
     tokio::spawn(async move { server.start().await.unwrap() });
 
-    // This could be flaky
-    tokio::time::sleep(tokio::time::Duration::from_millis(1000)).await;
+    ready.notified().await;
 
     let address = format!("{}:{}", HOST, PORT);
 

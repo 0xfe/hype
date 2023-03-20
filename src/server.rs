@@ -4,7 +4,7 @@ use futures::future::poll_fn;
 use tokio::{
     io::{AsyncReadExt, AsyncWriteExt, ReadBuf},
     net::TcpListener,
-    sync::RwLock,
+    sync::{Notify, RwLock},
 };
 
 use crate::{
@@ -41,6 +41,7 @@ pub struct Server {
     handlers: Arc<RwLock<Vec<(Matcher, Box<dyn Handler>)>>>,
     default_handler: Option<Arc<RwLock<Box<dyn Handler>>>>,
     conns: Arc<RwLock<ConnTracker>>,
+    start_notifier: Arc<Notify>,
 }
 
 impl Server {
@@ -54,6 +55,7 @@ impl Server {
             default_handler: None,
             base_url,
             conns: Arc::new(RwLock::new(ConnTracker::new())),
+            start_notifier: Arc::new(Notify::new()),
         }
     }
 
@@ -151,10 +153,17 @@ impl Server {
         handlers.push((Matcher::new(&path), handler));
     }
 
+    pub fn start_notifier(&self) -> Arc<Notify> {
+        Arc::clone(&self.start_notifier)
+    }
+
     pub async fn start(&mut self) -> Result<(), ()> {
         let hostport = format!("{}:{}", self.address, self.port);
         info!("Listening on {}", hostport);
         let listener = TcpListener::bind(hostport).await.unwrap();
+
+        // Let tests know we're ready
+        self.start_notifier.notify_one();
 
         loop {
             let (socket, _) = listener.accept().await.unwrap();
