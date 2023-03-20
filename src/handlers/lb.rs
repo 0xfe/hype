@@ -14,9 +14,9 @@ pub struct Lb<P: Picker<HttpBackend>> {
 }
 
 impl<P: Picker<HttpBackend>> Lb<P> {
-    pub fn new(backends: Vec<HttpBackend>, picker: P) -> Self {
+    pub fn new(balancer: Http<HttpBackend, P>) -> Self {
         return Self {
-            lb: Arc::new(RwLock::new(Http::new(backends, picker))),
+            lb: Arc::new(RwLock::new(balancer)),
         };
     }
 }

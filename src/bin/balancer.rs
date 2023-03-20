@@ -5,7 +5,7 @@ use async_trait::async_trait;
 use env_logger::Env;
 use hype::{
     handler::{self, AsyncStream, Handler},
-    lb::{backend::HttpBackend, picker::RRPicker},
+    lb::{backend::HttpBackend, http::Http, picker::RRPicker},
     request::Request,
     response::Response,
     server::Server,
@@ -46,7 +46,10 @@ async fn main() {
         HttpBackend::new("apple.com:80"),
     ];
 
-    let lb = hype::handlers::lb::Lb::new(backends, RRPicker::new());
+    let mut balancer = Http::new(backends, RRPicker::new());
+    balancer.rewrite_header("host", "google.com");
+
+    let lb = hype::handlers::lb::Lb::new(balancer);
     server.route_default(Box::new(lb));
 
     server.start().await.unwrap();

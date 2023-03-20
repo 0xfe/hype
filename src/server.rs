@@ -1,8 +1,7 @@
 #![allow(non_snake_case)]
 
-use futures::future::poll_fn;
 use tokio::{
-    io::{AsyncReadExt, AsyncWriteExt, ReadBuf},
+    io::{AsyncReadExt, AsyncWriteExt},
     net::TcpListener,
     sync::{Notify, RwLock},
 };
@@ -18,12 +17,6 @@ use crate::{
 };
 
 use std::sync::Arc;
-
-#[allow(dead_code)]
-#[derive(Debug)]
-enum Error {
-    ConnectionBroken,
-}
 
 #[derive(Debug)]
 struct Stream {
@@ -63,10 +56,6 @@ impl Server {
         let s1 = stream.conn.stream();
         let mut s = s1.write().await;
 
-        // These are used for poll_peek below. They probably could just be a byte.
-        let mut poll_buf = [0u8; 10];
-        let mut poll_buf = ReadBuf::new(&mut poll_buf);
-
         info!(
             "Connection ID {} received from {:?}",
             &stream.conn.id(),
@@ -81,17 +70,11 @@ impl Server {
             while !parser.is_complete() {
                 let mut buf = [0u8; 16384];
 
-                // This blocks until the socket is readable. The peek() or ready() don't block. We
-                // need poll_fn to get a Context type (cx).
-                if let Err(e) = poll_fn(|cx| s.poll_peek(cx, &mut poll_buf)).await {
-                    debug!("connection closed: {:?}", e);
-                    break 'top;
-                }
-
                 match s.read(&mut buf).await {
                     Ok(0) => {
                         // No data read, but it's possible the socket is still open.
                         debug!("read {} bytes", 0);
+                        break 'top;
                     }
                     Ok(n) => {
                         debug!("read {} bytes", n);
@@ -107,7 +90,7 @@ impl Server {
 
             // If we're here, then the parser has parsed a full request payload.
             let mut request: Request = parser.get_message().into();
-            request.push_header("X-Hype-Connection-ID", stream.conn.id().clone());
+            request.set_header("X-Hype-Connection-ID", stream.conn.id().clone());
             request.set_conn(stream.conn.clone());
             debug!("Request: {:?}", request);
 

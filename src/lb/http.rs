@@ -1,4 +1,4 @@
-use std::sync::Arc;
+use std::{collections::HashMap, sync::Arc};
 
 use tokio::sync::RwLock;
 
@@ -9,6 +9,7 @@ use super::{backend::Backend, picker::Picker};
 pub struct Http<T: Backend, P: Picker<T>> {
     backends: Arc<RwLock<Vec<T>>>,
     picker: P,
+    headers: HashMap<String, String>,
 }
 
 impl<T: Backend, P: Picker<T>> Http<T, P> {
@@ -16,7 +17,12 @@ impl<T: Backend, P: Picker<T>> Http<T, P> {
         Self {
             backends: Arc::new(RwLock::new(backends)),
             picker,
+            headers: HashMap::new(),
         }
+    }
+
+    pub fn rewrite_header(&mut self, k: impl Into<String>, v: impl Into<String>) {
+        self.headers.insert(k.into(), v.into());
     }
 
     pub async fn send_request(&self, req: &Request) -> Result<Response, ClientError> {
@@ -34,8 +40,12 @@ impl<T: Backend, P: Picker<T>> Http<T, P> {
             )));
         }
 
+        // Rewrite headers as needed
+        let mut req = req.clone();
+        self.headers.iter().for_each(|(k, v)| req.set_header(k, v));
+
         debug!("LB: sending request to backend {}: {:?}", index, req);
-        backends[index].send_request(req).await
+        backends[index].send_request(&req).await
     }
 
     pub fn get_backends(&self) -> Arc<RwLock<Vec<T>>> {

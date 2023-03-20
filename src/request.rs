@@ -99,7 +99,7 @@ impl Request {
         self.url = Some(url);
     }
 
-    pub fn push_header(&mut self, key: impl Into<String>, val: impl Into<String>) {
+    pub fn set_header(&mut self, key: impl Into<String>, val: impl Into<String>) {
         self.headers.insert(key.into().to_lowercase(), val.into());
     }
 
