@@ -141,7 +141,7 @@ impl ConnectedClient {
 
                 match stream.read(&mut buf).await {
                     Ok(0) => {
-                        break Ok(());
+                        break Err(ClientError::ConnectionClosed);
                     }
                     Ok(n) => {
                         debug!("{}", String::from_utf8_lossy(&buf[..n]));
@@ -165,6 +165,7 @@ impl ConnectedClient {
 
         let (result1, result2) = join!(handle1, handle2);
 
+        // Process join errors
         if result1.is_err() || result2.is_err() {
             *self.closed.lock().await = true;
         }

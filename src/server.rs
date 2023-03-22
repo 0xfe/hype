@@ -3,7 +3,7 @@
 use tokio::{
     io::{AsyncReadExt, AsyncWriteExt},
     net::TcpListener,
-    sync::{Notify, RwLock},
+    sync::{mpsc, Notify, RwLock},
 };
 
 use crate::{
@@ -24,6 +24,7 @@ struct Stream {
     handlers: Arc<RwLock<Vec<(Matcher, Box<dyn Handler>)>>>,
     default_handler: Option<Arc<RwLock<Box<dyn Handler>>>>,
     conn: Conn,
+    shutdown_notifier: Arc<Notify>,
 }
 
 #[derive(Debug)]
@@ -35,11 +36,15 @@ pub struct Server {
     default_handler: Option<Arc<RwLock<Box<dyn Handler>>>>,
     conns: Arc<RwLock<ConnTracker>>,
     start_notifier: Arc<Notify>,
+    done_notifier: Arc<Notify>,
+    shutdown_tx: Arc<mpsc::Sender<bool>>,
+    shutdown_rx: mpsc::Receiver<bool>,
 }
 
 impl Server {
     pub fn new<T: Into<String> + Clone>(address: T, port: u16) -> Self {
         let base_url = format!("http://{}:{}", address.clone().into(), port);
+        let (tx, rx) = mpsc::channel(1);
 
         Self {
             address: address.into(),
@@ -49,6 +54,9 @@ impl Server {
             base_url,
             conns: Arc::new(RwLock::new(ConnTracker::new())),
             start_notifier: Arc::new(Notify::new()),
+            done_notifier: Arc::new(Notify::new()),
+            shutdown_tx: Arc::new(tx),
+            shutdown_rx: rx,
         }
     }
 
@@ -70,7 +78,15 @@ impl Server {
             while !parser.is_complete() {
                 let mut buf = [0u8; 16384];
 
-                match s.read(&mut buf).await {
+                let result = tokio::select! {
+                    r = s.read(&mut buf) => r,
+                    _ = stream.shutdown_notifier.notified() => {
+                        info!("Shutting down connection {}...", &stream.conn.id());
+                        break 'top;
+                    }
+                };
+
+                match result {
                     Ok(0) => {
                         // No data read, but it's possible the socket is still open.
                         debug!("read {} bytes", 0);
@@ -124,6 +140,7 @@ impl Server {
             s.write_all(buf.as_bytes()).await.unwrap();
         }
 
+        info!("Closed connection {}", &stream.conn.id());
         // If we're here, then the connection is closed, there's nothing to do.
     }
 
@@ -140,16 +157,35 @@ impl Server {
         Arc::clone(&self.start_notifier)
     }
 
+    pub fn shutdown(&self) -> (Arc<mpsc::Sender<bool>>, Arc<Notify>) {
+        (
+            Arc::clone(&self.shutdown_tx),
+            Arc::clone(&self.done_notifier),
+        )
+    }
+
     pub async fn start(&mut self) -> Result<(), ()> {
         let hostport = format!("{}:{}", self.address, self.port);
         info!("Listening on {}", hostport);
         let listener = TcpListener::bind(hostport).await.unwrap();
+        let shutdown_notifier = Arc::new(Notify::new());
 
         // Let tests know we're ready
         self.start_notifier.notify_one();
 
-        loop {
-            let (socket, _) = listener.accept().await.unwrap();
+        'top: loop {
+            let shutdown_notifier = Arc::clone(&shutdown_notifier);
+            let result = tokio::select! {
+                result = listener.accept() => { result.unwrap() },
+                _ = self.shutdown_rx.recv() => {
+                    shutdown_notifier.notify_one();
+                    info!("Shutting down...");
+                    break 'top;
+                }
+            };
+
+            // let (socket, _) = listener.accept().await.unwrap();
+            let (socket, _) = result;
             let conn = self.conns.write().await.push_stream(socket).await;
 
             let base_url = self.base_url.clone();
@@ -165,9 +201,14 @@ impl Server {
                     base_url,
                     handlers,
                     default_handler,
+                    shutdown_notifier,
                 })
                 .await;
             });
         }
+
+        self.done_notifier.notify_one();
+
+        Ok(())
     }
 }

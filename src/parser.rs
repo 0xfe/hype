@@ -305,14 +305,12 @@ impl Parser {
         result
     }
 
-    fn consume(&mut self, b: u8) -> Result<(), ParseError> {
+    fn consume(&mut self, b: u8) {
         self.buf.push(b);
-        Ok(())
     }
 
-    fn consume_body(&mut self, b: u8) -> Result<(), ParseError> {
+    fn consume_body(&mut self, b: u8) {
         self.body.push(b);
-        Ok(())
     }
 
     pub fn parse_buf(&mut self, buf: &[u8]) -> Result<(), ParseError> {
@@ -330,13 +328,13 @@ impl Parser {
             match self.state {
                 State::StartRequest => {
                     if !ch.is_whitespace() {
-                        self.consume(*c)?;
+                        self.consume(*c);
                         self.update_state(State::InMethod)?;
                     }
                 }
                 State::StartResponse => {
                     if !ch.is_whitespace() {
-                        self.consume(*c)?;
+                        self.consume(*c);
                         self.update_state(State::InStatusLine)?;
                     }
                 }
@@ -344,7 +342,7 @@ impl Parser {
                     if ch == '\n' {
                         self.commit_line()?;
                     } else {
-                        self.consume(*c)?;
+                        self.consume(*c);
                     }
                 }
                 State::InChunkedBodySize => {
@@ -356,13 +354,13 @@ impl Parser {
                             self.update_state(State::InChunkedBodyContent)?;
                         }
                     } else if ch.is_ascii_hexdigit() {
-                        self.consume(*c)?;
+                        self.consume(*c);
                     }
 
                     // skip anything else
                 }
                 State::InChunkedBodyContent => {
-                    self.consume_body(*c)?;
+                    self.consume_body(*c);
                     self.chunk_pos += 1;
 
                     if self.chunk_pos == self.expected_chunk_size {
@@ -376,7 +374,7 @@ impl Parser {
                     }
                 }
                 State::InBody => {
-                    self.consume_body(*c)?;
+                    self.consume_body(*c);
                     if self.body.len() == self.expected_content_length {
                         self.parse_eof()?;
                     }

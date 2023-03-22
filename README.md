@@ -71,7 +71,6 @@ async fn main() {
 
 ## In Progress
 
--   Rewrite host header for load balancer
 -   Implement TCP Keepalive
     -   Done, need to parse Keepalive header
 
@@ -95,6 +94,7 @@ async fn main() {
 
 ### Done
 
+-   Rewrite host header for load balancer
 -   Implement chunked transfer-encoding
 -   Implement connection tracking
 -   LB handler
