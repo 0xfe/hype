@@ -39,13 +39,13 @@ lazy_static! {
 #[derive(Debug, Clone)]
 pub struct Request {
     method: Method,
+    conn: Option<Conn>,
     pub handler_path: Option<String>,
     pub base_url: String,
     pub url: Option<Url>,
     pub version: String,
     pub headers: HashMap<String, String>,
     pub body: String,
-    pub conn: Option<Conn>,
 }
 
 impl From<Message> for Request {

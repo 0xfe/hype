@@ -16,7 +16,7 @@ use crate::{
     status,
 };
 
-use std::sync::Arc;
+use std::{collections::HashMap, sync::Arc, time::Duration};
 
 #[derive(Debug)]
 pub struct Server {
@@ -100,7 +100,7 @@ impl Server {
                 .and_then(|h| Some(Arc::clone(&h)));
 
             tokio::spawn(async move {
-                let stream = ConnectedServer {
+                let mut stream = ConnectedServer {
                     conn,
                     base_url,
                     handlers,
@@ -129,7 +129,32 @@ struct ConnectedServer {
 }
 
 impl ConnectedServer {
-    async fn process_connection(&self) {
+    async fn process_headers(&mut self, headers: &HashMap<String, String>) {
+        if let Some(connection) = headers.get("connection") {
+            if connection.to_lowercase() == "keep-alive" {
+                if let Some(keepalive) = headers.get("keep-alive") {
+                    let parts: Vec<&str> = keepalive.split(",").map(|s| s.trim()).collect();
+                    for part in parts {
+                        let kv: Vec<&str> = part.split('=').map(|kv| kv.trim()).collect();
+                        if kv.len() == 0 {
+                            break;
+                        }
+                        match kv[0] {
+                            "timeout" => self.conn.set_keepalive_timeout(Duration::from_secs(
+                                kv[1].parse::<u64>().unwrap_or(60),
+                            )),
+                            "max" => self
+                                .conn
+                                .set_keepalive_max(kv[1].parse::<usize>().unwrap_or(100)),
+                            _ => {}
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    async fn process_connection(&mut self) {
         let s1 = self.conn.stream();
         let mut s = s1.write().await;
 
@@ -177,6 +202,8 @@ impl ConnectedServer {
             let mut request: Request = parser.get_message().into();
             request.set_header("X-Hype-Connection-ID", self.conn.id().clone());
             request.set_conn(self.conn.clone());
+            self.process_headers(&request.headers).await;
+
             debug!("Request: {:?}", request);
 
             let mut path = String::from("/__bad_path__");

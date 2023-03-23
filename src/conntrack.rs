@@ -1,4 +1,4 @@
-use std::{collections::HashMap, fmt, sync::Arc};
+use std::{collections::HashMap, fmt, sync::Arc, time::Duration};
 
 use rand::{thread_rng, Rng};
 use tokio::{net::TcpStream, sync::RwLock};
@@ -50,16 +50,23 @@ impl ConnTracker {
     }
 }
 
+#[derive(Debug, Clone)]
+pub struct ConnState {
+    pub keepalive_timeout: Option<Duration>,
+    pub keepalive_max: Option<usize>,
+}
+
 #[derive(Clone)]
 pub struct Conn {
     id: ConnId,
     stream: Arc<RwLock<TcpStream>>,
     backend_client: Arc<RwLock<Option<ConnectedClient>>>, // for Lb
+    pub state: Arc<std::sync::RwLock<ConnState>>,
 }
 
 impl fmt::Debug for Conn {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "Conn: {}", self.id)
+        write!(f, "Conn: {}\n, State: {:?}", self.id, self.state.read())
     }
 }
 
@@ -75,6 +82,10 @@ impl Conn {
             ),
             stream: Arc::new(RwLock::new(stream)),
             backend_client: Arc::new(RwLock::new(None)),
+            state: Arc::new(std::sync::RwLock::new(ConnState {
+                keepalive_timeout: None,
+                keepalive_max: None,
+            })),
         }
     }
 
@@ -86,11 +97,19 @@ impl Conn {
         Arc::clone(&self.stream)
     }
 
+    pub fn backend_client(&self) -> Arc<RwLock<Option<ConnectedClient>>> {
+        Arc::clone(&self.backend_client)
+    }
+
     pub async fn set_backend_client(&self, client: ConnectedClient) {
         *self.backend_client.write().await = Some(client)
     }
 
-    pub fn backend_client(&self) -> Arc<RwLock<Option<ConnectedClient>>> {
-        Arc::clone(&self.backend_client)
+    pub fn set_keepalive_timeout(&mut self, dur: Duration) {
+        self.state.write().unwrap().keepalive_timeout = Some(dur);
+    }
+
+    pub fn set_keepalive_max(&mut self, max: usize) {
+        self.state.write().unwrap().keepalive_max = Some(max);
     }
 }
