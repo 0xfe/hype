@@ -171,27 +171,39 @@ impl ConnectedClient {
         }
 
         let (e1, writer) = result1.map_err(|e| ClientError::InternalError(e.to_string()))?;
-
         let message = result2.map_err(|e| ClientError::InternalError(e.to_string()))?;
 
-        if e1.is_err() || message.is_err() {
+        // Error sending data
+        if let Err(e) = e1 {
             *self.closed.lock().await = true;
-            writer
-                .lock()
-                .await
-                .shutdown()
-                .await
-                .map_err(|e| ClientError::ShutdownError(e.to_string()))?;
+            Self::close_internal(writer).await?;
+            return Err(e);
+        }
 
-            if let Err(e) = e1 {
-                return Err(e);
-            };
-            if let Err(e) = message {
-                return Err(e);
-            };
+        // Error receiving data
+        if let Err(e) = message {
+            *self.closed.lock().await = true;
+            Self::close_internal(writer).await?;
+            return Err(e);
         }
 
         Ok(message.unwrap().into())
+    }
+
+    async fn close_internal(
+        writer: Arc<Mutex<Box<dyn AsyncWriteStream>>>,
+    ) -> Result<(), ClientError> {
+        Ok(writer
+            .lock()
+            .await
+            .shutdown()
+            .await
+            .map_err(|e| ClientError::ShutdownError(e.to_string()))?)
+    }
+
+    pub async fn close(&mut self) -> Result<(), ClientError> {
+        *self.closed.lock().await = true;
+        Self::close_internal(Arc::clone(&self.writer)).await
     }
 
     pub async fn is_closed(&self) -> bool {

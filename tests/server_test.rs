@@ -74,13 +74,13 @@ async fn keep_alive() {
 
     let address = format!("{}:{}", HOST, port);
 
-    let mut client = Client::new(address.clone());
-    let mut client = client.connect().await.unwrap();
-
     let mut request = Request::new(format!("http://{}", address));
     request.set_method(hype::request::Method::GET);
     request.set_path("/");
 
+    // Create new connection
+    let mut client = Client::new(address.clone());
+    let mut client = client.connect().await.unwrap();
     let response = client.send_request(&request).await.unwrap();
     assert_eq!(response.status.code, 200);
     assert_eq!(response.body, "OK");

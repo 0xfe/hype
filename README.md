@@ -72,12 +72,13 @@ async fn main() {
 ## In Progress
 
 -   Implement TCP Keepalive
-    -   Done, need to parse Keepalive header
+    -   Done, need to parse Keepalive header, and manage with server
+-   Transfer-Encoding: gzip (note Content-Encoding and Accept-Encoding too)
+-   Add LB configuration
 
 ## TODO
 
 -   Healthchecking
--   Transfer-Encoding: chunked, gzip (note Content-Encoding and Accept-Encoding too)
 -   Implement access log
 -   Use templating + #include to make file browser look better
     -   templating engine with https://crates.io/crates/tera
