@@ -33,6 +33,15 @@ $ cargo test parser
 
 # Show standard output
 $ cargo test -- --nocapture
+
+
+# To see logs (via `info!`, `debug!` etc.) in tests, add the following line to the test.
+hype::logger::init()
+
+# Then run the tests with the `-- --nocapture` flag, and optionally set the `RUST_LOG=debug` env var.
+
+# Build docs
+$ cargo doc
 ```
 
 ## Example
@@ -71,19 +80,21 @@ async fn main() {
 
 ## In Progress
 
--   Implement TCP Keepalive
-    -   Done, need to parse Keepalive header, and manage with server
+-   Don't propagate hop-by-hop-headers
+    -   Keep-Alive, Transfer-Encoding, TE, Connection, Trailer, Upgrade, Proxy-Authorization and Proxy-Authenticate
+-   Support X-Forwarded-For
 -   Transfer-Encoding: gzip (note Content-Encoding and Accept-Encoding too)
 -   Add LB configuration
 
 ## TODO
 
+-   TLS support
 -   Healthchecking
+-   Cache control
 -   Implement access log
 -   Use templating + #include to make file browser look better
     -   templating engine with https://crates.io/crates/tera
 -   gRPC API - https://github.com/hyperium/tonic
--   TLS support
 -   json handling (is it needed ??) -- serde_json
 
 ### Issues / Housekeeping
@@ -95,6 +106,8 @@ async fn main() {
 
 ### Done
 
+-   Implement TCP Keepalive
+    -   Done, need to parse Keepalive header, and manage with server
 -   Rewrite host header for load balancer
 -   Implement chunked transfer-encoding
 -   Implement connection tracking

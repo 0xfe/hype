@@ -193,6 +193,8 @@ async fn keep_alive_timeout() {
 
 #[tokio::test]
 async fn keep_alive_max() {
+    hype::logger::init();
+
     let port = 8859;
     let address = format!("{}:{}", HOST, port);
     let shutdown = start_server(port).await;

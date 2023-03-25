@@ -14,18 +14,26 @@ use crate::{
     response::Response,
 };
 
+/// Errors returned by the client.
 #[derive(Debug, Clone)]
 pub enum ClientError {
+    /// Errors related to DNS lookups
     LookupError(String),
+
+    /// Errors related to the TCP connection
     ConnectionError,
     ConnectionBroken,
     ConnectionClosed,
-    ShutdownError(String),
+
+    /// Errors while sending or receiving data
     SendError(String),
     RecvError(String),
-    ResponseError,
+
+    /// Error closing connection
+    ShutdownError(String),
+
+    /// Other unexpected condition
     InternalError(String),
-    OtherError(String),
 }
 
 impl fmt::Display for ClientError {
@@ -40,9 +48,7 @@ impl fmt::Display for ClientError {
             ClientError::RecvError(err) => {
                 write!(f, "could not receive data from backend: {}", err)
             }
-            ClientError::ResponseError => write!(f, "could not parse response"),
-            ClientError::InternalError(err) => write!(f, "could not spawn tasks: {}", err),
-            ClientError::OtherError(err) => write!(f, "could not send request: {}", err),
+            ClientError::InternalError(err) => write!(f, "internal error: {}", err),
         }
     }
 }
@@ -57,6 +63,18 @@ pub struct Client {
 }
 
 impl Client {
+    /// Create a new HTTP client connection.
+    ///
+    /// # Arguments
+    /// `address` - must be a host:port. The host can be an IPv4 address,
+    ///             IPv6 address, or a DNS host name.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use hype::client::Client;
+    /// let client = Client::new("localhost:8080");
+    /// ```
     pub fn new(address: impl Into<String>) -> Self {
         return Self {
             address: address.into(),

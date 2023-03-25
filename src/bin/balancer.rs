@@ -2,7 +2,6 @@
 extern crate log;
 
 use async_trait::async_trait;
-use env_logger::Env;
 use hype::{
     handler::{self, AsyncStream, Handler},
     lb::{backend::HttpBackend, http::Http, picker::RRPicker},
@@ -32,10 +31,7 @@ impl Handler for MyHandler {
 
 #[tokio::main]
 async fn main() {
-    // Set default log level to info. To change, set RUST_LOG as so:
-    //
-    //    $ RUST_LOG=debug cargo run
-    env_logger::Builder::from_env(Env::default().default_filter_or("info")).init();
+    hype::logger::init();
 
     info!("Starting hype...");
     let mut server = Server::new("127.0.0.1", 4000);

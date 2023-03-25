@@ -30,10 +30,10 @@ impl<T: Backend, P: Picker<T>> Http<T, P> {
         let index = self
             .picker
             .pick_backend(&*backends)
-            .map_err(|e| ClientError::OtherError(format!("could not pick backend: {}", e)))?;
+            .map_err(|e| ClientError::InternalError(format!("could not pick backend: {}", e)))?;
 
         if index > backends.len() {
-            return Err(ClientError::OtherError(format!(
+            return Err(ClientError::InternalError(format!(
                 "picker returned invalid index: {}, num backends: {}",
                 index,
                 backends.len()

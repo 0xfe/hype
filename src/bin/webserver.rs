@@ -4,7 +4,6 @@ extern crate log;
 use std::fs;
 
 use async_trait::async_trait;
-use env_logger::Env;
 use hype::{
     config::{self, Config},
     handler::{self, AsyncStream, Handler},
@@ -36,10 +35,7 @@ impl Handler for MyHandler {
 
 #[tokio::main]
 async fn main() {
-    // Set default log level to info. To change, set RUST_LOG as so:
-    //
-    //    $ RUST_LOG=debug cargo run
-    env_logger::Builder::from_env(Env::default().default_filter_or("info")).init();
+    hype::logger::init();
 
     let args: Vec<String> = std::env::args().collect();
 
