@@ -72,7 +72,6 @@ impl ConnTracker {
     }
 
     pub async fn process_keepalives(&self) {
-        // poll_fn(|cx| self.keepalive_queue.write().unwrap().poll_expired(cx));
         let mut keepalive_queue = DelayQueue::new();
         keepalive_queue.insert(ConnId("(0)".to_string()), Duration::from_secs(2000000));
         let conns = Arc::clone(&self.conns);
@@ -167,8 +166,15 @@ impl Conn {
         self.state.write().unwrap().keepalive_max = Some(max);
     }
 
-    pub fn inc_request_count(&mut self) {
-        self.state.write().unwrap().request_count += 1;
+    pub fn inc_request_count(&mut self) -> bool {
+        let mut state = self.state.write().unwrap();
+        state.request_count += 1;
+
+        if let Some(max) = state.keepalive_max {
+            return state.request_count > max;
+        }
+
+        false
     }
 
     pub fn timeout_notifier(&self) -> Arc<Notify> {

@@ -216,7 +216,10 @@ impl ConnectedServer {
                 }
             }
 
-            self.conn.inc_request_count();
+            if self.conn.inc_request_count() {
+                _ = s.shutdown().await;
+                break 'top;
+            }
 
             // If we're here, then the parser has parsed a full request payload.
             let mut request: Request = parser.get_message().into();
