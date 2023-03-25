@@ -161,3 +161,31 @@ async fn process_headers() {
 
     shutdown_server(shutdown).await;
 }
+
+#[tokio::test]
+async fn keep_alive_timeout() {
+    let port = 8858;
+    let address = format!("{}:{}", HOST, port);
+    start_server(port).await;
+
+    let mut request = Request::new(format!("http://{}", address));
+    request.set_method(hype::request::Method::GET);
+    request.set_path("/");
+    request.set_header("Connection", "Keep-Alive");
+    request.set_header("Keep-Alive", "timeout=1");
+
+    // Create new connection
+    let mut client = Client::new(address.clone());
+    let mut client = client.connect().await.unwrap();
+    let response = client.send_request(&request).await.unwrap();
+    assert_eq!(response.status.code, 200);
+    assert_eq!(response.body, "OK");
+    assert_eq!(client.is_closed().await, false);
+
+    tokio::time::sleep(Duration::from_secs(2)).await;
+
+    let response = client.send_request(&request).await;
+    assert_eq!(response.is_err(), true);
+    assert_eq!(client.is_closed().await, true);
+    // EXPECT ERROR
+}

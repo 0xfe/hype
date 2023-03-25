@@ -25,7 +25,7 @@ pub struct Server {
     base_url: String,
     handlers: Arc<RwLock<Vec<(Matcher, Box<dyn Handler>)>>>,
     default_handler: Option<Arc<RwLock<Box<dyn Handler>>>>,
-    conns: Arc<RwLock<ConnTracker>>,
+    conn_tracker: Arc<RwLock<ConnTracker>>,
     start_notifier: Arc<Notify>,
     done_notifier: Arc<Notify>,
     shutdown_tx: Arc<mpsc::Sender<bool>>,
@@ -43,7 +43,7 @@ impl Server {
             handlers: Arc::new(RwLock::new(Vec::new())),
             default_handler: None,
             base_url,
-            conns: Arc::new(RwLock::new(ConnTracker::new())),
+            conn_tracker: Arc::new(RwLock::new(ConnTracker::new())),
             start_notifier: Arc::new(Notify::new()),
             done_notifier: Arc::new(Notify::new()),
             shutdown_tx: Arc::new(tx),
@@ -80,18 +80,23 @@ impl Server {
         // Let tests know we're ready
         self.start_notifier.notify_one();
 
+        // Start keepalive proccessor background thread
+        self.conn_tracker.read().await.process_keepalives().await;
+
         'top: loop {
             let shutdown_notifier = Arc::clone(&shutdown_notifier);
+            let conn_tracker = Arc::clone(&self.conn_tracker);
             let (socket, _) = tokio::select! {
                 result = listener.accept() => { result.unwrap() },
                 _ = self.shutdown_rx.recv() => {
                     shutdown_notifier.notify_one();
+                    conn_tracker.read().await.shutdown();
                     info!("Shutting down...");
                     break 'top;
                 }
             };
 
-            let conn = self.conns.write().await.push_stream(socket).await;
+            let conn = self.conn_tracker.write().await.push_stream(socket);
             let base_url = self.base_url.clone();
             let handlers = Arc::clone(&self.handlers);
             let default_handler: Option<Arc<RwLock<Box<dyn Handler>>>> = self
@@ -106,6 +111,7 @@ impl Server {
                     handlers,
                     default_handler,
                     shutdown_notifier,
+                    conn_tracker,
                 };
 
                 stream.process_connection().await;
@@ -124,6 +130,7 @@ struct ConnectedServer {
     base_url: String,
     handlers: Arc<RwLock<Vec<(Matcher, Box<dyn Handler>)>>>,
     default_handler: Option<Arc<RwLock<Box<dyn Handler>>>>,
+    conn_tracker: Arc<RwLock<ConnTracker>>,
     conn: Conn,
     shutdown_notifier: Arc<Notify>,
 }
@@ -140,9 +147,15 @@ impl ConnectedServer {
                             break;
                         }
                         match kv[0] {
-                            "timeout" => self.conn.set_keepalive_timeout(Duration::from_secs(
-                                kv[1].parse::<u64>().unwrap_or(60),
-                            )),
+                            "timeout" => {
+                                let dur = Duration::from_secs(kv[1].parse::<u64>().unwrap_or(60));
+                                self.conn.set_keepalive_timeout(dur);
+                                self.conn_tracker
+                                    .read()
+                                    .await
+                                    .set_keepalive_timeout(self.conn.id().clone(), dur)
+                                    .await;
+                            }
                             "max" => self
                                 .conn
                                 .set_keepalive_max(kv[1].parse::<usize>().unwrap_or(100)),
@@ -157,6 +170,7 @@ impl ConnectedServer {
     async fn process_connection(&mut self) {
         let s1 = self.conn.stream();
         let mut s = s1.write().await;
+        let timeout_notifier = self.conn.timeout_notifier();
 
         info!(
             "Connection ID {} received from {:?}",
@@ -175,7 +189,11 @@ impl ConnectedServer {
                 let result = tokio::select! {
                     r = s.read(&mut buf) => r,
                     _ = self.shutdown_notifier.notified() => {
-                        info!("Shutting down connection {}...", &self.conn.id());
+                        debug!("Shutting down connection {}...", &self.conn.id());
+                        break 'top;
+                    }
+                    _ = timeout_notifier.notified() => {
+                        debug!("Keepalive timeout for connection {}...", &self.conn.id());
                         break 'top;
                     }
                 };
@@ -197,6 +215,8 @@ impl ConnectedServer {
                     }
                 }
             }
+
+            self.conn.inc_request_count();
 
             // If we're here, then the parser has parsed a full request payload.
             let mut request: Request = parser.get_message().into();
@@ -236,7 +256,7 @@ impl ConnectedServer {
             s.write_all(buf.as_bytes()).await.unwrap();
         }
 
-        info!("Closed connection {}", &self.conn.id());
+        debug!("Closed connection {}", &self.conn.id());
         // If we're here, then the connection is closed, there's nothing to do.
     }
 }
