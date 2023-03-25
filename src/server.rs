@@ -112,6 +112,7 @@ impl Server {
                     default_handler,
                     shutdown_notifier,
                     conn_tracker,
+                    close_connection: false,
                 };
 
                 stream.process_connection().await;
@@ -133,36 +134,44 @@ struct ConnectedServer {
     conn_tracker: Arc<RwLock<ConnTracker>>,
     conn: Conn,
     shutdown_notifier: Arc<Notify>,
+    close_connection: bool,
 }
 
 impl ConnectedServer {
     async fn process_headers(&mut self, headers: &HashMap<String, String>) {
         if let Some(connection) = headers.get("connection") {
-            if connection.to_lowercase() == "keep-alive" {
-                if let Some(keepalive) = headers.get("keep-alive") {
-                    let parts: Vec<&str> = keepalive.split(",").map(|s| s.trim()).collect();
-                    for part in parts {
-                        let kv: Vec<&str> = part.split('=').map(|kv| kv.trim()).collect();
-                        if kv.len() == 0 {
-                            break;
-                        }
-                        match kv[0] {
-                            "timeout" => {
-                                let dur = Duration::from_secs(kv[1].parse::<u64>().unwrap_or(60));
-                                self.conn.set_keepalive_timeout(dur);
-                                self.conn_tracker
-                                    .read()
-                                    .await
-                                    .set_keepalive_timeout(self.conn.id().clone(), dur)
-                                    .await;
+            match connection.to_lowercase().as_ref() {
+                "keep-alive" => {
+                    if let Some(keepalive) = headers.get("keep-alive") {
+                        let parts: Vec<&str> = keepalive.split(",").map(|s| s.trim()).collect();
+                        for part in parts {
+                            let kv: Vec<&str> = part.split('=').map(|kv| kv.trim()).collect();
+                            if kv.len() == 0 {
+                                break;
                             }
-                            "max" => self
-                                .conn
-                                .set_keepalive_max(kv[1].parse::<usize>().unwrap_or(100)),
-                            _ => {}
+                            match kv[0] {
+                                "timeout" => {
+                                    let dur =
+                                        Duration::from_secs(kv[1].parse::<u64>().unwrap_or(60));
+                                    self.conn.set_keepalive_timeout(dur);
+                                    self.conn_tracker
+                                        .read()
+                                        .await
+                                        .set_keepalive_timeout(self.conn.id().clone(), dur)
+                                        .await;
+                                }
+                                "max" => self
+                                    .conn
+                                    .set_keepalive_max(kv[1].parse::<usize>().unwrap_or(100)),
+                                _ => {}
+                            }
                         }
                     }
                 }
+                "close" => {
+                    self.close_connection = true;
+                }
+                _ => {}
             }
         }
     }
@@ -179,6 +188,12 @@ impl ConnectedServer {
         );
 
         'top: loop {
+            if self.close_connection {
+                // We received `Connection: close`
+                _ = s.shutdown().await;
+                break;
+            }
+
             let mut parser = Parser::new(&self.base_url, parser::State::StartRequest);
 
             // We're trying to keep the connection open here, and keep parsing requests until

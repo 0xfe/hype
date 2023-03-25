@@ -224,3 +224,30 @@ async fn keep_alive_max() {
 
     shutdown_server(shutdown).await;
 }
+
+#[tokio::test]
+async fn connection_close() {
+    hype::logger::init();
+    let port = 8860;
+    let address = format!("{}:{}", HOST, port);
+    let shutdown = start_server(port).await;
+
+    let mut request = Request::new(format!("http://{}", address));
+    request.set_method(hype::request::Method::GET);
+    request.set_path("/");
+    request.set_header("Connection", "close");
+
+    // Create new connection
+    let mut client = Client::new(address.clone());
+    let mut client = client.connect().await.unwrap();
+    let response = client.send_request(&request).await.unwrap();
+    assert_eq!(response.status.code, 200);
+    assert_eq!(response.body, "OK");
+    assert_eq!(client.is_closed().await, false);
+
+    let response = client.send_request(&request).await;
+    assert_eq!(response.is_err(), true);
+    assert_eq!(client.is_closed().await, true);
+
+    shutdown_server(shutdown).await;
+}

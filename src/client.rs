@@ -81,6 +81,7 @@ impl Client {
         };
     }
 
+    /// Connect to address and return a `ConnectedClient`.
     pub async fn connect(&mut self) -> Result<ConnectedClient, ClientError> {
         let stream;
 

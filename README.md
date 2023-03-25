@@ -82,6 +82,7 @@ async fn main() {
 
 -   Don't propagate hop-by-hop-headers
     -   Keep-Alive, Transfer-Encoding, TE, Connection, Trailer, Upgrade, Proxy-Authorization and Proxy-Authenticate
+-   Support chunked forwarding
 -   Support X-Forwarded-For
 -   Transfer-Encoding: gzip (note Content-Encoding and Accept-Encoding too)
 -   Add LB configuration
