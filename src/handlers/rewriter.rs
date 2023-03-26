@@ -3,7 +3,7 @@ use regex::Regex;
 use tokio::io::AsyncWriteExt;
 
 use crate::{
-    handler::{self, AsyncStream, Handler},
+    handler::{self, AsyncWriteStream, Handler},
     request::Request,
     response::Response,
     status,
@@ -34,7 +34,7 @@ impl Handler for Rewriter {
     async fn handle(
         &self,
         r: &Request,
-        w: &mut dyn AsyncStream,
+        w: &mut dyn AsyncWriteStream,
     ) -> Result<handler::Ok, handler::Error> {
         let mut response = Response::new(status::from(status::MOVED_PERMANENTLY));
         let path = r.abs_path();

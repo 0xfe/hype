@@ -2,7 +2,7 @@ use async_trait::async_trait;
 use tokio::io::AsyncWriteExt;
 
 use crate::{
-    handler::{self, AsyncStream, Handler},
+    handler::{self, AsyncWriteStream, Handler},
     request::Request,
     response::Response,
     status,
@@ -25,7 +25,7 @@ impl Handler for Redirect {
     async fn handle(
         &self,
         _r: &Request,
-        w: &mut dyn AsyncStream,
+        w: &mut dyn AsyncWriteStream,
     ) -> Result<handler::Ok, handler::Error> {
         let mut response = Response::new(status::from(status::MOVED_PERMANENTLY));
         response.set_header("Location", self.location.clone());

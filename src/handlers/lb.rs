@@ -4,7 +4,7 @@ use async_trait::async_trait;
 use tokio::{io::AsyncWriteExt, sync::RwLock};
 
 use crate::{
-    handler::{self, AsyncStream, Handler},
+    handler::{self, AsyncWriteStream, Handler},
     lb::{backend::HttpBackend, http::Http, picker::Picker},
     request::Request,
 };
@@ -26,7 +26,7 @@ impl<P: Picker<HttpBackend> + Sync + Send> Handler for Lb<P> {
     async fn handle(
         &self,
         r: &Request,
-        w: &mut dyn AsyncStream,
+        w: &mut dyn AsyncWriteStream,
     ) -> Result<handler::Ok, handler::Error> {
         let mut response = self
             .lb

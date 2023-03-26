@@ -111,17 +111,17 @@ impl Client {
         }
 
         let address = addresses[0];
-        let stream;
+        let tcp_stream;
 
         if address.is_ipv4() {
             let socket = TcpSocket::new_v4().or(Err(ClientError::ConnectionError))?;
-            stream = socket
+            tcp_stream = socket
                 .connect(address)
                 .await
                 .or(Err(ClientError::ConnectionError))?;
         } else {
             let socket = TcpSocket::new_v6().or(Err(ClientError::ConnectionError))?;
-            stream = socket
+            tcp_stream = socket
                 .connect(address)
                 .await
                 .or(Err(ClientError::ConnectionError))?;
@@ -147,19 +147,19 @@ impl Client {
             let domain = rustls::ServerName::try_from(self.secure_server_name.as_str())
                 .map_err(|e| ClientError::TLSError(format!("invalid domain: {}", e.to_string())))?;
 
-            let stream = connector
-                .connect(domain, stream)
+            let tls_stream = connector
+                .connect(domain, tcp_stream)
                 .await
                 .map_err(|e| ClientError::TLSError(format!("connection failed {}", e)))?;
 
-            let (reader, writer) = tokio::io::split(stream);
+            let (reader, writer) = tokio::io::split(tls_stream);
             Ok(ConnectedClient {
                 writer: Arc::new(Mutex::new(Box::new(writer))),
                 reader: Arc::new(Mutex::new(Box::new(reader))),
                 closed: Arc::new(Mutex::new(false)),
             })
         } else {
-            let (reader, writer) = tokio::io::split(stream);
+            let (reader, writer) = tokio::io::split(tcp_stream);
             Ok(ConnectedClient {
                 writer: Arc::new(Mutex::new(Box::new(writer))),
                 reader: Arc::new(Mutex::new(Box::new(reader))),

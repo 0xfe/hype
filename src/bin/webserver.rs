@@ -6,7 +6,7 @@ use std::fs;
 use async_trait::async_trait;
 use hype::{
     config::{self, Config},
-    handler::{self, AsyncStream, Handler},
+    handler::{self, AsyncWriteStream, Handler},
     handlers,
     request::Request,
     response::Response,
@@ -23,7 +23,7 @@ impl Handler for MyHandler {
     async fn handle(
         &self,
         r: &Request,
-        w: &mut dyn AsyncStream,
+        w: &mut dyn AsyncWriteStream,
     ) -> Result<handler::Ok, handler::Error> {
         let mut response = Response::new(status::from(status::NOT_FOUND));
         response.set_body(format!("404 File not found: {}\n", r.path()));

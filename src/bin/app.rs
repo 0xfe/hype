@@ -5,7 +5,7 @@ use std::sync::Arc;
 
 use async_trait::async_trait;
 use hype::{
-    handler::{self, AsyncStream, Handler},
+    handler::{self, AsyncWriteStream, Handler},
     middleware,
     request::{Method, Request},
     response::Response,
@@ -39,7 +39,7 @@ impl Handler for LogHandler {
     async fn handle(
         &self,
         r: &Request,
-        _: &mut dyn AsyncStream,
+        _: &mut dyn AsyncWriteStream,
     ) -> Result<handler::Ok, handler::Error> {
         info!("Request: {:?}", r);
         Ok(handler::Ok::Next)
@@ -55,7 +55,11 @@ impl MyHandler {
         MyHandler { app }
     }
 
-    async fn write_response<'a>(w: &mut dyn AsyncStream, status: status::Code<'a>, body: String) {
+    async fn write_response<'a>(
+        w: &mut dyn AsyncWriteStream,
+        status: status::Code<'a>,
+        body: String,
+    ) {
         let mut response = Response::new(status::from(status));
         w.write_all(response.set_body(body).serialize().as_bytes())
             .await
@@ -65,7 +69,7 @@ impl MyHandler {
     async fn handle_root(
         &self,
         _r: &Request,
-        w: &mut dyn AsyncStream,
+        w: &mut dyn AsyncWriteStream,
     ) -> Result<handler::Ok, handler::Error> {
         MyHandler::write_response(w, status::OK, "<html>hi!</html>\n".into()).await;
         Ok(handler::Ok::Done)
@@ -74,7 +78,7 @@ impl MyHandler {
     async fn handle_get_counter(
         &self,
         _r: &Request,
-        w: &mut dyn AsyncStream,
+        w: &mut dyn AsyncWriteStream,
     ) -> Result<handler::Ok, handler::Error> {
         MyHandler::write_response(
             w,
@@ -88,7 +92,7 @@ impl MyHandler {
     async fn handle_post_inc(
         &self,
         _r: &Request,
-        w: &mut dyn AsyncStream,
+        w: &mut dyn AsyncWriteStream,
     ) -> Result<handler::Ok, handler::Error> {
         self.app.lock().await.inc();
         MyHandler::write_response(w, status::OK, "{ \"op\": \"inc\" }\n".into()).await;
@@ -98,7 +102,7 @@ impl MyHandler {
     async fn handle_not_found(
         &self,
         _r: &Request,
-        w: &mut dyn AsyncStream,
+        w: &mut dyn AsyncWriteStream,
     ) -> Result<handler::Ok, handler::Error> {
         MyHandler::write_response(w, status::NOT_FOUND, "<html>NOT FOUND!</html>\n".into()).await;
         Ok(handler::Ok::Done)
@@ -110,7 +114,7 @@ impl Handler for MyHandler {
     async fn handle(
         &self,
         r: &Request,
-        w: &mut dyn AsyncStream,
+        w: &mut dyn AsyncWriteStream,
     ) -> Result<handler::Ok, handler::Error> {
         match (r.method(), r.path().as_str()) {
             (Method::GET | Method::POST, "/") => self.handle_root(r, w).await,

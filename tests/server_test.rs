@@ -3,7 +3,7 @@ use std::{sync::Arc, time::Duration};
 use async_trait::async_trait;
 use hype::{
     client::Client,
-    handler::{self, AsyncStream, Handler},
+    handler::{self, AsyncWriteStream, Handler},
     request::Request,
     response::Response,
     server::Server,
@@ -23,7 +23,7 @@ impl Handler for MyHandler {
     async fn handle(
         &self,
         r: &Request,
-        w: &mut dyn AsyncStream,
+        w: &mut dyn AsyncWriteStream,
     ) -> Result<handler::Ok, handler::Error> {
         let mut response = Response::new(status::from(status::OK));
         response.set_body("OK".into());

@@ -19,7 +19,7 @@ impl Handler for ErrorPage {
     async fn handle(
         &self,
         _r: &hype::request::Request,
-        w: &mut dyn hype::handler::AsyncStream,
+        w: &mut dyn hype::handler::AsyncWriteStream,
     ) -> Result<handler::Ok, handler::Error> {
         let mut response = hype::response::Response::new(status::from(status::NOT_FOUND));
         response.set_body("<html>404 NOT FOUND</html>\n".into());

@@ -1,7 +1,7 @@
 use async_trait::async_trait;
 
 use crate::{
-    handler::{self, AsyncStream, Handler},
+    handler::{self, AsyncWriteStream, Handler},
     request::Request,
 };
 
@@ -28,7 +28,7 @@ impl Handler for Stack {
     async fn handle(
         &self,
         r: &Request,
-        w: &mut dyn AsyncStream,
+        w: &mut dyn AsyncWriteStream,
     ) -> Result<handler::Ok, handler::Error> {
         for handler in self.handlers.iter() {
             match handler.handle(r, w).await {

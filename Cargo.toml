@@ -20,10 +20,11 @@ name = "fileserver"
 path = "src/bin/fileserver.rs"
 
 [dependencies]
-tokio = { version = "1", features = ["full"] }
-lazy_static = "1.4"
+argh = "0.1"
 log = "0.4"
+lazy_static = "1.4"
 env_logger = "0.10"
+tokio = { version = "1", features = ["full"] }
 async-trait = "0.1"
 url = "2.3"
 rand = "0.8"
@@ -34,6 +35,6 @@ serde_yaml = "0.9"
 futures = "0.3"
 tokio-util = {version = "0.7", features = ["time"]}
 tokio-rustls = "0.23"
-argh = "0.1"
 webpki-roots = "0.22"
+rustls-pemfile = "1.0"
 

@@ -3,13 +3,12 @@ use std::{collections::HashMap, fmt, sync::Arc, time::Duration};
 use futures::StreamExt;
 use rand::{thread_rng, Rng};
 use tokio::{
-    net::TcpStream,
     select,
     sync::{mpsc, Mutex, Notify, RwLock},
 };
 use tokio_util::time::DelayQueue;
 
-use crate::client::ConnectedClient;
+use crate::{client::ConnectedClient, handler::AsyncStream};
 
 #[derive(Debug, Clone, Hash, Eq, PartialEq)]
 pub struct ConnId(pub String);
@@ -46,14 +45,14 @@ impl ConnTracker {
         }
     }
 
-    pub fn push_stream(&mut self, stream: TcpStream) -> Conn {
+    pub fn push_stream(&mut self, stream: Box<dyn AsyncStream>) -> Conn {
         let conn = Conn::new(stream);
         let id = conn.id.clone();
         self.conns.write().unwrap().insert(id.clone(), conn.clone());
         conn
     }
 
-    pub async fn stream(&self, id: &ConnId) -> Result<Arc<RwLock<TcpStream>>, String> {
+    pub async fn stream(&self, id: &ConnId) -> Result<Arc<RwLock<Box<dyn AsyncStream>>>, String> {
         Ok(self
             .conns
             .read()
@@ -109,7 +108,7 @@ pub struct ConnState {
 #[derive(Clone)]
 pub struct Conn {
     id: ConnId,
-    stream: Arc<RwLock<TcpStream>>,
+    stream: Arc<RwLock<Box<dyn AsyncStream>>>,
     backend_client: Arc<RwLock<Option<ConnectedClient>>>, // for Lb
     timeout_notifier: Arc<Notify>,
     pub state: Arc<std::sync::RwLock<ConnState>>,
@@ -122,7 +121,7 @@ impl fmt::Debug for Conn {
 }
 
 impl Conn {
-    pub fn new(stream: TcpStream) -> Self {
+    pub fn new(stream: Box<dyn AsyncStream>) -> Self {
         Self {
             id: ConnId(
                 thread_rng()
@@ -146,7 +145,7 @@ impl Conn {
         &self.id
     }
 
-    pub fn stream(&self) -> Arc<RwLock<TcpStream>> {
+    pub fn stream(&self) -> Arc<RwLock<Box<dyn AsyncStream>>> {
         Arc::clone(&self.stream)
     }
 

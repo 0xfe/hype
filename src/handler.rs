@@ -34,23 +34,23 @@ impl fmt::Display for Error {
 
 impl error::Error for Error {}
 
-pub trait AsyncStream: AsyncWrite + Unpin + Send + Sync {}
 pub trait AsyncReadStream: AsyncRead + Unpin + Send + Sync {}
 pub trait AsyncWriteStream: AsyncWrite + Unpin + Send + Sync {}
-pub trait AsyncRWStream: AsyncWrite + AsyncRead + Unpin + Send + Sync {}
+pub trait AsyncStream: AsyncReadStream + AsyncWriteStream {}
 
-impl AsyncStream for Vec<u8> {} // for tests
 impl AsyncWriteStream for Vec<u8> {} // for tests
 
 impl AsyncStream for TcpStream {}
-impl AsyncRWStream for TcpStream {}
 impl AsyncReadStream for TcpStream {}
 impl AsyncWriteStream for TcpStream {}
 
 impl AsyncStream for tokio_rustls::client::TlsStream<tokio::net::TcpStream> {}
-impl AsyncRWStream for tokio_rustls::client::TlsStream<tokio::net::TcpStream> {}
 impl AsyncReadStream for tokio_rustls::client::TlsStream<tokio::net::TcpStream> {}
 impl AsyncWriteStream for tokio_rustls::client::TlsStream<tokio::net::TcpStream> {}
+
+impl AsyncStream for tokio_rustls::server::TlsStream<tokio::net::TcpStream> {}
+impl AsyncReadStream for tokio_rustls::server::TlsStream<tokio::net::TcpStream> {}
+impl AsyncWriteStream for tokio_rustls::server::TlsStream<tokio::net::TcpStream> {}
 
 impl AsyncReadStream for tokio::net::tcp::OwnedReadHalf {}
 impl AsyncWriteStream for tokio::net::tcp::OwnedWriteHalf {}
@@ -58,9 +58,12 @@ impl AsyncWriteStream for tokio::net::tcp::OwnedWriteHalf {}
 impl<T: AsyncReadStream> AsyncReadStream for tokio::io::ReadHalf<T> {}
 impl<T: AsyncWriteStream> AsyncWriteStream for tokio::io::WriteHalf<T> {}
 
-impl AsyncRWStream for Cursor<Vec<u8>> {}
 impl AsyncReadStream for Cursor<Vec<u8>> {}
 impl AsyncWriteStream for Cursor<Vec<u8>> {}
+
+impl AsyncStream for Box<dyn AsyncStream> {}
+impl AsyncReadStream for Box<dyn AsyncStream> {}
+impl AsyncWriteStream for Box<dyn AsyncStream> {}
 
 #[async_trait]
 pub trait Handler: Send + Sync {
@@ -68,7 +71,7 @@ pub trait Handler: Send + Sync {
         Ok(())
     }
 
-    async fn handle(&self, r: &Request, w: &mut dyn AsyncStream) -> Result<Ok, Error>;
+    async fn handle(&self, r: &Request, w: &mut dyn AsyncWriteStream) -> Result<Ok, Error>;
 }
 
 impl std::fmt::Debug for dyn Handler {

@@ -3,7 +3,7 @@ extern crate log;
 
 use async_trait::async_trait;
 use hype::{
-    handler::{self, AsyncStream, Handler},
+    handler::{self, AsyncWriteStream, Handler},
     lb::{backend::HttpBackend, http::Http, picker::RRPicker},
     request::Request,
     response::Response,
@@ -19,7 +19,7 @@ impl Handler for MyHandler {
     async fn handle(
         &self,
         _r: &Request,
-        w: &mut dyn AsyncStream,
+        w: &mut dyn AsyncWriteStream,
     ) -> Result<handler::Ok, handler::Error> {
         let mut response = Response::new(status::from(status::OK));
         response.set_body("<html>Hello world!</html>\n".into());

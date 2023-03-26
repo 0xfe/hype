@@ -1,14 +1,20 @@
 #![allow(non_snake_case)]
 
+use rustls_pemfile::{certs, rsa_private_keys};
+use tokio::io::AsyncReadExt;
 use tokio::{
-    io::{AsyncReadExt, AsyncWriteExt},
+    io::AsyncWriteExt,
     net::TcpListener,
     sync::{mpsc, Notify, RwLock},
+};
+use tokio_rustls::{
+    rustls::{self, Certificate, PrivateKey},
+    TlsAcceptor,
 };
 
 use crate::{
     conntrack::{Conn, ConnTracker},
-    handler::Handler,
+    handler::{AsyncStream, Handler},
     parser::{self, Parser},
     request::Request,
     response::Response,
@@ -16,7 +22,14 @@ use crate::{
     status,
 };
 
-use std::{collections::HashMap, sync::Arc, time::Duration};
+use std::{
+    collections::HashMap,
+    fs::File,
+    io,
+    path::{Path, PathBuf},
+    sync::Arc,
+    time::Duration,
+};
 
 #[derive(Debug)]
 pub struct Server {
@@ -30,6 +43,21 @@ pub struct Server {
     done_notifier: Arc<Notify>,
     shutdown_tx: Arc<mpsc::Sender<bool>>,
     shutdown_rx: mpsc::Receiver<bool>,
+    secure: bool,
+    cert_file: PathBuf,
+    key_file: PathBuf,
+}
+
+fn load_certs(path: &Path) -> io::Result<Vec<Certificate>> {
+    certs(&mut std::io::BufReader::new(std::fs::File::open(path)?))
+        .map_err(|_| io::Error::new(io::ErrorKind::InvalidInput, "invalid cert"))
+        .map(|mut certs| certs.drain(..).map(Certificate).collect())
+}
+
+fn load_keys(path: &Path) -> io::Result<Vec<PrivateKey>> {
+    rsa_private_keys(&mut io::BufReader::new(File::open(path)?))
+        .map_err(|_| io::Error::new(io::ErrorKind::InvalidInput, "invalid key"))
+        .map(|mut keys| keys.drain(..).map(PrivateKey).collect())
 }
 
 impl Server {
@@ -48,7 +76,16 @@ impl Server {
             done_notifier: Arc::new(Notify::new()),
             shutdown_tx: Arc::new(tx),
             shutdown_rx: rx,
+            secure: false,
+            cert_file: PathBuf::new(),
+            key_file: PathBuf::new(),
         }
+    }
+
+    pub fn set_secure(&mut self, cert_file: PathBuf, key_file: PathBuf) {
+        self.secure = true;
+        self.cert_file = cert_file;
+        self.key_file = key_file;
     }
 
     pub fn route_default(&mut self, handler: Box<dyn Handler>) {
@@ -72,6 +109,21 @@ impl Server {
     }
 
     pub async fn start(&mut self) -> Result<(), ()> {
+        let mut acceptor = None;
+
+        if self.secure {
+            info!("Loading TLS certificates...");
+            let certs = load_certs(&self.cert_file).unwrap();
+            let mut keys = load_keys(&self.key_file).unwrap();
+
+            let config = rustls::ServerConfig::builder()
+                .with_safe_defaults()
+                .with_no_client_auth()
+                .with_single_cert(certs, keys.remove(0))
+                .unwrap();
+            acceptor = Some(TlsAcceptor::from(Arc::new(config)));
+        }
+
         let hostport = format!("{}:{}", self.address, self.port);
         info!("Listening on {}", hostport);
         let listener = TcpListener::bind(hostport).await.unwrap();
@@ -86,7 +138,7 @@ impl Server {
         'top: loop {
             let shutdown_notifier = Arc::clone(&shutdown_notifier);
             let conn_tracker = Arc::clone(&self.conn_tracker);
-            let (socket, _) = tokio::select! {
+            let (tcp_socket, _) = tokio::select! {
                 result = listener.accept() => { result.unwrap() },
                 _ = self.shutdown_rx.recv() => {
                     shutdown_notifier.notify_one();
@@ -95,6 +147,16 @@ impl Server {
                     break 'top;
                 }
             };
+
+            let socket: Box<dyn AsyncStream>;
+
+            // If TLS
+            if let Some(ref acceptor) = acceptor {
+                let acceptor = acceptor.clone();
+                socket = Box::new(acceptor.accept(tcp_socket).await.unwrap());
+            } else {
+                socket = Box::new(tcp_socket);
+            }
 
             let conn = self.conn_tracker.write().await.push_stream(socket);
             let base_url = self.base_url.clone();
@@ -181,11 +243,13 @@ impl ConnectedServer {
         let mut s = s1.write().await;
         let timeout_notifier = self.conn.timeout_notifier();
 
+        /*
         info!(
             "Connection ID {} received from {:?}",
             &self.conn.id(),
             s.peer_addr().unwrap()
         );
+        */
 
         'top: loop {
             if self.close_connection {

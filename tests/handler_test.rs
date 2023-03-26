@@ -1,6 +1,6 @@
 use async_trait::async_trait;
 use hype::{
-    handler::{self, AsyncStream, Error, Handler},
+    handler::{self, AsyncWriteStream, Error, Handler},
     request::Request,
     response::Response,
     status,
@@ -11,7 +11,11 @@ struct MyHandler {}
 
 #[async_trait]
 impl Handler for MyHandler {
-    async fn handle(&self, _: &Request, w: &mut dyn AsyncStream) -> Result<handler::Ok, Error> {
+    async fn handle(
+        &self,
+        _: &Request,
+        w: &mut dyn AsyncWriteStream,
+    ) -> Result<handler::Ok, Error> {
         let mut response = Response::new(status::from(status::OK));
         response.set_header("foo", "bar");
         response.set_body("hello world!\n".into());

@@ -12,7 +12,7 @@ use tokio::{
 
 use crate::{
     config, content_types,
-    handler::{self, AsyncStream, Handler},
+    handler::{self, AsyncWriteStream, Handler},
     request::Request,
     response::Response,
     status,
@@ -48,7 +48,7 @@ impl Web {
     }
 
     async fn write_response<'b>(
-        w: &mut dyn AsyncStream,
+        w: &mut dyn AsyncWriteStream,
         status: status::Code<'b>,
         content_type: String,
         body: String,
@@ -61,7 +61,7 @@ impl Web {
     }
 
     async fn write_file_contents(
-        w: &mut dyn AsyncStream,
+        w: &mut dyn AsyncWriteStream,
         path: impl AsRef<str>,
         content_types: &HashMap<&str, &str>,
     ) -> Result<(), ()> {
@@ -86,7 +86,7 @@ impl Web {
     async fn handle_path(
         &self,
         r: &Request,
-        w: &mut dyn AsyncStream,
+        w: &mut dyn AsyncWriteStream,
     ) -> Result<handler::Ok, handler::Error> {
         let mut abs_fs_path = PathBuf::new();
         abs_fs_path.push(self.base_fs_path.as_str());
@@ -154,7 +154,7 @@ impl Handler for Web {
     async fn handle(
         &self,
         r: &Request,
-        w: &mut dyn AsyncStream,
+        w: &mut dyn AsyncWriteStream,
     ) -> Result<handler::Ok, handler::Error> {
         let result = self.handle_path(r, w).await;
 
