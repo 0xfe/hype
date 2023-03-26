@@ -313,7 +313,7 @@ impl ConnectedServer {
                 path = url.path().into()
             }
 
-            for handler in self.handlers.write().await.iter_mut() {
+            for handler in self.handlers.read().await.iter() {
                 if let Some(matched_path) = handler.0.matches(&path) {
                     request.set_handler_path(String::from(matched_path.to_string_lossy()));
                     if let Err(error) = handler.1.handle(&request, &mut *s).await {
@@ -324,7 +324,7 @@ impl ConnectedServer {
             }
 
             if let Some(handler) = &self.default_handler {
-                if let Err(error) = handler.write().await.handle(&request, &mut *s).await {
+                if let Err(error) = handler.read().await.handle(&request, &mut *s).await {
                     error!("Error from handler {:?}: {:?}", handler, error);
                 }
                 continue;
