@@ -7,6 +7,7 @@ use tokio::{
     net::TcpListener,
     sync::{mpsc, Notify, RwLock},
 };
+
 use tokio_rustls::{
     rustls::{self, Certificate, PrivateKey},
     TlsAcceptor,
@@ -43,6 +44,8 @@ pub struct Server {
     done_notifier: Arc<Notify>,
     shutdown_tx: Arc<mpsc::Sender<bool>>,
     shutdown_rx: mpsc::Receiver<bool>,
+
+    // TLS configuration
     secure: bool,
     cert_file: PathBuf,
     key_file: PathBuf,
@@ -88,6 +91,10 @@ impl Server {
         self.secure = true;
         self.cert_file = cert_file;
         self.key_file = key_file;
+    }
+
+    pub fn set_base_url(&mut self, base_url: impl Into<String>) {
+        self.base_url = base_url.into();
     }
 
     pub fn route_default(&mut self, handler: Box<dyn Handler>) {
@@ -179,7 +186,10 @@ impl Server {
                     close_connection: false,
                 };
 
-                stream.process_connection().await;
+                if let Err(err) = stream.process_connection().await {
+                    warn!("server error: {err}");
+                    _ = stream.conn.stream().write().await.shutdown().await;
+                }
             });
         }
 
@@ -240,7 +250,7 @@ impl ConnectedServer {
         }
     }
 
-    async fn process_connection(&mut self) {
+    async fn process_connection(&mut self) -> Result<(), String> {
         let s1 = self.conn.stream();
         let mut s = s1.write().await;
         let timeout_notifier = self.conn.timeout_notifier();
@@ -288,7 +298,7 @@ impl ConnectedServer {
                     }
                     Ok(n) => {
                         debug!("read {} bytes", n);
-                        parser.parse_buf(&buf[..n]).unwrap();
+                        parser.parse_buf(&buf[..n]).map_err(|e| e.to_string())?;
                     }
                     Err(e) => {
                         // Socket is closed, exit this method right away.
@@ -338,10 +348,13 @@ impl ConnectedServer {
             response.set_header("Content-Type", "text/plain");
             response.set_body("Hype: no route handlers installed.".into());
             let buf = response.serialize();
-            s.write_all(buf.as_bytes()).await.unwrap();
+            s.write_all(buf.as_bytes())
+                .await
+                .map_err(|e| format!("could not write to socket: {e}"))?;
         }
 
         debug!("Closed connection {}", &self.conn.id());
+        Ok(())
         // If we're here, then the connection is closed, there's nothing to do.
     }
 }

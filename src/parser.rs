@@ -1,5 +1,5 @@
-use std::collections::HashMap;
 use std::str;
+use std::{collections::HashMap, fmt};
 
 use url::Url;
 
@@ -52,6 +52,29 @@ pub enum ParseError {
     InvalidChunkSize,
     NonNumericChunkSize,
     UnexpectedEOF,
+}
+
+impl fmt::Display for ParseError {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            ParseError::UnexpectedState => write!(f, "Parser: unexpected state"),
+            ParseError::InvalidChunkSize => write!(f, "Parser: invalid chunk size"),
+            ParseError::NonNumericChunkSize => write!(f, "Parser: non-numeric chunk size"),
+            ParseError::UnexpectedEOF => write!(f, "Parser: unexpected state"),
+            ParseError::InvalidStateTransition(src, dest) => {
+                write!(
+                    f,
+                    "Parser: invalid state transition: {:?} -> {:?}",
+                    src, dest
+                )
+            }
+            ParseError::BadMethodLine(msg) => write!(f, "Parser: bad method line: {}", msg),
+            ParseError::BadStatusLine(msg) => write!(f, "Parser: bad status line: {}", msg),
+            ParseError::BadHeaderLine(msg) => write!(f, "Parser: bad header line: {}", msg),
+            ParseError::InvalidMethod(msg) => write!(f, "Parser: invalid method: {}", msg),
+            ParseError::InvalidPath(msg) => write!(f, "Parser: invalid path: {}", msg),
+        }
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -165,7 +188,8 @@ impl Parser {
     }
 
     fn commit_method(&mut self) -> Result<(), ParseError> {
-        let method_line = std::str::from_utf8(&self.buf[..]).unwrap();
+        let method_line = std::str::from_utf8(&self.buf[..])
+            .map_err(|e| ParseError::BadMethodLine(e.to_string()))?;
         let parts = method_line.split_ascii_whitespace().collect::<Vec<&str>>();
 
         if parts.len() != 3 {

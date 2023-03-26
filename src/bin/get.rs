@@ -12,11 +12,11 @@ use hype::{client::Client, request::Request};
 #[derive(FromArgs)]
 /// Reach new heights.
 struct Args {
-    /// whether or not to jump
+    /// server port
     #[argh(option, short = 'p', default = "80")]
     port: u16,
 
-    /// how high to go
+    /// enable TLS
     #[argh(switch, short = 's')]
     secure: bool,
 

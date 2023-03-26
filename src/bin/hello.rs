@@ -1,6 +1,7 @@
 #[macro_use]
 extern crate log;
 
+use argh::FromArgs;
 use async_trait::async_trait;
 use env_logger::Env;
 use hype::{
@@ -11,6 +12,30 @@ use hype::{
     status::{self},
 };
 use tokio::io::AsyncWriteExt;
+
+#[derive(FromArgs)]
+/// Reach new heights.
+struct Args {
+    /// server port
+    #[argh(option, short = 'h', default = "String::from(\"localhost\")")]
+    host: String,
+
+    /// server port
+    #[argh(option, short = 'p', default = "4000")]
+    port: u16,
+
+    /// enable TLS
+    #[argh(switch, short = 's')]
+    secure: bool,
+
+    /// TLS cert file
+    #[argh(option, default = "String::from(\"localhost.crt\")")]
+    cert_file: String,
+
+    /// TLS key file
+    #[argh(option, default = "String::from(\"localhost.key\")")]
+    key_file: String,
+}
 
 struct MyHandler {}
 
@@ -35,10 +60,15 @@ async fn main() {
     //
     //    $ RUST_LOG=debug cargo run
     env_logger::Builder::from_env(Env::default().default_filter_or("info")).init();
+    let args: Args = argh::from_env();
 
     info!("Starting hype...");
-    let mut server = Server::new("127.0.0.1", 4000);
-    server.route_default(Box::new(MyHandler {}));
+    let mut server = Server::new(args.host, args.port);
 
+    if args.secure {
+        server.set_secure(args.cert_file.into(), args.key_file.into());
+    }
+
+    server.route_default(Box::new(MyHandler {}));
     server.start().await.unwrap();
 }

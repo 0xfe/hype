@@ -16,7 +16,10 @@
 Start with debug logging.
 
 ```
-$ RUST_LOG=debug cargo run --bin {app, hello}
+$ RUST_LOG=debug cargo run --bin hello
+
+# Run with TLS
+$ cargo run --bin hello -- -s
 ```
 
 ## Run tests
@@ -119,7 +122,6 @@ async fn main() {
 -   Errors should be derived from error::Error -- see cookie.rs
 -   Support multiple headers with the same key
     -   bad request (400) if multiple host headers
--   Add end-to-end tests with reqwest
 
 ### Done
 
