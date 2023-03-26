@@ -47,8 +47,16 @@ impl AsyncRWStream for TcpStream {}
 impl AsyncReadStream for TcpStream {}
 impl AsyncWriteStream for TcpStream {}
 
+impl AsyncStream for tokio_rustls::client::TlsStream<tokio::net::TcpStream> {}
+impl AsyncRWStream for tokio_rustls::client::TlsStream<tokio::net::TcpStream> {}
+impl AsyncReadStream for tokio_rustls::client::TlsStream<tokio::net::TcpStream> {}
+impl AsyncWriteStream for tokio_rustls::client::TlsStream<tokio::net::TcpStream> {}
+
 impl AsyncReadStream for tokio::net::tcp::OwnedReadHalf {}
 impl AsyncWriteStream for tokio::net::tcp::OwnedWriteHalf {}
+
+impl<T: AsyncReadStream> AsyncReadStream for tokio::io::ReadHalf<T> {}
+impl<T: AsyncWriteStream> AsyncWriteStream for tokio::io::WriteHalf<T> {}
 
 impl AsyncRWStream for Cursor<Vec<u8>> {}
 impl AsyncReadStream for Cursor<Vec<u8>> {}

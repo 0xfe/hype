@@ -80,23 +80,24 @@ async fn main() {
 
 ## In Progress
 
--   Don't propagate hop-by-hop-headers
-    -   Keep-Alive, Transfer-Encoding, TE, Connection, Trailer, Upgrade, Proxy-Authorization and Proxy-Authenticate
--   Support chunked forwarding
--   Support X-Forwarded-For
--   Transfer-Encoding: gzip (note Content-Encoding and Accept-Encoding too)
--   Add LB configuration
+-   TLS support
+-   Support chunked forwarding (encoding support done)
 
 ## TODO
 
--   TLS support
--   Healthchecking
--   Cache control
--   Implement access log
+-   Add additional configuration schema for LB handler
+-   Support X-Forwarded-For
+-   Backend healthchecking for balancer targets
+-   Don't propagate hop-by-hop-headers
+    -   Keep-Alive, Transfer-Encoding, TE, Connection, Trailer, Upgrade, Proxy-Authorization and Proxy-Authenticate
+    -   Maybe okay to propagate keep-alive and connection headers.
+-   Cache control headers
+-   Transfer-Encoding: gzip (note Content-Encoding and Accept-Encoding too)
+-   CLI with https://docs.rs/argh/latest/argh/
 -   Use templating + #include to make file browser look better
     -   templating engine with https://crates.io/crates/tera
 -   gRPC API - https://github.com/hyperium/tonic
--   json handling (is it needed ??) -- serde_json
+-   Implement access log
 
 ### Issues / Housekeeping
 
@@ -107,8 +108,9 @@ async fn main() {
 
 ### Done
 
--   Implement TCP Keepalive
-    -   Done, need to parse Keepalive header, and manage with server
+-   Implment "Connection: close", shutdown socket as soon as request is processed.
+-   Implement HTTP Keepalive Timeout
+-   Implement HTTP Keepalive Max
 -   Rewrite host header for load balancer
 -   Implement chunked transfer-encoding
 -   Implement connection tracking

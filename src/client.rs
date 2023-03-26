@@ -6,6 +6,7 @@ use tokio::{
     net::{lookup_host, TcpSocket},
     sync::Mutex,
 };
+use tokio_rustls::{rustls, TlsConnector};
 
 use crate::{
     handler::{AsyncReadStream, AsyncWriteStream},
@@ -25,6 +26,9 @@ pub enum ClientError {
     ConnectionBroken,
     ConnectionClosed,
 
+    /// TLS Errors
+    TLSError(String),
+
     /// Errors while sending or receiving data
     SendError(String),
     RecvError(String),
@@ -43,6 +47,7 @@ impl fmt::Display for ClientError {
             ClientError::ConnectionError => write!(f, "could not connect to backend"),
             ClientError::ConnectionBroken => write!(f, "connection broken"),
             ClientError::ConnectionClosed => write!(f, "connection closed"),
+            ClientError::TLSError(message) => write!(f, "TLS error: {}", message),
             ClientError::ShutdownError(err) => write!(f, "error while closing socket: {}", err),
             ClientError::SendError(err) => write!(f, "could not send data to backend: {}", err),
             ClientError::RecvError(err) => {
@@ -60,6 +65,8 @@ impl Client {}
 #[derive(Debug)]
 pub struct Client {
     address: String,
+    secure: bool,
+    secure_server_name: String,
 }
 
 impl Client {
@@ -78,13 +85,19 @@ impl Client {
     pub fn new(address: impl Into<String>) -> Self {
         return Self {
             address: address.into(),
+            secure: false,
+            secure_server_name: String::from(""),
         };
+    }
+
+    pub fn set_secure(&mut self, server_name: impl Into<String>) -> &mut Self {
+        self.secure = true;
+        self.secure_server_name = server_name.into();
+        self
     }
 
     /// Connect to address and return a `ConnectedClient`.
     pub async fn connect(&mut self) -> Result<ConnectedClient, ClientError> {
-        let stream;
-
         let addresses: Vec<SocketAddr> = lookup_host(&self.address)
             .await
             .map_err(|e| ClientError::LookupError(format!("{}: {}", self.address.clone(), e)))?
@@ -98,6 +111,7 @@ impl Client {
         }
 
         let address = addresses[0];
+        let stream;
 
         if address.is_ipv4() {
             let socket = TcpSocket::new_v4().or(Err(ClientError::ConnectionError))?;
@@ -113,12 +127,35 @@ impl Client {
                 .or(Err(ClientError::ConnectionError))?;
         }
 
-        let (reader, writer) = stream.into_split();
-        Ok(ConnectedClient {
-            writer: Arc::new(Mutex::new(Box::new(writer))),
-            reader: Arc::new(Mutex::new(Box::new(reader))),
-            closed: Arc::new(Mutex::new(false)),
-        })
+        if self.secure {
+            let root_cert_store = rustls::RootCertStore::empty();
+            let config = rustls::ClientConfig::builder()
+                .with_safe_defaults()
+                .with_root_certificates(root_cert_store)
+                .with_no_client_auth(); // i guess this was previously the default?
+            let connector = TlsConnector::from(Arc::new(config));
+            let domain = rustls::ServerName::try_from(self.secure_server_name.as_str())
+                .map_err(|e| ClientError::TLSError(format!("invalid domain: {}", e.to_string())))?;
+
+            let stream = connector
+                .connect(domain, stream)
+                .await
+                .map_err(|e| ClientError::TLSError(format!("connection failed {}", e)))?;
+
+            let (reader, writer) = tokio::io::split(stream);
+            Ok(ConnectedClient {
+                writer: Arc::new(Mutex::new(Box::new(writer))),
+                reader: Arc::new(Mutex::new(Box::new(reader))),
+                closed: Arc::new(Mutex::new(false)),
+            })
+        } else {
+            let (reader, writer) = tokio::io::split(stream);
+            Ok(ConnectedClient {
+                writer: Arc::new(Mutex::new(Box::new(writer))),
+                reader: Arc::new(Mutex::new(Box::new(reader))),
+                closed: Arc::new(Mutex::new(false)),
+            })
+        }
     }
 }
 
