@@ -44,6 +44,19 @@ hype::logger::init()
 $ cargo doc
 ```
 
+## Generate TLS key and cert file for localhost
+
+```
+$ openssl genrsa -out localhost.key 2048
+$ openssl req -new -x509 -sha256 -key localhost.key -out localhost.crt -days 3650
+```
+
+To test:
+
+```
+curl --insecure https://localhost:4000
+```
+
 ## Example
 
 ```rust
@@ -85,7 +98,9 @@ async fn main() {
 
 ## TODO
 
--   Add additional configuration schema for LB handler
+-   Add additional configuration schema for LB handlers
+    -   host rewrite
+    -   cert files
 -   Support X-Forwarded-For
 -   Backend healthchecking for balancer targets
 -   Don't propagate hop-by-hop-headers

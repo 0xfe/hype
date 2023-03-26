@@ -1,2 +1,4 @@
 /target
 /Cargo.lock
+/localhost.key
+/localhost.crt

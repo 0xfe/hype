@@ -77,8 +77,8 @@ impl Server {
             shutdown_tx: Arc::new(tx),
             shutdown_rx: rx,
             secure: false,
-            cert_file: PathBuf::new(),
-            key_file: PathBuf::new(),
+            cert_file: PathBuf::from("localhost.crt"),
+            key_file: PathBuf::from("localhost.key"),
         }
     }
 
