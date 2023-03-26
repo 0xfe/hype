@@ -200,7 +200,7 @@ impl ConnectedClient {
         let handle2 = tokio::spawn(async move {
             let mut stream = reader.lock().await;
 
-            let mut parser = parser::Parser::new("http://foo", parser::State::StartResponse);
+            let mut parser = parser::ResponseParser::new();
 
             loop {
                 let mut buf = [0u8; 16384];

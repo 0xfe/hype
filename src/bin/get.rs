@@ -41,7 +41,7 @@ async fn main() {
 
     let mut client = client.connect().await.unwrap();
 
-    let mut request = Request::new("http://foo");
+    let mut request = Request::new();
     request.set_method(hype::request::Method::GET);
     request.set_path("/");
 

@@ -8,7 +8,7 @@ fn parse(
     start_state: parser::State,
 ) -> (Option<hype::parser::Message>, Result<(), ParseError>) {
     println!("Parsing buffer:\n{}", buf);
-    let mut parser = Parser::new("http://localhost", start_state);
+    let mut parser = Parser::new(start_state);
     let result1 = parser.parse_buf(String::from(buf).as_bytes());
     if result1 == Ok(()) {
         (Some(parser.get_message()), result1)

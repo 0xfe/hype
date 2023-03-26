@@ -9,7 +9,7 @@ Host: google.com"##;
     let mut client = Client::new("google.com:80");
     let mut client = client.connect().await.unwrap();
 
-    let req = Request::from(r, "http://google.com").unwrap();
+    let req = Request::from(r).unwrap();
     let result = client.send_request(&req).await.unwrap();
 
     println!("result: {:?}", result);

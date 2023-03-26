@@ -65,7 +65,7 @@ Content-Length: 23
 merchantID=2003&foo=bar"##;
 
         let rewriter = Rewriter::new("(.*)([^/]$)", "$1$2/").unwrap();
-        let request = Request::from(r, "http://localhost").unwrap();
+        let request = Request::from(r).unwrap();
         let mut stream: Vec<u8> = vec![];
 
         rewriter.handle(&request, &mut stream).await.unwrap();
@@ -87,7 +87,7 @@ Content-Length: 23
 merchantID=2003&foo=bar"##;
 
         let rewriter = Rewriter::new("(.*)([^/]$)", "$1$2/").unwrap();
-        let request = Request::from(r, "http://localhost").unwrap();
+        let request = Request::from(r).unwrap();
         let mut stream: Vec<u8> = vec![];
 
         rewriter.handle(&request, &mut stream).await.unwrap();

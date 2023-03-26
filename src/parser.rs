@@ -99,7 +99,7 @@ pub struct RequestParser {}
 
 impl RequestParser {
     pub fn new() -> Parser {
-        return Parser::new("http://no_base_url", State::StartRequest);
+        return Parser::new(State::StartRequest);
     }
 }
 
@@ -107,7 +107,7 @@ pub struct ResponseParser {}
 
 impl ResponseParser {
     pub fn new() -> Parser {
-        return Parser::new("http://no_base_url", State::StartResponse);
+        return Parser::new(State::StartResponse);
     }
 }
 
@@ -125,15 +125,14 @@ pub struct Parser {
 }
 
 impl Parser {
-    pub fn new(base_url: impl Into<String>, start_state: State) -> Parser {
-        let base_url = base_url.into();
-        let mut message = Message::Request(Request::new(base_url.clone()));
+    pub fn new(start_state: State) -> Parser {
+        let mut message = Message::Request(Request::new());
         if start_state == State::StartResponse {
             message = Message::Response(Response::new(status::from(status::OK)));
         }
 
         Parser {
-            base_url: base_url,
+            base_url: "http://UNSET".into(),
             start_state: start_state.clone(),
             state: start_state,
             buf: Vec::with_capacity(16384),
@@ -143,6 +142,9 @@ impl Parser {
             expected_content_length: 0,
             chunk_pos: 0,
         }
+    }
+    pub fn set_base_url(&mut self, base_url: impl Into<String>) {
+        self.base_url = base_url.into();
     }
 
     fn update_state(&mut self, target_state: State) -> Result<(), ParseError> {

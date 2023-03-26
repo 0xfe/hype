@@ -4,7 +4,7 @@ use url::Url;
 
 use crate::{
     conntrack::Conn,
-    parser::{self, Message, Parser},
+    parser::{Message, RequestParser},
 };
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Hash)]
@@ -59,9 +59,9 @@ impl From<Message> for Request {
 }
 
 impl Request {
-    pub fn new(base_url: impl Into<String>) -> Self {
+    pub fn new() -> Self {
         Request {
-            base_url: base_url.into(),
+            base_url: "http://UNSET".into(),
             handler_path: None,
             url: None,
             method: Method::GET,
@@ -92,6 +92,10 @@ impl Request {
         self.conn.clone()
     }
 
+    pub fn set_base_url(&mut self, base_url: impl Into<String>) {
+        self.base_url = base_url.into();
+    }
+
     pub fn set_path(&mut self, path: impl AsRef<str>) {
         let mut url =
             Url::from_str(&self.base_url).unwrap_or(Url::from_str("http://UNSET").unwrap());
@@ -103,8 +107,8 @@ impl Request {
         self.headers.insert(key.into().to_lowercase(), val.into());
     }
 
-    pub fn from(buf: impl Into<String>, base_url: impl Into<String>) -> Result<Self, String> {
-        let mut parser = Parser::new(base_url.into(), parser::State::StartRequest);
+    pub fn from(buf: impl Into<String>) -> Result<Self, String> {
+        let mut parser = RequestParser::new();
         parser
             .parse_buf(buf.into().as_bytes())
             .or(Err("could not parse buffer"))?;

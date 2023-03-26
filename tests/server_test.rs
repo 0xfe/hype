@@ -85,7 +85,7 @@ async fn it_works() {
     let mut client = Client::new(address.clone());
     let mut client = client.connect().await.unwrap();
 
-    let mut request = Request::new(format!("http://{}", address));
+    let mut request = Request::new();
     request.set_method(hype::request::Method::GET);
     request.set_path("/");
 
@@ -103,7 +103,7 @@ async fn keep_alive() {
 
     let address = format!("{}:{}", HOST, port);
 
-    let mut request = Request::new(format!("http://{}", address));
+    let mut request = Request::new();
     request.set_method(hype::request::Method::GET);
     request.set_path("/");
 
@@ -138,7 +138,7 @@ async fn process_headers() {
     let mut client = Client::new(address.clone());
     let mut client = client.connect().await.unwrap();
 
-    let mut request = Request::new(format!("http://{}", address));
+    let mut request = Request::new();
     request.set_method(hype::request::Method::GET);
     request.set_path("/");
     request.set_header("Connection", "Keep-Alive");
@@ -168,7 +168,7 @@ async fn keep_alive_timeout() {
     let address = format!("{}:{}", HOST, port);
     let shutdown = start_server(port).await;
 
-    let mut request = Request::new(format!("http://{}", address));
+    let mut request = Request::new();
     request.set_method(hype::request::Method::GET);
     request.set_path("/");
     request.set_header("Connection", "Keep-Alive");
@@ -199,7 +199,7 @@ async fn keep_alive_max() {
     let address = format!("{}:{}", HOST, port);
     let shutdown = start_server(port).await;
 
-    let mut request = Request::new(format!("http://{}", address));
+    let mut request = Request::new();
     request.set_method(hype::request::Method::GET);
     request.set_path("/");
     request.set_header("Connection", "Keep-Alive");
@@ -232,7 +232,7 @@ async fn connection_close() {
     let address = format!("{}:{}", HOST, port);
     let shutdown = start_server(port).await;
 
-    let mut request = Request::new(format!("http://{}", address));
+    let mut request = Request::new();
     request.set_method(hype::request::Method::GET);
     request.set_path("/");
     request.set_header("Connection", "close");

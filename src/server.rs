@@ -12,10 +12,10 @@ use tokio_rustls::{
     TlsAcceptor,
 };
 
+use crate::parser::RequestParser;
 use crate::{
     conntrack::{Conn, ConnTracker},
     handler::{AsyncStream, Handler},
-    parser::{self, Parser},
     request::Request,
     response::Response,
     router::Matcher,
@@ -48,12 +48,14 @@ pub struct Server {
     key_file: PathBuf,
 }
 
+// Load TLS certs from `path`
 fn load_certs(path: &Path) -> io::Result<Vec<Certificate>> {
     certs(&mut std::io::BufReader::new(std::fs::File::open(path)?))
         .map_err(|_| io::Error::new(io::ErrorKind::InvalidInput, "invalid cert"))
         .map(|mut certs| certs.drain(..).map(Certificate).collect())
 }
 
+// Load TLS private keys from `path`
 fn load_keys(path: &Path) -> io::Result<Vec<PrivateKey>> {
     rsa_private_keys(&mut io::BufReader::new(File::open(path)?))
         .map_err(|_| io::Error::new(io::ErrorKind::InvalidInput, "invalid key"))
@@ -258,7 +260,8 @@ impl ConnectedServer {
                 break;
             }
 
-            let mut parser = Parser::new(&self.base_url, parser::State::StartRequest);
+            let mut parser = RequestParser::new();
+            parser.set_base_url(&self.base_url);
 
             // We're trying to keep the connection open here, and keep parsing requests until
             // the socket is closed.

@@ -65,9 +65,7 @@ async fn random_policy() {
     let lb = http::Http::new(backends, RandomPicker::new());
 
     for _ in 0..20 {
-        lb.send_request(&Request::new("http://localhost:8000"))
-            .await
-            .unwrap();
+        lb.send_request(&Request::new()).await.unwrap();
     }
 
     let results = futures::future::join_all((0..3).map(|i| get_stats(&lb, i))).await;
@@ -100,9 +98,7 @@ async fn rr_policy() {
     let lb = http::Http::new(backends, RRPicker::new());
 
     for _ in 0..20 {
-        lb.send_request(&Request::new("http://localhost:8000"))
-            .await
-            .unwrap();
+        lb.send_request(&Request::new()).await.unwrap();
     }
 
     let results = futures::future::join_all((0..4).map(|i| get_stats(&lb, i))).await;
@@ -127,9 +123,7 @@ async fn weighted_rr_policy() {
     let lb = http::Http::new(backends, WeightedRRPicker::new(vec![3, 2, 1, 4]));
 
     for _ in 0..20 {
-        lb.send_request(&Request::new("http://localhost:8000"))
-            .await
-            .unwrap();
+        lb.send_request(&Request::new()).await.unwrap();
     }
 
     let results = futures::future::join_all((0..4).map(|i| get_stats(&lb, i))).await;
