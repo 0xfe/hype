@@ -12,6 +12,7 @@ pub mod cookie;
 pub mod handler;
 pub mod handlers;
 pub mod lb;
+pub mod lbconfig;
 pub mod logger;
 pub mod middleware;
 pub mod parser;

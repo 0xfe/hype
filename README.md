@@ -1,15 +1,6 @@
 # hype
 
--   hype is a web server
--   hype is an L7 load balancer
--   hype is a tiny web framework
-
-## Features implemented so far
-
--   Handler and middleware API for web apps
--   Simple pattern based request routing
--   L7 loadbalancing with multiple backend selection policies
--   Handler to serve files from directories
+hype is a programmable L4/7 load balancer
 
 ## To run
 
@@ -58,40 +49,6 @@ To test:
 
 ```
 curl --insecure https://localhost:4000
-```
-
-## Example
-
-```rust
-struct MyHandler {}
-
-#[async_trait]
-impl Handler for MyHandler {
-    async fn handle(&self, r: &Request, w: &mut dyn AsyncStream) -> Result<(), handler::Error> {
-        let mut response = Response::new(status::from(status::OK));
-
-        match (r.method, r.url.as_ref().unwrap().path()) {
-            (Method::GET | Method::POST, "/") => {
-                response.set_body("<html>hi!</html>\n".into());
-            }
-            _ => {
-                response.set_status(status::from(status::NOT_FOUND));
-                response.set_body("<html>404 NOT FOUND</html>".into());
-            }
-        }
-
-        let buf = response.serialize();
-        w.write_all(buf.as_bytes()).await.unwrap();
-        Ok(())
-    }
-}
-
-#[tokio::main]
-async fn main() {
-    let server = Server::new("127.0.0.1".into(), 4000);
-    server.route_default(Box::new(MyHandler {})).await;
-}
-
 ```
 
 ## In Progress

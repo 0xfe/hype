@@ -59,7 +59,7 @@ async fn main() {
     // Set default log level to info. To change, set RUST_LOG as so:
     //
     //    $ RUST_LOG=debug cargo run
-    env_logger::Builder::from_env(Env::default().default_filter_or("info")).init();
+    hype::logger::init();
     let args: Args = argh::from_env();
 
     info!("Starting hype...");

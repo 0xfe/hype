@@ -1,0 +1,14 @@
+listen_ip: 127.0.0.1
+port: 4000
+log_level: Info
+routes:
+    - location: /lb
+      backends:
+          - "google.com:80"
+          - "yahoo.com:80"
+          - "apple.com:80"
+    - location: /lb2
+      backends:
+          - "bing.com:80"
+          - "reddit.com:80"
+          - "news.ycombinator.com:80"
