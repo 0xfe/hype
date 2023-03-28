@@ -55,6 +55,7 @@ curl --insecure https://localhost:4000
 
 -   TLS support
 -   Support chunked forwarding (encoding support done)
+-   Support path override in LB configuration
 
 ## TODO
 
@@ -67,6 +68,7 @@ curl --insecure https://localhost:4000
     -   Keep-Alive, Transfer-Encoding, TE, Connection, Trailer, Upgrade, Proxy-Authorization and Proxy-Authenticate
     -   Maybe okay to propagate keep-alive and connection headers.
 -   Cache control headers
+-   L4 proxy
 -   Transfer-Encoding: gzip (note Content-Encoding and Accept-Encoding too)
 -   CLI with https://docs.rs/argh/latest/argh/
 -   Use templating + #include to make file browser look better

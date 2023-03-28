@@ -66,7 +66,7 @@ impl Client {}
 pub struct Client {
     address: String,
     enable_tls: bool,
-    secure_server_name: String,
+    tls_server_name: String,
 }
 
 impl Client {
@@ -86,13 +86,13 @@ impl Client {
         return Self {
             address: address.into(),
             enable_tls: false,
-            secure_server_name: String::from(""),
+            tls_server_name: String::from(""),
         };
     }
 
     pub fn enable_tls(&mut self, server_name: impl Into<String>) -> &mut Self {
         self.enable_tls = true;
-        self.secure_server_name = server_name.into();
+        self.tls_server_name = server_name.into();
         self
     }
 
@@ -144,7 +144,7 @@ impl Client {
                 .with_root_certificates(root_cert_store)
                 .with_no_client_auth(); // i guess this was previously the default?
             let connector = TlsConnector::from(Arc::new(config));
-            let domain = rustls::ServerName::try_from(self.secure_server_name.as_str())
+            let domain = rustls::ServerName::try_from(self.tls_server_name.as_str())
                 .map_err(|e| ClientError::TLSError(format!("invalid domain: {}", e.to_string())))?;
 
             let tls_stream = connector
@@ -207,6 +207,7 @@ impl ConnectedClient {
 
                 match stream.read(&mut buf).await {
                     Ok(0) => {
+                        debug!("0 bytes read");
                         break Err(ClientError::ConnectionClosed);
                     }
                     Ok(n) => {

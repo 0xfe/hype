@@ -3,6 +3,7 @@ use std::{error, fmt};
 use serde::Deserialize;
 
 #[derive(Debug, Deserialize)]
+#[serde(rename_all = "lowercase")]
 pub enum LogLevel {
     Debug,
     Info,
@@ -37,7 +38,7 @@ pub struct Backend {
 #[derive(Debug, Deserialize)]
 pub struct Route {
     pub location: String,
-    pub host: Option<String>,
+    pub host_header: Option<String>,
     pub backends: Vec<Backend>,
 }
 

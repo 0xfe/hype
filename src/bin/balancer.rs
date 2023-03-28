@@ -7,8 +7,12 @@ use argh::FromArgs;
 
 use hype::{
     handlers,
-    lb::{backend::HttpBackend, http::Http, picker::RRPicker},
-    lbconfig,
+    lb::{
+        backend::{Backend, HttpBackend},
+        http::Http,
+        picker::RRPicker,
+    },
+    lbconfig::{self},
     server::Server,
 };
 
@@ -18,6 +22,14 @@ struct Args {
     /// server port
     #[argh(option, short = 'c', default = "String::from(\"lbconfig.yaml\")")]
     config: String,
+}
+
+fn build_backend(backend: &lbconfig::Backend) -> HttpBackend {
+    let mut b = HttpBackend::new(format!("{}:{}", backend.host, backend.port));
+    if backend.enable_tls {
+        b.enable_tls(backend.host.clone());
+    }
+    b
 }
 
 #[tokio::main]
@@ -32,15 +44,11 @@ async fn main() {
     let mut server = Server::new(config.server.listen_ip, config.server.port);
 
     for route in config.routes {
-        let backends: Vec<HttpBackend> = route
-            .backends
-            .iter()
-            .map(|b| HttpBackend::new(format!("{}:{}", b.host, b.port)))
-            .collect();
+        let backends: Vec<HttpBackend> = route.backends.iter().map(build_backend).collect();
 
         let mut balancer = Http::new(backends, RRPicker::new());
-        if let Some(host) = route.host {
-            balancer.rewrite_header("host", host);
+        if let Some(host_header) = route.host_header {
+            balancer.rewrite_header("host", host_header);
         }
 
         let lb = hype::handlers::lb::Lb::new(balancer);

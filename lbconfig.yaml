@@ -1,6 +1,6 @@
 listen_ip: 127.0.0.1
 port: 4000
-log_level: Info
+log_level: info
 routes:
     - location: /lb
       backends:
@@ -18,3 +18,21 @@ routes:
             port: 80
           - host: amazon.com
             port: 80
+    - location: /google
+      host_header: google.com
+      backends:
+          - host: google.com
+            port: 443
+            enable_tls: true
+    - location: /yahoo
+      host_header: yahoo.com
+      backends:
+          - host: yahoo.com
+            port: 443
+            enable_tls: true
+    - location: /pitchy
+      host_header: pitchy.ninja
+      backends:
+          - host: pitchy.ninja
+            port: 443
+            enable_tls: true
