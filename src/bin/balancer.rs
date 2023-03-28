@@ -32,11 +32,16 @@ async fn main() {
     let mut server = Server::new(config.server.listen_ip, config.server.port);
 
     for route in config.routes {
-        let backends: Vec<HttpBackend> =
-            route.backends.iter().map(|b| HttpBackend::new(b)).collect();
+        let backends: Vec<HttpBackend> = route
+            .backends
+            .iter()
+            .map(|b| HttpBackend::new(format!("{}:{}", b.host, b.port)))
+            .collect();
 
         let mut balancer = Http::new(backends, RRPicker::new());
-        balancer.rewrite_header("host", "google.com");
+        if let Some(host) = route.host {
+            balancer.rewrite_header("host", host);
+        }
 
         let lb = hype::handlers::lb::Lb::new(balancer);
         server.route(route.location, Box::new(lb)).await;

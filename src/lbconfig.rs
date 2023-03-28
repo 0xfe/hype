@@ -23,9 +23,22 @@ pub struct Server {
 }
 
 #[derive(Debug, Deserialize)]
+pub struct Backend {
+    pub host: String,
+    pub port: u16,
+
+    #[serde(default)]
+    pub enable_tls: bool,
+
+    #[serde(default)]
+    pub weight: u32,
+}
+
+#[derive(Debug, Deserialize)]
 pub struct Route {
     pub location: String,
-    pub backends: Vec<String>,
+    pub host: Option<String>,
+    pub backends: Vec<Backend>,
 }
 
 #[derive(Debug, Deserialize)]

@@ -36,7 +36,7 @@ async fn main() {
     info!("Starting hype...");
     let mut client = Client::new(format!("{}:{}", &args.host, &args.port));
     if args.secure {
-        client.set_secure(&args.host);
+        client.enable_tls(&args.host);
     }
 
     let mut client = client.connect().await.unwrap();

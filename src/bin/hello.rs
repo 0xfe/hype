@@ -3,7 +3,7 @@ extern crate log;
 
 use argh::FromArgs;
 use async_trait::async_trait;
-use env_logger::Env;
+
 use hype::{
     handler::{self, AsyncWriteStream, Handler},
     request::Request,
@@ -16,7 +16,7 @@ use tokio::io::AsyncWriteExt;
 #[derive(FromArgs)]
 /// Reach new heights.
 struct Args {
-    /// server port
+    /// server hostname or IP
     #[argh(option, short = 'h', default = "String::from(\"localhost\")")]
     host: String,
 

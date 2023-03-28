@@ -65,7 +65,7 @@ impl Client {}
 #[derive(Debug)]
 pub struct Client {
     address: String,
-    secure: bool,
+    enable_tls: bool,
     secure_server_name: String,
 }
 
@@ -85,13 +85,13 @@ impl Client {
     pub fn new(address: impl Into<String>) -> Self {
         return Self {
             address: address.into(),
-            secure: false,
+            enable_tls: false,
             secure_server_name: String::from(""),
         };
     }
 
-    pub fn set_secure(&mut self, server_name: impl Into<String>) -> &mut Self {
-        self.secure = true;
+    pub fn enable_tls(&mut self, server_name: impl Into<String>) -> &mut Self {
+        self.enable_tls = true;
         self.secure_server_name = server_name.into();
         self
     }
@@ -127,7 +127,7 @@ impl Client {
                 .or(Err(ClientError::ConnectionError))?;
         }
 
-        if self.secure {
+        if self.enable_tls {
             let mut root_cert_store = rustls::RootCertStore::empty();
             root_cert_store.add_server_trust_anchors(webpki_roots::TLS_SERVER_ROOTS.0.iter().map(
                 |ta| {
