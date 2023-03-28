@@ -11,6 +11,14 @@ pub enum LogLevel {
     Error,
 }
 
+fn default_tls_cert_file() -> String {
+    String::from("localhost.crt")
+}
+
+fn default_tls_key_file() -> String {
+    String::from("localhost.key")
+}
+
 #[derive(Debug, Deserialize)]
 pub struct Server {
     pub listen_ip: String,
@@ -19,8 +27,11 @@ pub struct Server {
 
     #[serde(default)]
     pub enable_tls: bool,
-    pub tls_cert_file: Option<String>,
-    pub tls_key_file: Option<String>,
+
+    #[serde(default = "default_tls_cert_file")]
+    pub tls_cert_file: String,
+    #[serde(default = "default_tls_key_file")]
+    pub tls_key_file: String,
 }
 
 #[derive(Debug, Deserialize)]

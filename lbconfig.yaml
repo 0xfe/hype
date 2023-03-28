@@ -1,6 +1,9 @@
-listen_ip: 127.0.0.1
+listen_ip: localhost
 port: 4000
 log_level: info
+enable_tls: false
+tls_cert_file: localhost.crt
+tls_key_file: localhost.key
 routes:
     - location: /lb
       backends:

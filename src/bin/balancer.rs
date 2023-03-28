@@ -42,6 +42,12 @@ async fn main() {
     debug!("Config: {:?}", config);
 
     let mut server = Server::new(config.server.listen_ip, config.server.port);
+    if config.server.enable_tls {
+        server.enable_tls(
+            config.server.tls_cert_file.into(),
+            config.server.tls_key_file.into(),
+        );
+    }
 
     for route in config.routes {
         let backends: Vec<HttpBackend> = route.backends.iter().map(build_backend).collect();

@@ -66,7 +66,7 @@ async fn main() {
     let mut server = Server::new(args.host, args.port);
 
     if args.secure {
-        server.set_secure(args.cert_file.into(), args.key_file.into());
+        server.enable_tls(args.cert_file.into(), args.key_file.into());
     }
 
     server.route_default(Box::new(MyHandler {}));

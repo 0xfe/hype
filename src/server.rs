@@ -46,7 +46,7 @@ pub struct Server {
     shutdown_rx: mpsc::Receiver<bool>,
 
     // TLS configuration
-    secure: bool,
+    enable_tls: bool,
     cert_file: PathBuf,
     key_file: PathBuf,
 }
@@ -81,14 +81,14 @@ impl Server {
             done_notifier: Arc::new(Notify::new()),
             shutdown_tx: Arc::new(tx),
             shutdown_rx: rx,
-            secure: false,
+            enable_tls: false,
             cert_file: PathBuf::from("localhost.crt"),
             key_file: PathBuf::from("localhost.key"),
         }
     }
 
-    pub fn set_secure(&mut self, cert_file: PathBuf, key_file: PathBuf) {
-        self.secure = true;
+    pub fn enable_tls(&mut self, cert_file: PathBuf, key_file: PathBuf) {
+        self.enable_tls = true;
         self.cert_file = cert_file;
         self.key_file = key_file;
     }
@@ -117,25 +117,27 @@ impl Server {
         )
     }
 
-    pub async fn start(&mut self) -> Result<(), ()> {
+    pub async fn start(&mut self) -> Result<(), String> {
         let mut acceptor = None;
 
-        if self.secure {
+        if self.enable_tls {
             info!("Loading TLS certificates...");
-            let certs = load_certs(&self.cert_file).unwrap();
-            let mut keys = load_keys(&self.key_file).unwrap();
+            let certs = load_certs(&self.cert_file).map_err(|e| e.to_string())?;
+            let mut keys = load_keys(&self.key_file).map_err(|e| e.to_string())?;
 
             let config = rustls::ServerConfig::builder()
                 .with_safe_defaults()
                 .with_no_client_auth()
                 .with_single_cert(certs, keys.remove(0))
-                .unwrap();
+                .map_err(|e| e.to_string())?;
             acceptor = Some(TlsAcceptor::from(Arc::new(config)));
         }
 
         let hostport = format!("{}:{}", self.address, self.port);
         info!("Listening on {}", hostport);
-        let listener = TcpListener::bind(hostport).await.unwrap();
+        let listener = TcpListener::bind(hostport)
+            .await
+            .map_err(|e| e.to_string())?;
         let shutdown_notifier = Arc::new(Notify::new());
 
         // Let tests know we're ready
@@ -148,7 +150,7 @@ impl Server {
             let shutdown_notifier = Arc::clone(&shutdown_notifier);
             let conn_tracker = Arc::clone(&self.conn_tracker);
             let (tcp_socket, _) = tokio::select! {
-                result = listener.accept() => { result.unwrap() },
+                result = listener.accept() => { result.map_err(|e| e.to_string())? },
                 _ = self.shutdown_rx.recv() => {
                     shutdown_notifier.notify_one();
                     conn_tracker.read().await.shutdown();
@@ -162,7 +164,12 @@ impl Server {
             // If TLS
             if let Some(ref acceptor) = acceptor {
                 let acceptor = acceptor.clone();
-                socket = Box::new(acceptor.accept(tcp_socket).await.unwrap());
+                socket = Box::new(
+                    acceptor
+                        .accept(tcp_socket)
+                        .await
+                        .map_err(|e| e.to_string())?,
+                );
             } else {
                 socket = Box::new(tcp_socket);
             }
