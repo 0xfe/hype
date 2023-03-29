@@ -11,6 +11,10 @@ $ RUST_LOG=debug cargo run --bin hello
 
 # Run with TLS
 $ cargo run --bin hello -- -s
+
+# Run balancer
+$ vi lbconfig.yaml
+$ cargo run --bin balancer
 ```
 
 ## Run tests
@@ -53,15 +57,11 @@ curl --insecure https://localhost:4000
 
 ## In Progress
 
--   TLS support
 -   Support chunked forwarding (encoding support done)
 -   Support path override in LB configuration
 
 ## TODO
 
--   Add additional configuration schema for LB handlers
-    -   host rewrite
-    -   cert files
 -   Support X-Forwarded-For
 -   Backend healthchecking for balancer targets
 -   Don't propagate hop-by-hop-headers
@@ -84,6 +84,10 @@ curl --insecure https://localhost:4000
 
 ### Done
 
+-   Add additional configuration schema for LB handlers
+    -   host rewrite
+    -   cert files
+-   TLS support
 -   Implment "Connection: close", shutdown socket as soon as request is processed.
 -   Implement HTTP Keepalive Timeout
 -   Implement HTTP Keepalive Max

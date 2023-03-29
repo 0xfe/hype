@@ -150,7 +150,14 @@ impl Server {
             let shutdown_notifier = Arc::clone(&shutdown_notifier);
             let conn_tracker = Arc::clone(&self.conn_tracker);
             let (tcp_socket, _) = tokio::select! {
-                result = listener.accept() => { result.map_err(|e| e.to_string())? },
+                result = listener.accept() => {
+                    if let Err(err) = result {
+                        // Don't propagate accept errors, just continue.
+                        debug!("accept error: {}", err.to_string());
+                        continue 'top;
+                    }
+                    result.unwrap()
+                },
                 _ = self.shutdown_rx.recv() => {
                     shutdown_notifier.notify_one();
                     conn_tracker.read().await.shutdown();
@@ -164,12 +171,13 @@ impl Server {
             // If TLS
             if let Some(ref acceptor) = acceptor {
                 let acceptor = acceptor.clone();
-                socket = Box::new(
-                    acceptor
-                        .accept(tcp_socket)
-                        .await
-                        .map_err(|e| e.to_string())?,
-                );
+                let connection = acceptor.accept(tcp_socket).await;
+                if let Err(err) = connection {
+                    // Don't propagate TLS connection errors, just continue.
+                    debug!("TLS accept error: {}", err.to_string());
+                    continue 'top;
+                }
+                socket = Box::new(connection.unwrap());
             } else {
                 socket = Box::new(tcp_socket);
             }
