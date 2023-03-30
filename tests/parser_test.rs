@@ -81,7 +81,7 @@ Content-Length: 20
 
     assert!(response.is_some());
     let response = response.unwrap();
-    assert_eq!(response.status.code, 200);
+    assert_eq!(response.status().code, 200);
 }
 
 #[test]
@@ -104,12 +104,12 @@ fn get_request() {
     let request = request.unwrap();
     assert_eq!(request.method(), Method::GET);
 
-    if let Some(url) = &request.url {
+    if let Some(url) = &request.url() {
         assert_eq!(url.path(), "/");
     } else {
-        assert!(&request.url.is_some())
+        assert!(&request.url().is_some())
     }
-    assert_eq!(request.version, "HTTP/1.1");
+    assert_eq!(request.version(), "HTTP/1.1");
 }
 
 #[test]
@@ -149,7 +149,7 @@ Content-Type: application/x-www-form-urlencoded"##;
     assert!(request.is_some());
 
     let request = request.unwrap();
-    assert!(request.url.is_some());
+    assert!(request.url().is_some());
     let query_params = request.query_params();
     assert!(query_params.is_some());
 
@@ -196,8 +196,8 @@ A
 
     assert!(response.is_some());
     let response = response.unwrap();
-    assert_eq!(response.status.code, 200);
-    assert_eq!(response.body, "123451234567890");
+    assert_eq!(response.status().code, 200);
+    assert_eq!(response.body(), "123451234567890");
 }
 
 #[test]
@@ -214,6 +214,6 @@ Transfer-Encoding: chunked
 
     assert!(response.is_some());
     let response = response.unwrap();
-    assert_eq!(response.status.code, 200);
-    assert_eq!(response.body, "");
+    assert_eq!(response.status().code, 200);
+    assert_eq!(response.body(), "");
 }

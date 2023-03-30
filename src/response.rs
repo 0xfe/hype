@@ -2,13 +2,14 @@ use std::collections::HashMap;
 
 use crate::{cookie::Cookie, parser::Message, status};
 
+// CHUNK: remove pub
 #[derive(Debug, Clone)]
 pub struct Response {
-    pub version: String,
-    pub status: status::Status,
-    pub headers: HashMap<String, String>,
-    pub cookies: Vec<Cookie>,
-    pub body: String,
+    version: String,
+    status: status::Status,
+    headers: HashMap<String, String>,
+    cookies: Vec<Cookie>,
+    body: String,
 }
 
 impl From<Message> for Response {
@@ -20,6 +21,16 @@ impl From<Message> for Response {
         panic!("value is not a response")
     }
 }
+
+// CHUNK:
+//  - response.set_chunked();
+//    response.push_chunk(); ...
+//    response.end_chunks();
+//
+//  response.body only returns full body, or chunk error.
+//  alternate API:
+//  - response.get_chunk();
+//    response.try_get_chunk();
 
 impl Response {
     // This is just for testing. It parses the body as a set of newline strings,
@@ -107,6 +118,31 @@ impl Response {
     pub fn set_cookie(&mut self, cookie: Cookie) -> &mut Self {
         self.cookies.push(cookie);
         self
+    }
+
+    pub fn set_version(&mut self, version: impl Into<String>) -> &mut Self {
+        self.version = version.into();
+        self
+    }
+
+    pub fn version(&self) -> &String {
+        return &self.version;
+    }
+
+    pub fn headers(&self) -> &HashMap<String, String> {
+        return &self.headers;
+    }
+
+    pub fn headers_mut(&mut self) -> &mut HashMap<String, String> {
+        return &mut self.headers;
+    }
+
+    pub fn status(&self) -> &status::Status {
+        return &self.status;
+    }
+
+    pub fn body(&self) -> &String {
+        return &self.body;
     }
 
     pub fn serialize(&mut self) -> String {

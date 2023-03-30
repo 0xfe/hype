@@ -132,7 +132,8 @@ impl File {
 
         let abs_fs_path = String::from(abs_fs_path);
         let default_path = String::new();
-        let handler_path = r.handler_path.as_ref().unwrap_or(&default_path);
+        let handler_path = r.handler_path();
+        let handler_path = handler_path.as_ref().unwrap_or(&default_path);
         let handler_path = handler_path
             .strip_prefix('/')
             .unwrap_or(&handler_path)

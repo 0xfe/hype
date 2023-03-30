@@ -290,6 +290,8 @@ impl ConnectedServer {
 
             // We're trying to keep the connection open here, and keep parsing requests until
             // the socket is closed.
+
+            // CHUNK: is_ready()
             while !parser.is_complete() {
                 let mut buf = [0u8; 16384];
 
@@ -323,21 +325,27 @@ impl ConnectedServer {
                 }
             }
 
+            // CHUNK: inc_chunk_count()
             if self.conn.inc_request_count() {
                 _ = s.shutdown().await;
                 break 'top;
             }
 
+            // CHUNK: match (request vs. chunk)
+            //  if chunk:
+            //      response.push_chunk(...)
+            //  else:
+            //      follow path below
             // If we're here, then the parser has parsed a full request payload.
             let mut request: Request = parser.get_message().into();
             request.set_header("X-Hype-Connection-ID", self.conn.id().clone());
             request.set_conn(self.conn.clone());
-            self.process_headers(&request.headers).await;
+            self.process_headers(request.headers()).await;
 
             debug!("Request: {:?}", request);
 
             let mut path = String::from("/__bad_path__");
-            if let Some(url) = &request.url {
+            if let Some(url) = &request.url() {
                 path = url.path().into()
             }
 

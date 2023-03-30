@@ -40,12 +40,12 @@ lazy_static! {
 pub struct Request {
     method: Method,
     conn: Option<Conn>,
-    pub handler_path: Option<String>,
-    pub base_url: String,
-    pub url: Option<Url>,
-    pub version: String,
-    pub headers: HashMap<String, String>,
-    pub body: String,
+    handler_path: Option<String>,
+    base_url: String,
+    url: Option<Url>,
+    version: String,
+    headers: HashMap<String, String>,
+    body: String,
 }
 
 impl From<Message> for Request {
@@ -80,6 +80,19 @@ impl Request {
         self.handler_path = Some(handler);
     }
 
+    pub fn handler_path(&self) -> &Option<String> {
+        return &self.handler_path;
+    }
+
+    pub fn set_version(&mut self, version: impl Into<String>) -> &mut Self {
+        self.version = version.into();
+        self
+    }
+
+    pub fn version(&self) -> &String {
+        return &self.version;
+    }
+
     pub fn set_body(&mut self, body: String) {
         self.body = body;
     }
@@ -90,6 +103,14 @@ impl Request {
 
     pub fn conn(&self) -> Option<Conn> {
         self.conn.clone()
+    }
+
+    pub fn url(&self) -> &Option<Url> {
+        return &self.url;
+    }
+
+    pub fn set_url(&mut self, url: Url) {
+        self.url = Some(url)
     }
 
     pub fn set_base_url(&mut self, base_url: impl Into<String>) {
@@ -105,6 +126,14 @@ impl Request {
 
     pub fn set_header(&mut self, key: impl Into<String>, val: impl Into<String>) {
         self.headers.insert(key.into().to_lowercase(), val.into());
+    }
+
+    pub fn headers_mut(&mut self) -> &mut HashMap<String, String> {
+        return &mut self.headers;
+    }
+
+    pub fn headers(&self) -> &HashMap<String, String> {
+        return &self.headers;
     }
 
     pub fn from(buf: impl Into<String>) -> Result<Self, String> {

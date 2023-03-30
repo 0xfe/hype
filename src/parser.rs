@@ -93,7 +93,7 @@ impl Message {
         panic!("message is not a request")
     }
 
-    pub fn mut_request(&mut self) -> &mut Request {
+    pub fn request_mut(&mut self) -> &mut Request {
         if let Message::Request(r) = self {
             return r;
         }
@@ -109,7 +109,7 @@ impl Message {
         panic!("message is not a response")
     }
 
-    pub fn mut_response(&mut self) -> &mut Response {
+    pub fn response_mut(&mut self) -> &mut Response {
         if let Message::Response(r) = self {
             return r;
         }
@@ -197,7 +197,7 @@ impl Parser {
         }
 
         if let Some(method) = VALID_METHODS.get(&parts[0]) {
-            self.message.mut_request().set_method(*method);
+            self.message.request_mut().set_method(*method);
         } else {
             return Err(ParseError::InvalidMethod(parts[0].into()));
         }
@@ -208,8 +208,8 @@ impl Parser {
             .join(parts[1])
             .or(Err(ParseError::InvalidPath(parts[1].into())))?;
 
-        self.message.mut_request().version = parts[2].into();
-        self.message.mut_request().url = Some(url);
+        self.message.request_mut().set_version(parts[2]);
+        self.message.request_mut().set_url(url);
 
         self.buf.clear();
         Ok(())
@@ -225,10 +225,10 @@ impl Parser {
             return Err(ParseError::BadStatusLine(status_line.into()));
         }
 
-        self.message.mut_response().version = parts[0].into();
+        self.message.response_mut().set_version(parts[0]);
 
         if let Ok(code) = parts[1].to_string().parse::<u16>() {
-            self.message.mut_response().set_status(status::Status {
+            self.message.response_mut().set_status(status::Status {
                 code,
                 text: parts[2].trim().to_string(),
             });
@@ -244,9 +244,11 @@ impl Parser {
 
         let headers;
         if self.start_state == State::StartResponse {
-            headers = &mut self.message.mut_response().headers;
+            let response = self.message.response_mut();
+            headers = response.headers_mut();
         } else {
-            headers = &mut self.message.mut_request().headers;
+            let request = self.message.request_mut();
+            headers = request.headers_mut();
         }
 
         if header_line == "\r" || header_line == "" {
@@ -435,9 +437,9 @@ impl Parser {
             let body = String::from_utf8_lossy(&self.body[..]);
 
             if self.start_state == State::StartRequest {
-                self.message.mut_request().set_body(body.into_owned());
+                self.message.request_mut().set_body(body.into_owned());
             } else {
-                self.message.mut_response().set_body(body.into_owned());
+                self.message.response_mut().set_body(body.into_owned());
             }
             self.update_state(State::ParseComplete)?;
             return Ok(());

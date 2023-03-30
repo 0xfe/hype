@@ -53,7 +53,7 @@ hello world!
     let response = Response::from(expected_buf).unwrap();
 
     assert_eq!(
-        response.headers.get("foo".into()).unwrap(),
+        response.headers().get("foo".into()).unwrap(),
         &"bar".to_string()
     );
 }

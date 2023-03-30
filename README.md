@@ -58,6 +58,11 @@ curl --insecure https://localhost:4000
 ## In Progress
 
 -   Support chunked forwarding (encoding support done)
+    -   [ ] remove pub fields in request and response
+    -   [ ] support pushing chunked responses
+        -   set_chunked, push_chunk, end_chunked, get_chunk, try_get_chunk (or iterator/stream API)
+        -   return error for body() if chunked and not complete
+    -   [ ] support pushing chunked request (same API)
 -   Support path override in LB configuration
 
 ## TODO
