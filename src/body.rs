@@ -7,7 +7,7 @@ use std::{
 use futures::Stream;
 
 /// We have two body types, based on their encoding: Chunked and Full.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 enum Content {
     Chunked(Arc<RwLock<ChunkState>>),
     Full(Arc<RwLock<String>>),
@@ -16,7 +16,7 @@ enum Content {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Chunk(pub String);
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 struct ChunkState {
     // chunked body
     chunks: Vec<Chunk>,
@@ -38,9 +38,17 @@ impl ChunkState {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Body {
     content: Content,
+}
+
+impl<T: Into<String>> From<T> for Body {
+    fn from(val: T) -> Self {
+        Self {
+            content: Content::Full(Arc::new(RwLock::new(val.into()))),
+        }
+    }
 }
 
 impl Body {
@@ -121,7 +129,7 @@ impl Body {
         }
     }
 
-    pub fn body(&self) -> String {
+    pub fn content(&self) -> String {
         match &self.content {
             Content::Full(body) => body.read().unwrap().clone(),
             Content::Chunked(state) => {

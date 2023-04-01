@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use crate::{cookie::Cookie, message::Message, status};
+use crate::{body::Body, cookie::Cookie, message::Message, status};
 
 // CHUNK: remove pub
 #[derive(Debug, Clone)]
@@ -9,7 +9,7 @@ pub struct Response {
     status: status::Status,
     headers: HashMap<String, String>,
     cookies: Vec<Cookie>,
-    body: String,
+    body: Body,
 }
 
 impl From<Message> for Response {
@@ -77,7 +77,7 @@ impl Response {
             status,
             headers,
             cookies: vec![],
-            body: String::new(),
+            body: Body::new(),
         })
     }
 
@@ -87,7 +87,7 @@ impl Response {
             status,
             headers: HashMap::new(),
             cookies: vec![],
-            body: String::new(),
+            body: Body::new(),
         }
     }
 
@@ -111,7 +111,7 @@ impl Response {
     }
 
     pub fn set_body(&mut self, body: String) -> &mut Self {
-        self.body = body;
+        self.body = body.into();
         self
     }
 
@@ -141,13 +141,13 @@ impl Response {
         return &self.status;
     }
 
-    pub fn body(&self) -> &String {
-        return &self.body;
+    pub fn body(&self) -> String {
+        return self.body.content().clone();
     }
 
     pub fn serialize(&mut self) -> String {
         let status_line = format!("HTTP/1.1 {} {}", self.status.code, self.status.text);
-        let length = self.body.len();
+        let length = self.body.content().len();
         if length > 0 {
             self.set_header("Content-Length", length.to_string());
         }
@@ -168,7 +168,7 @@ impl Response {
 
         let buf = format!(
             "{status_line}\r\n{headers}\r\n{cookie_headers}\r\n{}",
-            self.body
+            self.body.content()
         );
 
         buf
