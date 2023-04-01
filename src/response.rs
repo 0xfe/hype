@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use crate::{cookie::Cookie, parser::Message, status};
+use crate::{cookie::Cookie, message::Message, status};
 
 // CHUNK: remove pub
 #[derive(Debug, Clone)]

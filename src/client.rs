@@ -10,7 +10,8 @@ use tokio_rustls::{rustls, TlsConnector};
 
 use crate::{
     handler::{AsyncReadStream, AsyncWriteStream},
-    parser::{self, Message},
+    message::Message,
+    parser::{self},
     request::Request,
     response::Response,
 };

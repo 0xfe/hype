@@ -6,7 +6,7 @@ use hype::response::Response;
 fn parse(
     buf: &str,
     start_state: parser::State,
-) -> (Option<hype::parser::Message>, Result<(), ParseError>) {
+) -> (Option<hype::message::Message>, Result<(), ParseError>) {
     println!("Parsing buffer:\n{}", buf);
     let mut parser = Parser::new(start_state);
     let result1 = parser.parse_buf(String::from(buf).as_bytes());

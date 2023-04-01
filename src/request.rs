@@ -2,10 +2,7 @@ use std::{collections::HashMap, str::FromStr};
 
 use url::Url;
 
-use crate::{
-    conntrack::Conn,
-    parser::{Message, RequestParser},
-};
+use crate::{conntrack::Conn, message::Message, parser::RequestParser};
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Hash)]
 pub enum Method {

@@ -15,6 +15,7 @@ pub mod handlers;
 pub mod lb;
 pub mod lbconfig;
 pub mod logger;
+pub mod message;
 pub mod middleware;
 pub mod parser;
 pub mod request;
