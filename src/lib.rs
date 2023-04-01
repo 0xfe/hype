@@ -4,6 +4,7 @@ extern crate lazy_static;
 #[macro_use]
 extern crate log;
 
+pub mod body;
 pub mod client;
 pub mod config;
 pub mod conntrack;

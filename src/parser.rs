@@ -1,4 +1,5 @@
 use std::str;
+
 use std::{collections::HashMap, fmt};
 
 use url::Url;
