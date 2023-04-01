@@ -141,8 +141,8 @@ impl Response {
         return &self.status;
     }
 
-    pub fn body(&self) -> String {
-        return self.body.content().clone();
+    pub fn body(&self) -> &Body {
+        return &self.body;
     }
 
     pub fn serialize(&mut self) -> String {

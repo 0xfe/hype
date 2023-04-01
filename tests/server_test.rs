@@ -91,7 +91,7 @@ async fn it_works() {
 
     let response = client.send_request(&request).await.unwrap();
     assert_eq!(response.status().code, 200);
-    assert_eq!(response.body(), "OK");
+    assert_eq!(response.body().content(), "OK");
 
     shutdown_server(shutdown).await;
 }
@@ -112,12 +112,12 @@ async fn keep_alive() {
     let mut client = client.connect().await.unwrap();
     let response = client.send_request(&request).await.unwrap();
     assert_eq!(response.status().code, 200);
-    assert_eq!(response.body(), "OK");
+    assert_eq!(response.body().content(), "OK");
     assert_eq!(client.is_closed().await, false);
 
     let response = client.send_request(&request).await.unwrap();
     assert_eq!(response.status().code, 200);
-    assert_eq!(response.body(), "OK");
+    assert_eq!(response.body().content(), "OK");
     assert_eq!(client.is_closed().await, false);
 
     shutdown_server(shutdown).await;
@@ -146,7 +146,7 @@ async fn process_headers() {
 
     let response = client.send_request(&request).await.unwrap();
     assert_eq!(response.status().code, 200);
-    assert_eq!(response.body(), "OK");
+    assert_eq!(response.body().content(), "OK");
     assert_eq!(
         response
             .headers()
@@ -179,7 +179,7 @@ async fn keep_alive_timeout() {
     let mut client = client.connect().await.unwrap();
     let response = client.send_request(&request).await.unwrap();
     assert_eq!(response.status().code, 200);
-    assert_eq!(response.body(), "OK");
+    assert_eq!(response.body().content(), "OK");
     assert_eq!(client.is_closed().await, false);
 
     tokio::time::sleep(Duration::from_secs(2)).await;
@@ -210,12 +210,12 @@ async fn keep_alive_max() {
     let mut client = client.connect().await.unwrap();
     let response = client.send_request(&request).await.unwrap();
     assert_eq!(response.status().code, 200);
-    assert_eq!(response.body(), "OK");
+    assert_eq!(response.body().content(), "OK");
     assert_eq!(client.is_closed().await, false);
 
     let response = client.send_request(&request).await.unwrap();
     assert_eq!(response.status().code, 200);
-    assert_eq!(response.body(), "OK");
+    assert_eq!(response.body().content(), "OK");
     assert_eq!(client.is_closed().await, false);
 
     let response = client.send_request(&request).await;
@@ -242,7 +242,7 @@ async fn connection_close() {
     let mut client = client.connect().await.unwrap();
     let response = client.send_request(&request).await.unwrap();
     assert_eq!(response.status().code, 200);
-    assert_eq!(response.body(), "OK");
+    assert_eq!(response.body().content(), "OK");
     assert_eq!(client.is_closed().await, false);
 
     let response = client.send_request(&request).await;
