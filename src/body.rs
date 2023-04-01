@@ -5,61 +5,77 @@ use std::{
 
 use futures::Stream;
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Chunk(pub String);
+
+#[derive(Debug)]
+struct ChunkState {
+    // chunked body
+    chunks: Vec<Chunk>,
+    chunks_complete: bool,
+    wakers: Vec<Waker>,
+}
+
 #[derive(Debug)]
 pub struct Body {
     full_body: String,
-
-    // chunked body
-    chunked: std::sync::Arc<std::sync::RwLock<bool>>,
-    chunks: Vec<String>,
-    chunks_complete: bool,
-
-    // stream
-    current_chunk: usize,
-    cx: Option<Waker>,
+    chunked: bool,
+    chunk_state: std::sync::Arc<std::sync::RwLock<ChunkState>>,
 }
 
 impl Body {
     pub fn new() -> Self {
         return Self {
-            chunked: std::sync::Arc::new(std::sync::RwLock::new(false)),
             full_body: String::new(),
-            chunks: vec![],
-            chunks_complete: false,
-            current_chunk: 0,
-            cx: None,
+            chunked: false,
+            chunk_state: std::sync::Arc::new(std::sync::RwLock::new(ChunkState {
+                chunks: vec![],
+                chunks_complete: false,
+                wakers: vec![],
+            })),
         };
     }
 
     pub fn set_chunked(&mut self) {
-        *self.chunked.write().unwrap() = true;
+        self.chunked = true;
     }
 
-    pub fn push_chunk(&mut self, chunk: impl Into<String>) {
-        let chunked = self.chunked.write().unwrap();
-
-        if !*chunked {
+    pub fn push_chunk(&self, chunk: impl Into<String>) {
+        if !self.chunked {
             panic!("push_chunk: not chunked")
         }
 
-        self.chunks.push(chunk.into());
-
-        if let Some(waker) = &self.cx {
-            waker.clone().wake();
-        }
+        let mut chunk_state = self.chunk_state.write().unwrap();
+        chunk_state.chunks.push(Chunk(chunk.into()));
+        chunk_state.wakers.iter().for_each(|w| w.clone().wake());
+        chunk_state.wakers.clear();
     }
 
-    pub fn end_chunked(&mut self) {
-        let chunked = self.chunked.write().unwrap();
-
-        if !*chunked {
+    pub fn end_chunked(&self) {
+        if !self.chunked {
             panic!("end_chunked: not chunked")
         }
 
-        if self.chunks_complete {
+        let mut chunk_state = self.chunk_state.write().unwrap();
+        if chunk_state.chunks_complete {
             panic!("chunks already complete")
         }
-        self.chunks_complete = true;
+
+        chunk_state.chunks_complete = true;
+        chunk_state.wakers.iter().for_each(|w| w.clone().wake());
+        chunk_state.wakers.clear();
+    }
+
+    pub fn get_chunk(&self, i: usize, waker: Waker) -> Result<Chunk, bool> {
+        let mut chunk_state = self.chunk_state.write().unwrap();
+        if i >= chunk_state.chunks.len() {
+            if !chunk_state.chunks_complete {
+                chunk_state.wakers.push(waker);
+            }
+            return Err(chunk_state.chunks_complete);
+        }
+
+        Ok(chunk_state.chunks[i].clone())
     }
 
     pub fn append_body(&mut self, buf: impl AsRef<str>) {
@@ -67,43 +83,55 @@ impl Body {
     }
 
     pub fn body(&self) -> String {
-        let chunked = self.chunked.read().unwrap();
-        if *chunked {
-            if !self.chunks_complete {
-                panic!("body(): incomplete chunks")
-            }
-            return self.chunks.join("").to_string();
+        if !self.chunked {
+            return self.full_body.clone();
         }
-        return self.full_body.clone();
+
+        let chunk_state = self.chunk_state.read().unwrap();
+
+        if !chunk_state.chunks_complete {
+            panic!("body(): incomplete chunks")
+        }
+
+        return chunk_state
+            .chunks
+            .iter()
+            .map(|c| c.0.clone())
+            .collect::<Vec<String>>()
+            .join("")
+            .to_string();
+    }
+
+    pub fn stream(&self) -> BodyStream {
+        if !self.chunked {
+            panic!("stream(): not chunked")
+        }
+
+        BodyStream {
+            current_chunk: 0,
+            body: self,
+        }
     }
 }
 
-impl Stream for Body {
-    type Item = String;
+pub struct BodyStream<'a> {
+    current_chunk: usize,
+    body: &'a Body,
+}
 
-    fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<String>> {
-        let chunked = *self.chunked.read().unwrap();
+impl<'a> Stream for BodyStream<'a> {
+    type Item = Chunk;
 
-        if !chunked {
-            // No more delays
-            return Poll::Ready(None);
-        }
+    fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Chunk>> {
+        let chunk = self.body.get_chunk(self.current_chunk, cx.waker().clone());
 
-        if self.current_chunk < self.chunks.len() {
-            self.current_chunk += 1;
-            if let Some(chunk) = self.chunks.get(self.current_chunk - 1) {
-                return Poll::Ready(Some(chunk.clone()));
-            } else {
-                return Poll::Ready(None);
+        match chunk {
+            Ok(chunk) => {
+                self.current_chunk += 1;
+                Poll::Ready(Some(chunk))
             }
-        } else {
-            if self.chunks_complete {
-                return Poll::Ready(None);
-            }
+            Err(true) => Poll::Ready(None),
+            Err(false) => Poll::Pending,
         }
-
-        self.cx = Some(cx.waker().clone());
-
-        return Poll::Pending;
     }
 }
