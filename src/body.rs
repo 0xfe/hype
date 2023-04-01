@@ -1,9 +1,17 @@
 use std::{
     pin::Pin,
+    sync::{Arc, RwLock},
     task::{Context, Poll, Waker},
 };
 
 use futures::Stream;
+
+/// We have two body types, based on their encoding: Chunked and Full.
+#[derive(Debug)]
+enum Content {
+    Chunked(Arc<RwLock<ChunkState>>),
+    Full(Arc<RwLock<String>>),
+}
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Chunk(pub String);
@@ -12,98 +20,130 @@ pub struct Chunk(pub String);
 struct ChunkState {
     // chunked body
     chunks: Vec<Chunk>,
-    chunks_complete: bool,
+
+    // no more chunks
+    complete: bool,
+
+    // wakers for stream futures
     wakers: Vec<Waker>,
+}
+
+impl ChunkState {
+    fn new() -> Self {
+        ChunkState {
+            chunks: vec![],
+            complete: false,
+            wakers: vec![],
+        }
+    }
 }
 
 #[derive(Debug)]
 pub struct Body {
-    full_body: String,
-    chunked: bool,
-    chunk_state: std::sync::Arc<std::sync::RwLock<ChunkState>>,
+    content: Content,
 }
 
 impl Body {
     pub fn new() -> Self {
-        return Self {
-            full_body: String::new(),
-            chunked: false,
-            chunk_state: std::sync::Arc::new(std::sync::RwLock::new(ChunkState {
-                chunks: vec![],
-                chunks_complete: false,
-                wakers: vec![],
-            })),
-        };
+        Self {
+            content: Content::Full(Arc::new(RwLock::new(String::new()))),
+        }
     }
 
     pub fn set_chunked(&mut self) {
-        self.chunked = true;
+        self.content = Content::Chunked(Arc::new(RwLock::new(ChunkState::new())));
+    }
+
+    pub fn chunked(&self) -> bool {
+        if let Content::Chunked(_) = self.content {
+            return true;
+        }
+
+        return false;
     }
 
     pub fn push_chunk(&self, chunk: impl Into<String>) {
-        if !self.chunked {
-            panic!("push_chunk: not chunked")
+        match &self.content {
+            Content::Full(_) => panic!("not chunked"),
+            Content::Chunked(state) => {
+                // Notify async stream wakers that there's a new chunk
+                let mut wakers = vec![];
+                {
+                    let mut chunk_state = state.write().unwrap();
+                    chunk_state.chunks.push(Chunk(chunk.into()));
+                    std::mem::swap(&mut wakers, &mut chunk_state.wakers);
+                }
+                wakers.iter().for_each(|w| w.wake_by_ref());
+            }
         }
-
-        let mut chunk_state = self.chunk_state.write().unwrap();
-        chunk_state.chunks.push(Chunk(chunk.into()));
-        chunk_state.wakers.iter().for_each(|w| w.clone().wake());
-        chunk_state.wakers.clear();
     }
 
     pub fn end_chunked(&self) {
-        if !self.chunked {
-            panic!("end_chunked: not chunked")
-        }
+        match &self.content {
+            Content::Full(_) => panic!("not chunked"),
+            Content::Chunked(state) => {
+                let mut wakers = vec![];
+                {
+                    let mut chunk_state = state.write().unwrap();
+                    if chunk_state.complete {
+                        panic!("chunks already complete")
+                    }
 
-        let mut chunk_state = self.chunk_state.write().unwrap();
-        if chunk_state.chunks_complete {
-            panic!("chunks already complete")
+                    chunk_state.complete = true;
+                    std::mem::swap(&mut wakers, &mut chunk_state.wakers);
+                }
+                wakers.iter().for_each(|w| w.wake_by_ref());
+            }
         }
-
-        chunk_state.chunks_complete = true;
-        chunk_state.wakers.iter().for_each(|w| w.clone().wake());
-        chunk_state.wakers.clear();
     }
 
     pub fn get_chunk(&self, i: usize, waker: Waker) -> Result<Chunk, bool> {
-        let mut chunk_state = self.chunk_state.write().unwrap();
-        if i >= chunk_state.chunks.len() {
-            if !chunk_state.chunks_complete {
-                chunk_state.wakers.push(waker);
-            }
-            return Err(chunk_state.chunks_complete);
-        }
+        match &self.content {
+            Content::Full(_) => panic!("not chunked"),
+            Content::Chunked(state) => {
+                let mut chunk_state = state.write().unwrap();
+                if i >= chunk_state.chunks.len() {
+                    if !chunk_state.complete {
+                        chunk_state.wakers.push(waker);
+                    }
+                    return Err(chunk_state.complete);
+                }
 
-        Ok(chunk_state.chunks[i].clone())
+                Ok(chunk_state.chunks[i].clone())
+            }
+        }
     }
 
     pub fn append_body(&mut self, buf: impl AsRef<str>) {
-        self.full_body.push_str(buf.as_ref())
+        match &self.content {
+            Content::Full(body) => body.write().unwrap().push_str(buf.as_ref()),
+            Content::Chunked(_) => panic!("chunked body"),
+        }
     }
 
     pub fn body(&self) -> String {
-        if !self.chunked {
-            return self.full_body.clone();
+        match &self.content {
+            Content::Full(body) => body.read().unwrap().clone(),
+            Content::Chunked(state) => {
+                let chunk_state = state.read().unwrap();
+
+                if !chunk_state.complete {
+                    panic!("body(): incomplete chunks")
+                }
+
+                chunk_state
+                    .chunks
+                    .iter()
+                    .map(|c| c.0.clone())
+                    .collect::<Vec<String>>()
+                    .join("")
+                    .to_string()
+            }
         }
-
-        let chunk_state = self.chunk_state.read().unwrap();
-
-        if !chunk_state.chunks_complete {
-            panic!("body(): incomplete chunks")
-        }
-
-        return chunk_state
-            .chunks
-            .iter()
-            .map(|c| c.0.clone())
-            .collect::<Vec<String>>()
-            .join("")
-            .to_string();
     }
 
     pub fn stream(&self) -> BodyStream {
-        if !self.chunked {
+        if let Content::Full(_) = self.content {
             panic!("stream(): not chunked")
         }
 
