@@ -108,7 +108,7 @@ impl Web {
 
         let abs_fs_path = String::from(abs_fs_path);
 
-        if let Some(host) = r.host() {
+        if let Some(host) = r.headers.get("host") {
             if !self.hosts.is_empty() && !self.hosts.contains(host) {
                 return Err(handler::Error::Failed(format!(
                     "host {} does not match: {:?}",

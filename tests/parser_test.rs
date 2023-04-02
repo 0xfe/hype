@@ -65,7 +65,7 @@ Content-Length: 20
 
     assert!(request.is_some());
     let request = request.unwrap();
-    assert_eq!(request.method(), Method::POST);
+    assert_eq!(request.method, Method::POST);
 }
 
 #[test]
@@ -102,14 +102,14 @@ fn get_request() {
     let request = assert_parse_ok("GET / HTTP/1.1\n");
     assert!(request.is_some());
     let request = request.unwrap();
-    assert_eq!(request.method(), Method::GET);
+    assert_eq!(request.method, Method::GET);
 
-    if let Some(url) = &request.url() {
+    if let Some(url) = &request.url {
         assert_eq!(url.path(), "/");
     } else {
-        assert!(&request.url().is_some())
+        assert!(&request.url.is_some())
     }
-    assert_eq!(request.version(), "HTTP/1.1");
+    assert_eq!(request.version, "HTTP/1.1");
 }
 
 #[test]
@@ -149,7 +149,7 @@ Content-Type: application/x-www-form-urlencoded"##;
     assert!(request.is_some());
 
     let request = request.unwrap();
-    assert!(request.url().is_some());
+    assert!(request.url.is_some());
     let query_params = request.query_params();
     assert!(query_params.is_some());
 

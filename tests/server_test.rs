@@ -84,10 +84,7 @@ async fn it_works() {
 
     let mut client = Client::new(address.clone());
     let mut client = client.connect().await.unwrap();
-
-    let mut request = Request::new();
-    request.set_method(hype::request::Method::GET);
-    request.set_path("/");
+    let request = Request::default();
 
     let response = client.send_request(&request).await.unwrap();
     assert_eq!(response.status.code, 200);
@@ -100,12 +97,8 @@ async fn it_works() {
 async fn keep_alive() {
     let port = 7856;
     let shutdown = start_server(port).await;
-
     let address = format!("{}:{}", HOST, port);
-
-    let mut request = Request::new();
-    request.set_method(hype::request::Method::GET);
-    request.set_path("/");
+    let request = Request::default();
 
     // Create new connection
     let mut client = Client::new(address.clone());
@@ -138,9 +131,7 @@ async fn process_headers() {
     let mut client = Client::new(address.clone());
     let mut client = client.connect().await.unwrap();
 
-    let mut request = Request::new();
-    request.set_method(hype::request::Method::GET);
-    request.set_path("/");
+    let mut request = Request::default();
     request.set_header("Connection", "Keep-Alive");
     request.set_header("Keep-Alive", "timeout=10, max=5");
 
@@ -168,9 +159,7 @@ async fn keep_alive_timeout() {
     let address = format!("{}:{}", HOST, port);
     let shutdown = start_server(port).await;
 
-    let mut request = Request::new();
-    request.set_method(hype::request::Method::GET);
-    request.set_path("/");
+    let mut request = Request::default();
     request.set_header("Connection", "Keep-Alive");
     request.set_header("Keep-Alive", "timeout=1");
 
@@ -199,9 +188,7 @@ async fn keep_alive_max() {
     let address = format!("{}:{}", HOST, port);
     let shutdown = start_server(port).await;
 
-    let mut request = Request::new();
-    request.set_method(hype::request::Method::GET);
-    request.set_path("/");
+    let mut request = Request::default();
     request.set_header("Connection", "Keep-Alive");
     request.set_header("Keep-Alive", "max=2");
 
@@ -232,9 +219,7 @@ async fn connection_close() {
     let address = format!("{}:{}", HOST, port);
     let shutdown = start_server(port).await;
 
-    let mut request = Request::new();
-    request.set_method(hype::request::Method::GET);
-    request.set_path("/");
+    let mut request = Request::default();
     request.set_header("Connection", "close");
 
     // Create new connection

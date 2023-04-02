@@ -2,7 +2,7 @@ use std::{collections::HashMap, str::FromStr};
 
 use url::Url;
 
-use crate::{conntrack::Conn, message::Message, parser::RequestParser};
+use crate::{body::Body, conntrack::Conn, message::Message, parser::RequestParser};
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Hash)]
 pub enum Method {
@@ -35,14 +35,14 @@ lazy_static! {
 
 #[derive(Debug, Clone)]
 pub struct Request {
-    method: Method,
-    conn: Option<Conn>,
-    handler_path: Option<String>,
-    base_url: String,
-    url: Option<Url>,
-    version: String,
+    pub method: Method,
+    pub version: String,
     pub headers: HashMap<String, String>,
-    body: String,
+    pub url: Option<Url>,
+    pub base_url: String,
+    pub handler_path: Option<String>,
+    pub body: Body,
+    conn: Option<Conn>,
 }
 
 impl From<Message> for Request {
@@ -55,43 +55,35 @@ impl From<Message> for Request {
     }
 }
 
+impl Default for Request {
+    fn default() -> Self {
+        Request::new(Method::GET, "/")
+    }
+}
+
 impl Request {
-    pub fn new() -> Self {
-        Request {
+    pub fn new(method: Method, path: impl AsRef<str>) -> Self {
+        let mut request = Request {
             base_url: "http://UNSET".into(),
             handler_path: None,
             url: None,
-            method: Method::GET,
+            method,
             version: String::new(),
             headers: HashMap::new(),
-            body: String::new(),
+            body: Body::new(),
             conn: None,
-        }
+        };
+
+        request.set_path(path);
+        request
     }
 
-    pub fn set_method(&mut self, method: Method) {
-        self.method = method;
-    }
-
-    pub fn set_handler_path(&mut self, handler: String) {
-        self.handler_path = Some(handler);
-    }
-
-    pub fn handler_path(&self) -> &Option<String> {
-        return &self.handler_path;
-    }
-
-    pub fn set_version(&mut self, version: impl Into<String>) -> &mut Self {
-        self.version = version.into();
-        self
-    }
-
-    pub fn version(&self) -> &String {
-        return &self.version;
-    }
-
-    pub fn set_body(&mut self, body: String) {
-        self.body = body;
+    pub fn from(buf: impl Into<String>) -> Result<Self, String> {
+        let mut parser = RequestParser::new();
+        parser
+            .parse_buf(buf.into().as_bytes())
+            .or(Err("could not parse buffer"))?;
+        Ok(parser.get_message().into())
     }
 
     pub fn set_conn(&mut self, conn: Conn) {
@@ -100,18 +92,6 @@ impl Request {
 
     pub fn conn(&self) -> Option<Conn> {
         self.conn.clone()
-    }
-
-    pub fn url(&self) -> &Option<Url> {
-        return &self.url;
-    }
-
-    pub fn set_url(&mut self, url: Url) {
-        self.url = Some(url)
-    }
-
-    pub fn set_base_url(&mut self, base_url: impl Into<String>) {
-        self.base_url = base_url.into();
     }
 
     pub fn set_path(&mut self, path: impl AsRef<str>) {
@@ -125,27 +105,12 @@ impl Request {
         self.headers.insert(key.into().to_lowercase(), val.into());
     }
 
-    pub fn headers_mut(&mut self) -> &mut HashMap<String, String> {
-        return &mut self.headers;
-    }
-
-    pub fn headers(&self) -> &HashMap<String, String> {
-        return &self.headers;
-    }
-
-    pub fn from(buf: impl Into<String>) -> Result<Self, String> {
-        let mut parser = RequestParser::new();
-        parser
-            .parse_buf(buf.into().as_bytes())
-            .or(Err("could not parse buffer"))?;
-        Ok(parser.get_message().into())
-    }
-
     pub fn post_params(&mut self) -> Option<HashMap<String, String>> {
         let mut result: HashMap<String, String> = HashMap::new();
         if let Some(content_type) = self.headers.get("content-type") {
             if *content_type == "application/x-www-form-urlencoded".to_string() {
-                let parts = self.body.split('&');
+                let content = self.body.content();
+                let parts = content.split('&');
 
                 parts.for_each(|part| {
                     let kv: Vec<&str> = part.split('=').collect();
@@ -193,10 +158,6 @@ impl Request {
         return self.url.as_ref().unwrap().path().to_string();
     }
 
-    pub fn host(&self) -> Option<&String> {
-        self.headers.get("host")
-    }
-
     pub fn path(&self) -> String {
         if let Some(handler_path) = &self.handler_path {
             return self
@@ -210,10 +171,6 @@ impl Request {
         } else {
             return self.abs_path();
         }
-    }
-
-    pub fn method(&self) -> Method {
-        return self.method;
     }
 
     pub fn serialize(&self) -> String {
@@ -234,9 +191,10 @@ impl Request {
 
         r.push_str("\r\n");
 
-        if !self.body.is_empty() {
-            r.push_str(format!("Content-Length: {}\r\n\r\n", self.body.chars().count()).as_str());
-            r.push_str(self.body.as_str());
+        let content = self.body.content();
+        if !content.is_empty() {
+            r.push_str(format!("Content-Length: {}\r\n\r\n", content.chars().count()).as_str());
+            r.push_str(content.as_str());
         } else {
             r.push_str("\r\n");
         }

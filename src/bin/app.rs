@@ -116,7 +116,7 @@ impl Handler for MyHandler {
         r: &Request,
         w: &mut dyn AsyncWriteStream,
     ) -> Result<handler::Ok, handler::Error> {
-        match (r.method(), r.path().as_str()) {
+        match (r.method, r.path().as_str()) {
             (Method::GET | Method::POST, "/") => self.handle_root(r, w).await,
             (Method::GET, "/counter") => self.handle_get_counter(r, w).await,
             (Method::POST, "/inc") => self.handle_post_inc(r, w).await,

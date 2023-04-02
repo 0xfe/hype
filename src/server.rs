@@ -340,18 +340,18 @@ impl ConnectedServer {
             let mut request: Request = parser.get_message().into();
             request.set_header("X-Hype-Connection-ID", self.conn.id().clone());
             request.set_conn(self.conn.clone());
-            self.process_headers(request.headers()).await;
+            self.process_headers(&request.headers).await;
 
             debug!("Request: {:?}", request);
 
             let mut path = String::from("/__bad_path__");
-            if let Some(url) = &request.url() {
+            if let Some(url) = &request.url {
                 path = url.path().into()
             }
 
             for handler in self.handlers.read().await.iter() {
                 if let Some(matched_path) = handler.0.matches(&path) {
-                    request.set_handler_path(String::from(matched_path.to_string_lossy()));
+                    request.handler_path = Some(String::from(matched_path.to_string_lossy()));
                     if let Err(error) = handler.1.handle(&request, &mut *s).await {
                         error!("Error from handler {:?}: {:?}", handler, error);
                     }

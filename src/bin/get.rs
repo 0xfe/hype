@@ -40,10 +40,7 @@ async fn main() {
     }
 
     let mut client = client.connect().await.unwrap();
-
-    let mut request = Request::new();
-    request.set_method(hype::request::Method::GET);
-    request.set_path("/");
+    let request = Request::new(hype::request::Method::GET, "/");
 
     let response = client.send_request(&request).await.unwrap();
     info!("Response: {:?}", response);

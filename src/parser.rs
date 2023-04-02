@@ -110,7 +110,7 @@ pub struct Parser {
 
 impl Parser {
     pub fn new(start_state: State) -> Parser {
-        let mut message = Message::Request(Request::new());
+        let mut message = Message::Request(Request::new(crate::request::Method::GET, "/"));
         if start_state == State::StartResponse {
             message = Message::Response(Response::new(status::from(status::OK)));
         }
@@ -158,7 +158,7 @@ impl Parser {
         }
 
         if let Some(method) = VALID_METHODS.get(&parts[0]) {
-            self.message.request_mut().set_method(*method);
+            self.message.request_mut().method = *method;
         } else {
             return Err(ParseError::InvalidMethod(parts[0].into()));
         }
@@ -169,8 +169,8 @@ impl Parser {
             .join(parts[1])
             .or(Err(ParseError::InvalidPath(parts[1].into())))?;
 
-        self.message.request_mut().set_version(parts[2]);
-        self.message.request_mut().set_url(url);
+        self.message.request_mut().version = parts[2].into();
+        self.message.request_mut().url = Some(url);
 
         self.buf.clear();
         Ok(())
@@ -398,7 +398,7 @@ impl Parser {
             let body = String::from_utf8_lossy(&self.body[..]);
 
             if self.start_state == State::StartRequest {
-                self.message.request_mut().set_body(body.into_owned());
+                self.message.request_mut().body = body.into();
             } else {
                 self.message.response_mut().body = body.into();
             }
