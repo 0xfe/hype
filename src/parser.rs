@@ -4,6 +4,7 @@ use std::{collections::HashMap, fmt};
 
 use url::Url;
 
+use crate::body::Body;
 use crate::message::Message;
 use crate::{
     request::{Request, VALID_METHODS},
@@ -105,7 +106,7 @@ pub struct Parser {
     expected_chunk_size: usize,
     expected_content_length: usize,
     chunk_pos: usize,
-    body: Vec<u8>,
+    body: Body,
 }
 
 impl Parser {
@@ -120,7 +121,7 @@ impl Parser {
             start_state: start_state.clone(),
             state: start_state,
             buf: Vec::with_capacity(16384),
-            body: Vec::with_capacity(16384),
+            body: Body::new(),
             message,
             expected_chunk_size: 0,
             expected_content_length: 0,
@@ -298,15 +299,15 @@ impl Parser {
         self.buf.push(b);
     }
 
-    fn consume_body(&mut self, b: u8) {
-        self.body.push(b);
+    fn consume_body(&mut self, b: &[u8]) {
+        self.body.append(b);
     }
 
     pub fn parse_buf(&mut self, buf: &[u8]) -> Result<(), ParseError> {
         // Fast path for body
         if self.state == State::InBody {
-            self.body.extend(buf);
-            if self.body.len() >= self.expected_content_length {
+            self.consume_body(buf);
+            if self.body.content().len() >= self.expected_content_length {
                 self.parse_eof()?;
             }
             return Ok(());
@@ -349,7 +350,7 @@ impl Parser {
                     // skip anything else
                 }
                 State::InChunkedBodyContent => {
-                    self.consume_body(*c);
+                    self.consume_body(&[*c]);
                     self.chunk_pos += 1;
 
                     if self.chunk_pos == self.expected_chunk_size {
@@ -363,8 +364,8 @@ impl Parser {
                     }
                 }
                 State::InBody => {
-                    self.consume_body(*c);
-                    if self.body.len() == self.expected_content_length {
+                    self.consume_body(&[*c]);
+                    if self.body.content().len() == self.expected_content_length {
                         self.parse_eof()?;
                     }
                 }
@@ -395,12 +396,10 @@ impl Parser {
             || self.state == State::InHeaders
             || self.state == State::EndChunkedBody
         {
-            let body = String::from_utf8_lossy(&self.body[..]);
-
             if self.start_state == State::StartRequest {
-                self.message.request_mut().body = body.into();
+                self.message.request_mut().body = self.body.clone();
             } else {
-                self.message.response_mut().body = body.into();
+                self.message.response_mut().body = self.body.clone();
             }
             self.update_state(State::ParseComplete)?;
             return Ok(());

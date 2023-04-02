@@ -12,7 +12,7 @@ async fn it_works() {
     body.push_chunk("blah");
     body.end_chunked();
 
-    let mut stream = body.stream();
+    let mut stream = body.chunk_stream();
 
     assert_eq!(stream.next().await.unwrap(), Chunk("foobar".into()));
     assert_eq!(stream.next().await.unwrap(), Chunk("blah".into()));
@@ -36,7 +36,7 @@ async fn it_works_with_waker() {
         body_writer.end_chunked();
     });
 
-    let mut stream = body_reader.stream();
+    let mut stream = body_reader.chunk_stream();
     let mut count = 0;
     while let Some(chunk) = stream.next().await {
         println!("got chunk: {}", chunk.0);

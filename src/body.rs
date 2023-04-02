@@ -10,7 +10,7 @@ use futures::Stream;
 #[derive(Debug, Clone)]
 enum Content {
     Chunked(Arc<RwLock<ChunkState>>),
-    Full(Arc<RwLock<String>>),
+    Full(Arc<RwLock<Vec<u8>>>),
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -46,7 +46,7 @@ pub struct Body {
 impl<T: Into<String>> From<T> for Body {
     fn from(val: T) -> Self {
         Self {
-            content: Content::Full(Arc::new(RwLock::new(val.into()))),
+            content: Content::Full(Arc::new(RwLock::new(val.into().as_bytes().to_vec()))),
         }
     }
 }
@@ -54,7 +54,7 @@ impl<T: Into<String>> From<T> for Body {
 impl Body {
     pub fn new() -> Self {
         Self {
-            content: Content::Full(Arc::new(RwLock::new(String::new()))),
+            content: Content::Full(Arc::new(RwLock::new(vec![]))),
         }
     }
 
@@ -122,16 +122,17 @@ impl Body {
         }
     }
 
-    pub fn append_body(&mut self, buf: impl AsRef<str>) {
+    pub fn append(&mut self, buf: &[u8]) {
         match &self.content {
-            Content::Full(body) => body.write().unwrap().push_str(buf.as_ref()),
+            Content::Full(body) => body.write().unwrap().extend(buf),
             Content::Chunked(_) => panic!("chunked body"),
         }
     }
 
     pub fn content(&self) -> String {
         match &self.content {
-            Content::Full(body) => body.read().unwrap().clone(),
+            Content::Full(body) => String::from_utf8(body.read().unwrap().clone())
+                .unwrap_or("UTF-8 Decode Failed".to_string()),
             Content::Chunked(state) => {
                 let chunk_state = state.read().unwrap();
 
@@ -150,7 +151,7 @@ impl Body {
         }
     }
 
-    pub fn stream(&self) -> BodyStream {
+    pub fn chunk_stream(&self) -> BodyStream {
         if let Content::Full(_) = self.content {
             panic!("stream(): not chunked")
         }

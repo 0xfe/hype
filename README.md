@@ -59,7 +59,8 @@ curl --insecure https://localhost:4000
 
 -   [ ] Support chunked forwarding (encoding support done)
     -   [x] remove pub fields in request and response
-    -   [x] factor out Body from request and response
+    -   [x] factor Body into request and response
+    -   [x] factor Body into parser
     -   [x] support streaming of chunked bodies
         -   [x] futures::Stream implementation for chunked body
         -   [ ] return error for body() if chunked and not complete
