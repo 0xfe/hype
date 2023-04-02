@@ -5,11 +5,11 @@ use crate::{body::Body, cookie::Cookie, message::Message, status};
 // CHUNK: remove pub
 #[derive(Debug, Clone)]
 pub struct Response {
-    version: String,
-    status: status::Status,
-    headers: HashMap<String, String>,
-    cookies: Vec<Cookie>,
-    body: Body,
+    pub version: String,
+    pub status: status::Status,
+    pub headers: HashMap<String, String>,
+    pub body: Body,
+    pub cookies: Vec<Cookie>,
 }
 
 impl From<Message> for Response {
@@ -91,11 +91,6 @@ impl Response {
         }
     }
 
-    pub fn set_status(&mut self, status: status::Status) -> &mut Self {
-        self.status = status;
-        self
-    }
-
     pub fn set_header(&mut self, key: impl Into<String>, value: impl Into<String>) -> &mut Self {
         let key = key.into().to_lowercase();
         let value = value.into();
@@ -110,39 +105,9 @@ impl Response {
         self
     }
 
-    pub fn set_body(&mut self, body: String) -> &mut Self {
-        self.body = body.into();
-        self
-    }
-
     pub fn set_cookie(&mut self, cookie: Cookie) -> &mut Self {
         self.cookies.push(cookie);
         self
-    }
-
-    pub fn set_version(&mut self, version: impl Into<String>) -> &mut Self {
-        self.version = version.into();
-        self
-    }
-
-    pub fn version(&self) -> &String {
-        return &self.version;
-    }
-
-    pub fn headers(&self) -> &HashMap<String, String> {
-        return &self.headers;
-    }
-
-    pub fn headers_mut(&mut self) -> &mut HashMap<String, String> {
-        return &mut self.headers;
-    }
-
-    pub fn status(&self) -> &status::Status {
-        return &self.status;
-    }
-
-    pub fn body(&self) -> &Body {
-        return &self.body;
     }
 
     pub fn serialize(&mut self) -> String {

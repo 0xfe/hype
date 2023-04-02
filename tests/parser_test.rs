@@ -81,7 +81,7 @@ Content-Length: 20
 
     assert!(response.is_some());
     let response = response.unwrap();
-    assert_eq!(response.status().code, 200);
+    assert_eq!(response.status.code, 200);
 }
 
 #[test]
@@ -196,8 +196,8 @@ A
 
     assert!(response.is_some());
     let response = response.unwrap();
-    assert_eq!(response.status().code, 200);
-    assert_eq!(response.body().content(), "123451234567890");
+    assert_eq!(response.status.code, 200);
+    assert_eq!(response.body.content(), "123451234567890");
 }
 
 #[test]
@@ -214,6 +214,6 @@ Transfer-Encoding: chunked
 
     assert!(response.is_some());
     let response = response.unwrap();
-    assert_eq!(response.status().code, 200);
-    assert_eq!(response.body().content(), "");
+    assert_eq!(response.status.code, 200);
+    assert_eq!(response.body.content(), "");
 }

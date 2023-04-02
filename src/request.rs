@@ -41,7 +41,7 @@ pub struct Request {
     base_url: String,
     url: Option<Url>,
     version: String,
-    headers: HashMap<String, String>,
+    pub headers: HashMap<String, String>,
     body: String,
 }
 

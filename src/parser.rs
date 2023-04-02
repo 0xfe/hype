@@ -186,13 +186,13 @@ impl Parser {
             return Err(ParseError::BadStatusLine(status_line.into()));
         }
 
-        self.message.response_mut().set_version(parts[0]);
+        self.message.response_mut().version = parts[0].to_string();
 
         if let Ok(code) = parts[1].to_string().parse::<u16>() {
-            self.message.response_mut().set_status(status::Status {
+            self.message.response_mut().status = status::Status {
                 code,
                 text: parts[2].trim().to_string(),
-            });
+            };
         }
 
         self.buf.clear();
@@ -206,10 +206,10 @@ impl Parser {
         let headers;
         if self.start_state == State::StartResponse {
             let response = self.message.response_mut();
-            headers = response.headers_mut();
+            headers = &mut response.headers;
         } else {
             let request = self.message.request_mut();
-            headers = request.headers_mut();
+            headers = &mut request.headers;
         }
 
         if header_line == "\r" || header_line == "" {
@@ -400,7 +400,7 @@ impl Parser {
             if self.start_state == State::StartRequest {
                 self.message.request_mut().set_body(body.into_owned());
             } else {
-                self.message.response_mut().set_body(body.into_owned());
+                self.message.response_mut().body = body.into();
             }
             self.update_state(State::ParseComplete)?;
             return Ok(());

@@ -61,9 +61,9 @@ impl MyHandler {
         body: String,
     ) {
         let mut response = Response::new(status::from(status));
-        w.write_all(response.set_body(body).serialize().as_bytes())
-            .await
-            .unwrap();
+        response.body = body.into();
+
+        w.write_all(response.serialize().as_bytes()).await.unwrap();
     }
 
     async fn handle_root(

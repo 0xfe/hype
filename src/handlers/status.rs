@@ -38,7 +38,7 @@ impl Handler for Status {
         w: &mut dyn AsyncWriteStream,
     ) -> Result<handler::Ok, handler::Error> {
         let mut response = Response::new(self.status.clone());
-        response.set_body(self.body.clone());
+        response.body = self.body.clone().into();
 
         for header in &self.headers {
             response.set_header(header.0, header.1);

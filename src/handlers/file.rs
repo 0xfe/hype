@@ -11,6 +11,7 @@ use tokio::{
 };
 
 use crate::{
+    body::Body,
     content_types,
     handler::{self, AsyncWriteStream, Handler},
     request::Request,
@@ -39,9 +40,9 @@ impl File {
     ) -> io::Result<()> {
         let mut response = Response::new(status::from(status));
         response.set_header("Content-Type", content_type);
+        response.body = Body::from(body);
 
-        w.write_all(response.set_body(body).serialize().as_bytes())
-            .await
+        w.write_all(response.serialize().as_bytes()).await
     }
 
     async fn write_dir(
