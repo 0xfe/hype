@@ -57,72 +57,68 @@ curl --insecure https://localhost:4000
 
 ## In Progress
 
--   Support chunked forwarding (encoding support done)
-    -   [ ] remove pub fields in request and response
-    -   [ ] support pushing chunked responses
-        -   set_chunked, push_chunk, end_chunked, get_chunk, try_get_chunk (or iterator/stream API)
-        -   return error for body() if chunked and not complete
-    -   [ ] support pushing chunked request (same API)
--   Support path override in LB configuration
+-   [ ] Support chunked forwarding (encoding support done)
+    -   [x] remove pub fields in request and response
+    -   [x] factor out Body from request and response
+    -   [x] support streaming of chunked bodies
+        -   [x] futures::Stream implementation for chunked body
+        -   [ ] return error for body() if chunked and not complete
+    -   [ ] plumb chunked streams through server / LB
+-   [ ] use futures::Stream for non-chunked bodies too, forward every read
 
 ## TODO
 
--   Support X-Forwarded-For
--   Backend healthchecking for balancer targets
--   Don't propagate hop-by-hop-headers
+-   [ ] Support path override in LB configuration
+-   [ ] Support X-Forwarded-For
+-   [ ] Backend healthchecking for balancer targets
+-   [ ] Don't propagate hop-by-hop-headers
     -   Keep-Alive, Transfer-Encoding, TE, Connection, Trailer, Upgrade, Proxy-Authorization and Proxy-Authenticate
     -   Maybe okay to propagate keep-alive and connection headers.
--   Cache control headers
--   L4 proxy
--   Transfer-Encoding: gzip (note Content-Encoding and Accept-Encoding too)
--   CLI with https://docs.rs/argh/latest/argh/
--   Use templating + #include to make file browser look better
+-   [ ] Cache control headers
+-   [ ] L4 proxy
+-   [ ] Transfer-Encoding: gzip (note Content-Encoding and Accept-Encoding too)
+-   [ ] CLI with https://docs.rs/argh/latest/argh/
+-   [ ] Use templating + #include to make file browser look better
     -   templating engine with https://crates.io/crates/tera
--   gRPC API - https://github.com/hyperium/tonic
--   Implement access log
-
-### Issues / Housekeeping
-
--   Errors should be derived from error::Error -- see cookie.rs
--   Support multiple headers with the same key
+-   [ ] gRPC API - https://github.com/hyperium/tonic
+-   [ ] Implement access log
+-   [ ] Errors should be derived from error::Error -- see cookie.rs
+-   [ ] Support multiple headers with the same key
     -   bad request (400) if multiple host headers
-
-### Done
-
--   Add additional configuration schema for LB handlers
-    -   host rewrite
-    -   cert files
--   TLS support
--   Implment "Connection: close", shutdown socket as soon as request is processed.
--   Implement HTTP Keepalive Timeout
--   Implement HTTP Keepalive Max
--   Rewrite host header for load balancer
--   Implement chunked transfer-encoding
--   Implement connection tracking
--   LB handler
--   Fix case sensitivity in headers
--   Move redirection to URL rewriting middleware
--   L7 load balancer (in progress)
+-   [x] Add additional configuration schema for LB handlers
+    -   [x] host rewrite
+    -   [x] cert files
+-   [x] TLS support
+-   [x] Implment "Connection: close", shutdown socket as soon as request is processed.
+-   [x] Implement HTTP Keepalive Timeout
+-   [x] Implement HTTP Keepalive Max
+-   [x] Rewrite host header for load balancer
+-   [x] Implement chunked transfer-encoding
+-   [x] Implement connection tracking
+-   [x] LB handler
+-   [x] Fix case sensitivity in headers
+-   [x] Move redirection to URL rewriting middleware
+-   [x] L7 load balancer
     -   Implemented random backend picker
     -   Implemented Roundrobin picker
     -   Implemented Weighted RR picker
--   Basic loadbalancer framework
--   URL rewrite middleware
--   Config file like lighttpd -- keep it simple, reverse proxy support
+-   [x] Basic loadbalancer framework
+-   [x] URL rewrite middleware
+-   [x] Config file like lighttpd -- keep it simple, reverse proxy support
     -   access log
     -   index file
     -   server name / host header (with wildcards: \*.example.com)
--   Figure out solution for trailing '/' -- 301 permanent redirect
--   Match Host headers, bad request (400) if multiple headers
--   API to fetch cookies from request header
--   Implement Cookie::try_from(...) to parse from string
--   Implement TryFrom trait for request and cookie
--   API to set cookies in response header -- you can have multiple setcookie headers!
--   Routing: match path components: `/files/*, /pages/*/admin, /files, /files/foo`
--   set content type based on file extension
--   implement handler abstraction
--   URL parsing (use `url` crate) -- https://docs.rs/url/latest/url/
--   API for URL parameters
--   API to get form POST parameters
--   serve files
--   more unit tests
+-   [x] Figure out solution for trailing '/' -- 301 permanent redirect
+-   [x] Match Host headers, bad request (400) if multiple headers
+-   [x] API to fetch cookies from request header
+-   [x] Implement Cookie::try_from(...) to parse from string
+-   [x] Implement TryFrom trait for request and cookie
+-   [x] API to set cookies in response header -- you can have multiple setcookie headers!
+-   [x] Routing: match path components: `/files/*, /pages/*/admin, /files, /files/foo`
+-   [x] set content type based on file extension
+-   [x] implement handler abstraction
+-   [x] URL parsing (use `url` crate) -- https://docs.rs/url/latest/url/
+-   [x] API for URL parameters
+-   [x] API to get form POST parameters
+-   [x] serve files
+-   [x] more unit tests
