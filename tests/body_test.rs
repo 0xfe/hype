@@ -38,10 +38,43 @@ async fn it_works_with_waker() {
 
     let mut stream = body_reader.chunk_stream();
     let mut count = 0;
-    while let Some(chunk) = stream.next().await {
-        println!("got chunk: {}", chunk.0);
+    while let Some(_) = stream.next().await {
         count += 1;
     }
 
     assert_eq!(count, 10);
+}
+
+// Test multiple chunk streams at the same time
+#[tokio::test]
+async fn it_works_with_multiple_streams() {
+    let mut body = Body::new();
+    body.set_chunked();
+
+    let body_writer = Arc::new(body);
+    let body_reader = Arc::clone(&body_writer);
+
+    tokio::spawn(async move {
+        for _ in 0..10 {
+            body_writer.push_chunk("foobar");
+            tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
+        }
+
+        body_writer.end_chunked();
+    });
+
+    let mut stream1 = body_reader.chunk_stream();
+    let mut stream2 = body_reader.chunk_stream();
+
+    let mut count = 0;
+    while let Some(_) = stream1.next().await {
+        count += 1;
+    }
+
+    while let Some(chunk) = stream2.next().await {
+        println!("got chunk: {}", chunk.0);
+        count += 1;
+    }
+
+    assert_eq!(count, 20);
 }
