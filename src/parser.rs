@@ -307,7 +307,7 @@ impl Parser {
         // Fast path for body
         if self.state == State::InBody {
             self.consume_body(buf);
-            if self.body.content().len() >= self.expected_content_length {
+            if self.body.full_content().len() >= self.expected_content_length {
                 self.parse_eof()?;
             }
             return Ok(());
@@ -365,7 +365,7 @@ impl Parser {
                 }
                 State::InBody => {
                     self.consume_body(&[*c]);
-                    if self.body.content().len() == self.expected_content_length {
+                    if self.body.full_content().len() == self.expected_content_length {
                         self.parse_eof()?;
                     }
                 }

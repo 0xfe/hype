@@ -1,10 +1,30 @@
 use std::{
+    error, fmt,
     pin::Pin,
     sync::{Arc, RwLock},
     task::{Context, Poll, Waker},
 };
 
 use futures::Stream;
+
+#[derive(Debug)]
+pub enum BodyError {
+    IncompleteBody,
+    UTF8DecodeFailed(String),
+}
+
+impl fmt::Display for BodyError {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        let e = match self {
+            Self::IncompleteBody => "incomplete body".to_string(),
+            Self::UTF8DecodeFailed(err) => format!("UTF-8 decode failed: {}", err),
+        };
+
+        write!(f, "BodyError: {}", e)
+    }
+}
+
+impl error::Error for BodyError {}
 
 /// We have two body types, based on their encoding: Chunked and Full.
 #[derive(Debug, Clone)]
@@ -129,7 +149,7 @@ impl Body {
         }
     }
 
-    pub fn content(&self) -> String {
+    pub fn full_content(&self) -> String {
         match &self.content {
             Content::Full(body) => String::from_utf8(body.read().unwrap().clone())
                 .unwrap_or("UTF-8 Decode Failed".to_string()),
@@ -147,6 +167,28 @@ impl Body {
                     .collect::<Vec<String>>()
                     .join("")
                     .to_string()
+            }
+        }
+    }
+
+    pub fn content(&self) -> Result<String, BodyError> {
+        match &self.content {
+            Content::Full(body) => String::from_utf8(body.read().unwrap().clone())
+                .map_err(|e| BodyError::UTF8DecodeFailed(e.to_string())),
+            Content::Chunked(state) => {
+                let chunk_state = state.read().unwrap();
+
+                if !chunk_state.complete {
+                    Err(BodyError::IncompleteBody)
+                } else {
+                    Ok(chunk_state
+                        .chunks
+                        .iter()
+                        .map(|c| c.0.clone())
+                        .collect::<Vec<String>>()
+                        .join("")
+                        .to_string())
+                }
             }
         }
     }
