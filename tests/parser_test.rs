@@ -135,6 +135,7 @@ merchantID=2003&foo=bar"##;
     assert!(post_params.is_some());
 
     let post_params = post_params.unwrap();
+    println!("POST: {:?}", post_params);
     assert_eq!(post_params.get("merchantID").unwrap(), &"2003".to_string());
     assert_eq!(post_params.get("foo").unwrap(), &"bar".to_string());
 }

@@ -4,7 +4,7 @@ use std::{collections::HashMap, fmt};
 
 use url::Url;
 
-use crate::body::Body;
+use crate::body::{Body, BodyError};
 use crate::message::Message;
 use crate::{
     request::{Request, VALID_METHODS},
@@ -52,6 +52,7 @@ pub enum ParseError {
     BadStatusLine(String),
     InvalidMethod(String),
     InvalidPath(String),
+    BodyError(String),
     InvalidChunkSize,
     NonNumericChunkSize,
     UnexpectedEOF,
@@ -76,6 +77,7 @@ impl fmt::Display for ParseError {
             ParseError::BadHeaderLine(msg) => write!(f, "Parser: bad header line: {}", msg),
             ParseError::InvalidMethod(msg) => write!(f, "Parser: invalid method: {}", msg),
             ParseError::InvalidPath(msg) => write!(f, "Parser: invalid path: {}", msg),
+            ParseError::BodyError(msg) => write!(f, "Parser: body error: {}", msg),
         }
     }
 }
@@ -102,9 +104,9 @@ pub struct Parser {
     start_state: State,
     state: State,
     buf: Vec<u8>,
+    chunk_buf: Vec<u8>,
     message: Message,
     expected_chunk_size: usize,
-    expected_content_length: usize,
     chunk_pos: usize,
     body: Body,
 }
@@ -121,10 +123,10 @@ impl Parser {
             start_state: start_state.clone(),
             state: start_state,
             buf: Vec::with_capacity(16384),
+            chunk_buf: Vec::with_capacity(16384),
             body: Body::new(),
             message,
             expected_chunk_size: 0,
-            expected_content_length: 0,
             chunk_pos: 0,
         }
     }
@@ -227,6 +229,7 @@ impl Parser {
                 let parts: Vec<&str> = encoding.split(',').map(|p| p.trim()).collect();
                 if parts.contains(&"chunked") {
                     debug!("expecting chunked encoding");
+                    self.body.set_chunked();
                     new_state = State::InChunkedBodySize;
                     has_body = true;
                 }
@@ -243,7 +246,8 @@ impl Parser {
             if let Some((k, v)) = header_line.split_once(':') {
                 let key = k.to_lowercase();
                 if key == "content-length" {
-                    self.expected_content_length = v.trim().parse::<usize>().unwrap_or(0);
+                    self.body
+                        .set_content_length(v.trim().parse::<usize>().unwrap_or(0));
                 }
 
                 headers.insert(key, v.trim().into());
@@ -299,15 +303,29 @@ impl Parser {
         self.buf.push(b);
     }
 
-    fn consume_body(&mut self, b: &[u8]) {
-        self.body.append(b);
+    fn consume_chunk(&mut self, b: u8) {
+        self.chunk_buf.push(b);
+    }
+
+    fn consume_body(&mut self, b: &[u8]) -> Result<bool, BodyError> {
+        self.body.append(b)
+    }
+
+    fn commit_chunk(&mut self) {
+        self.body.push_chunk(
+            String::from_utf8(self.chunk_buf.clone()).unwrap_or("UTF-8 decode error".to_string()),
+        );
+        self.chunk_buf.clear();
     }
 
     pub fn parse_buf(&mut self, buf: &[u8]) -> Result<(), ParseError> {
         // Fast path for body
         if self.state == State::InBody {
-            self.consume_body(buf);
-            if self.body.full_content().len() >= self.expected_content_length {
+            let done = self
+                .consume_body(buf)
+                .map_err(|e| ParseError::BodyError(e.to_string()))?;
+
+            if done {
                 self.parse_eof()?;
             }
             return Ok(());
@@ -350,11 +368,12 @@ impl Parser {
                     // skip anything else
                 }
                 State::InChunkedBodyContent => {
-                    self.consume_body(&[*c]);
+                    self.consume_chunk(*c);
                     self.chunk_pos += 1;
 
                     if self.chunk_pos == self.expected_chunk_size {
                         self.update_state(State::InChunkComplete)?;
+                        self.commit_chunk();
                         self.buf.clear();
                     }
                 }
@@ -364,13 +383,15 @@ impl Parser {
                     }
                 }
                 State::InBody => {
-                    self.consume_body(&[*c]);
-                    if self.body.full_content().len() == self.expected_content_length {
+                    self.consume_body(&[*c])
+                        .map_err(|e| ParseError::BodyError(e.to_string()))?;
+                    if self.body.full_contents_loaded() {
                         self.parse_eof()?;
                     }
                 }
                 State::EndChunkedBody => {
                     if ch == '\n' {
+                        self.body.end_chunked();
                         self.parse_eof()?;
                         break;
                     }

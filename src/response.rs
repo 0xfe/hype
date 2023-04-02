@@ -2,7 +2,6 @@ use std::collections::HashMap;
 
 use crate::{body::Body, cookie::Cookie, message::Message, status};
 
-// CHUNK: remove pub
 #[derive(Debug, Clone)]
 pub struct Response {
     pub version: String,

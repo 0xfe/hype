@@ -10,6 +10,7 @@ use futures::Stream;
 #[derive(Debug)]
 pub enum BodyError {
     IncompleteBody,
+    ContentTooLong(usize, usize),
     UTF8DecodeFailed(String),
 }
 
@@ -17,6 +18,9 @@ impl fmt::Display for BodyError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         let e = match self {
             Self::IncompleteBody => "incomplete body".to_string(),
+            Self::ContentTooLong(want, got) => {
+                format!("content too long, want: {}, got {}", want, got)
+            }
             Self::UTF8DecodeFailed(err) => format!("UTF-8 decode failed: {}", err),
         };
 
@@ -30,7 +34,7 @@ impl error::Error for BodyError {}
 #[derive(Debug, Clone)]
 enum Content {
     Chunked(Arc<RwLock<ChunkState>>),
-    Full(Arc<RwLock<Vec<u8>>>),
+    Full(Arc<RwLock<ContentState>>),
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -59,6 +63,35 @@ impl ChunkState {
 }
 
 #[derive(Debug, Clone)]
+struct ContentState {
+    content: Vec<u8>,
+    expected_length: usize,
+    wakers: Vec<Waker>,
+}
+
+impl ContentState {
+    fn new() -> Self {
+        Self {
+            content: vec![],
+            expected_length: 0,
+            wakers: vec![],
+        }
+    }
+}
+
+impl<T: Into<String>> From<T> for ContentState {
+    fn from(val: T) -> Self {
+        let val = val.into();
+
+        Self {
+            content: val.as_bytes().to_vec(),
+            expected_length: val.len(),
+            wakers: vec![],
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
 pub struct Body {
     content: Content,
 }
@@ -66,7 +99,7 @@ pub struct Body {
 impl<T: Into<String>> From<T> for Body {
     fn from(val: T) -> Self {
         Self {
-            content: Content::Full(Arc::new(RwLock::new(val.into().as_bytes().to_vec()))),
+            content: Content::Full(Arc::new(RwLock::new(ContentState::from(val)))),
         }
     }
 }
@@ -74,12 +107,19 @@ impl<T: Into<String>> From<T> for Body {
 impl Body {
     pub fn new() -> Self {
         Self {
-            content: Content::Full(Arc::new(RwLock::new(vec![]))),
+            content: Content::Full(Arc::new(RwLock::new(ContentState::new()))),
         }
     }
 
     pub fn set_chunked(&mut self) {
         self.content = Content::Chunked(Arc::new(RwLock::new(ChunkState::new())));
+    }
+
+    pub fn set_content_length(&mut self, length: usize) {
+        match &self.content {
+            Content::Full(state) => state.write().unwrap().expected_length = length,
+            Content::Chunked(_) => panic!("chunked body"),
+        }
     }
 
     pub fn chunked(&self) -> bool {
@@ -142,16 +182,64 @@ impl Body {
         }
     }
 
-    pub fn append(&mut self, buf: &[u8]) {
+    fn get_full_contents(&self, start_pos: usize, waker: Waker) -> Result<Vec<u8>, bool> {
         match &self.content {
-            Content::Full(body) => body.write().unwrap().extend(buf),
+            Content::Full(state) => {
+                let mut state = state.write().unwrap();
+                if start_pos >= state.content.len() {
+                    if state.content.len() != state.expected_length {
+                        state.wakers.push(waker);
+                    }
+                    return Err(state.content.len() == state.expected_length);
+                }
+
+                Ok(state.content[start_pos..].to_vec())
+            }
             Content::Chunked(_) => panic!("chunked body"),
         }
     }
 
+    /// Returns true if the body is complete.
+    pub fn full_contents_loaded(&self) -> bool {
+        match &self.content {
+            Content::Full(state) => {
+                let state = state.read().unwrap();
+                state.content.len() >= state.expected_length
+            }
+            Content::Chunked(_) => panic!("chunked body"),
+        }
+    }
+
+    /// Append bytes to the body. Returns true if the body is complete.
+    pub fn append(&self, buf: &[u8]) -> Result<bool, BodyError> {
+        match &self.content {
+            Content::Full(state) => {
+                let mut wakers = vec![];
+                let mut done = false;
+                {
+                    let mut state = state.write().unwrap();
+                    state.content.extend(buf);
+                    if state.content.len() > state.expected_length {
+                        state.content = state.content[..state.expected_length].to_vec();
+                    }
+
+                    if state.content.len() == state.expected_length {
+                        done = true;
+                    }
+
+                    std::mem::swap(&mut wakers, &mut state.wakers);
+                }
+                wakers.iter().for_each(|w| w.wake_by_ref());
+                Ok(done)
+            }
+            Content::Chunked(_) => panic!("chunked body"),
+        }
+    }
+
+    /// Return the full body as a string
     pub fn full_content(&self) -> String {
         match &self.content {
-            Content::Full(body) => String::from_utf8(body.read().unwrap().clone())
+            Content::Full(body) => String::from_utf8(body.read().unwrap().content.clone())
                 .unwrap_or("UTF-8 Decode Failed".to_string()),
             Content::Chunked(state) => {
                 let chunk_state = state.read().unwrap();
@@ -171,10 +259,17 @@ impl Body {
         }
     }
 
+    /// Return the full body as a string, only if it's complete.
     pub fn content(&self) -> Result<String, BodyError> {
         match &self.content {
-            Content::Full(body) => String::from_utf8(body.read().unwrap().clone())
-                .map_err(|e| BodyError::UTF8DecodeFailed(e.to_string())),
+            Content::Full(body) => {
+                if !self.full_contents_loaded() {
+                    return Err(BodyError::IncompleteBody);
+                }
+
+                String::from_utf8(body.read().unwrap().content.clone())
+                    .map_err(|e| BodyError::UTF8DecodeFailed(e.to_string()))
+            }
             Content::Chunked(state) => {
                 let chunk_state = state.read().unwrap();
 
@@ -190,6 +285,13 @@ impl Body {
                         .to_string())
                 }
             }
+        }
+    }
+
+    pub fn content_stream(&self) -> ContentStream {
+        ContentStream {
+            current_pos: 0,
+            body: self,
         }
     }
 
@@ -220,6 +322,30 @@ impl<'a> Stream for BodyStream<'a> {
             Ok(chunk) => {
                 self.current_chunk += 1;
                 Poll::Ready(Some(chunk))
+            }
+            Err(true) => Poll::Ready(None),
+            Err(false) => Poll::Pending,
+        }
+    }
+}
+
+pub struct ContentStream<'a> {
+    current_pos: usize,
+    body: &'a Body,
+}
+
+impl<'a> Stream for ContentStream<'a> {
+    type Item = Vec<u8>;
+
+    fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Vec<u8>>> {
+        let contents = self
+            .body
+            .get_full_contents(self.current_pos, cx.waker().clone());
+
+        match contents {
+            Ok(contents) => {
+                self.current_pos += contents.len();
+                Poll::Ready(Some(contents))
             }
             Err(true) => Poll::Ready(None),
             Err(false) => Poll::Pending,

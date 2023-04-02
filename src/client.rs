@@ -27,6 +27,9 @@ pub enum ClientError {
     ConnectionBroken,
     ConnectionClosed,
 
+    /// Parse errors
+    ParseError(String),
+
     /// TLS Errors
     TLSError(String),
 
@@ -51,6 +54,7 @@ impl fmt::Display for ClientError {
             ClientError::TLSError(message) => write!(f, "TLS error: {}", message),
             ClientError::ShutdownError(err) => write!(f, "error while closing socket: {}", err),
             ClientError::SendError(err) => write!(f, "could not send data to backend: {}", err),
+            ClientError::ParseError(err) => write!(f, "could not parse response: {}", err),
             ClientError::RecvError(err) => {
                 write!(f, "could not receive data from backend: {}", err)
             }
@@ -213,7 +217,9 @@ impl ConnectedClient {
                     }
                     Ok(n) => {
                         debug!("{}", String::from_utf8_lossy(&buf[..n]));
-                        parser.parse_buf(&buf[..n]).unwrap();
+                        parser.parse_buf(&buf[..n]).map_err(|e| {
+                            ClientError::ParseError(format!("error parsing response: {}", e))
+                        })?;
 
                         // Clients may leave the connection open, so check to see if we've
                         // got a full request in. (Otherwise, we just block.)
