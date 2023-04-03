@@ -2,6 +2,7 @@ use hype::{client::Client, request::Request};
 
 #[tokio::test]
 async fn it_works() {
+    hype::logger::init();
     let r = r##"GET / HTTP/1.1
 Accept-Encoding: identity
 Host: google.com"##;
@@ -13,4 +14,5 @@ Host: google.com"##;
     let result = client.send_request(&req).await.unwrap();
 
     println!("result: {:?}", result);
+    println!("BODY: {:?}", result.content().await.unwrap());
 }

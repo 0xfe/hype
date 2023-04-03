@@ -1,13 +1,21 @@
-use std::collections::HashMap;
+use std::{
+    collections::HashMap,
+    sync::{Arc, RwLock},
+};
 
-use crate::{body::Body, cookie::Cookie, message::Message, status};
+use crate::{
+    body::{Body, BodyError},
+    cookie::Cookie,
+    message::Message,
+    status,
+};
 
 #[derive(Debug, Clone)]
 pub struct Response {
     pub version: String,
     pub status: status::Status,
     pub headers: HashMap<String, String>,
-    pub body: Body,
+    pub body: Arc<RwLock<Body>>,
     pub cookies: Vec<Cookie>,
 }
 
@@ -76,7 +84,7 @@ impl Response {
             status,
             headers,
             cookies: vec![],
-            body: Body::new(),
+            body: Arc::new(RwLock::new(Body::new())),
         })
     }
 
@@ -86,8 +94,16 @@ impl Response {
             status,
             headers: HashMap::new(),
             cookies: vec![],
-            body: Body::new(),
+            body: Arc::new(RwLock::new(Body::new())),
         }
+    }
+
+    pub fn set_body(&self, body: Body) {
+        *self.body.write().unwrap() = body;
+    }
+
+    pub async fn content(&self) -> Result<String, BodyError> {
+        self.body.read().unwrap().content().await
     }
 
     pub fn set_header(&mut self, key: impl Into<String>, value: impl Into<String>) -> &mut Self {
@@ -111,7 +127,7 @@ impl Response {
 
     pub fn serialize(&mut self) -> String {
         let status_line = format!("HTTP/1.1 {} {}", self.status.code, self.status.text);
-        let length = self.body.full_content().len();
+        let length = self.body.read().unwrap().full_content().len();
         if length > 0 {
             self.set_header("Content-Length", length.to_string());
         }
@@ -132,7 +148,7 @@ impl Response {
 
         let buf = format!(
             "{status_line}\r\n{headers}\r\n{cookie_headers}\r\n{}",
-            self.body.full_content()
+            self.body.read().unwrap().full_content()
         );
 
         buf

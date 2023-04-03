@@ -167,3 +167,25 @@ async fn read_all() {
 
     assert_eq!(data, "foobar 0foobar 1foobar 2foobar 3foobar 4");
 }
+
+#[tokio::test]
+async fn read_all_chunks() {
+    let mut body = Body::new();
+    body.set_chunked();
+
+    let body_writer = Arc::new(body);
+    let body_reader = Arc::clone(&body_writer);
+
+    tokio::spawn(async move {
+        for i in 0..5 {
+            body_writer.push_chunk(format!("foobar {i}"));
+            tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
+        }
+
+        body_writer.end_chunked();
+    });
+
+    let data = body_reader.content().await.unwrap();
+
+    assert_eq!(data, "foobar 0foobar 1foobar 2foobar 3foobar 4");
+}

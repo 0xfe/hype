@@ -1,5 +1,6 @@
 use std::str;
 
+use std::sync::{Arc, RwLock};
 use std::{collections::HashMap, fmt};
 
 use url::Url;
@@ -108,15 +109,20 @@ pub struct Parser {
     message: Message,
     expected_chunk_size: usize,
     chunk_pos: usize,
-    body: Body,
+    body: Arc<RwLock<Body>>,
     ready: bool,
 }
 
 impl Parser {
     pub fn new(start_state: State) -> Parser {
-        let mut message = Message::Request(Request::new(crate::request::Method::GET, "/"));
+        let request = Request::new(crate::request::Method::GET, "/");
+        let mut body = Arc::clone(&request.body);
+        let mut message = Message::Request(request);
+
         if start_state == State::StartResponse {
-            message = Message::Response(Response::new(status::from(status::OK)));
+            let response = Response::new(status::from(status::OK));
+            body = Arc::clone(&response.body);
+            message = Message::Response(response);
         }
 
         Parser {
@@ -125,7 +131,7 @@ impl Parser {
             state: start_state,
             buf: Vec::with_capacity(16384),
             chunk_buf: Vec::with_capacity(16384),
-            body: Body::new(),
+            body,
             message,
             expected_chunk_size: 0,
             chunk_pos: 0,
@@ -236,7 +242,7 @@ impl Parser {
                 let parts: Vec<&str> = encoding.split(',').map(|p| p.trim()).collect();
                 if parts.contains(&"chunked") {
                     debug!("expecting chunked encoding");
-                    self.body.set_chunked();
+                    self.body.write().unwrap().set_chunked();
                     new_state = State::InChunkedBodySize;
                     has_body = true;
                 }
@@ -257,6 +263,8 @@ impl Parser {
                 let key = k.to_lowercase();
                 if key == "content-length" {
                     self.body
+                        .write()
+                        .unwrap()
                         .set_content_length(v.trim().parse::<usize>().unwrap_or(0));
                 }
 
@@ -318,11 +326,11 @@ impl Parser {
     }
 
     fn consume_body(&mut self, b: &[u8]) -> Result<bool, BodyError> {
-        self.body.append(b)
+        self.body.read().unwrap().append(b)
     }
 
     fn commit_chunk(&mut self) {
-        self.body.push_chunk(
+        self.body.read().unwrap().push_chunk(
             String::from_utf8(self.chunk_buf.clone()).unwrap_or("UTF-8 decode error".to_string()),
         );
         self.chunk_buf.clear();
@@ -395,13 +403,13 @@ impl Parser {
                 State::InBody => {
                     self.consume_body(&[*c])
                         .map_err(|e| ParseError::BodyError(e.to_string()))?;
-                    if self.body.full_contents_loaded() {
+                    if self.body.read().unwrap().full_contents_loaded() {
                         self.parse_eof()?;
                     }
                 }
                 State::EndChunkedBody => {
                     if ch == '\n' {
-                        self.body.end_chunked();
+                        self.body.read().unwrap().end_chunked();
                         self.parse_eof()?;
                         break;
                     }
@@ -427,11 +435,6 @@ impl Parser {
             || self.state == State::InHeaders
             || self.state == State::EndChunkedBody
         {
-            if self.start_state == State::StartRequest {
-                self.message.request_mut().body = self.body.clone();
-            } else {
-                self.message.response_mut().body = self.body.clone();
-            }
             self.update_state(State::ParseComplete)?;
             return Ok(());
         }

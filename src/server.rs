@@ -309,7 +309,7 @@ impl ConnectedServer {
 
                 match result {
                     Ok(0) => {
-                        // No data read, but it's possible the socket is still open.
+                        // Connection closed
                         debug!("read {} bytes", 0);
                         break 'top;
                     }
@@ -369,7 +369,7 @@ impl ConnectedServer {
             // Fell through here, no handlers match
             let mut response = Response::new(status::from(status::NOT_FOUND));
             response.set_header("Content-Type", "text/plain");
-            response.body = "Hype: no route handlers installed.".into();
+            response.set_body("Hype: no route handlers installed.".into());
             let buf = response.serialize();
             s.write_all(buf.as_bytes())
                 .await

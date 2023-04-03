@@ -61,7 +61,7 @@ impl MyHandler {
         body: String,
     ) {
         let mut response = Response::new(status::from(status));
-        response.body = body.into();
+        response.set_body(body.into());
 
         w.write_all(response.serialize().as_bytes()).await.unwrap();
     }

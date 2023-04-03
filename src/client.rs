@@ -4,13 +4,12 @@ use tokio::{
     io::{AsyncReadExt, AsyncWriteExt},
     join,
     net::{lookup_host, TcpSocket},
-    sync::Mutex,
+    sync::{mpsc, Mutex},
 };
 use tokio_rustls::{rustls, TlsConnector};
 
 use crate::{
     handler::{AsyncReadStream, AsyncWriteStream},
-    message::Message,
     parser::{self},
     request::Request,
     response::Response,
@@ -186,8 +185,8 @@ impl ConnectedClient {
             return Err(ClientError::ConnectionClosed);
         }
 
-        let data = req.serialize();
-        debug!("Sending request:\n{}", data);
+        let request_data = req.serialize();
+        debug!("Sending request:\n{}", request_data);
 
         let writer = Arc::clone(&self.writer);
         let reader = Arc::clone(&self.reader);
@@ -196,16 +195,22 @@ impl ConnectedClient {
             let result = writer
                 .lock()
                 .await
-                .write_all(data.as_bytes())
+                .write_all(request_data.as_bytes())
                 .await
                 .map_err(|e| ClientError::SendError(e.to_string()));
             (result, writer)
         });
 
-        let handle2 = tokio::spawn(async move {
+        let (tx, mut rx) = mpsc::channel(1);
+
+        // Background task to read the response. Returns the response struct as soon
+        // as the headers are read, and continues to read from the socket in the background
+        // until the entire response is read or the connection is closed.
+        tokio::spawn(async move {
             let mut stream = reader.lock().await;
 
             let mut parser = parser::ResponseParser::new();
+            let mut ready = false;
 
             loop {
                 let mut buf = [0u8; 16384];
@@ -213,55 +218,75 @@ impl ConnectedClient {
                 match stream.read(&mut buf).await {
                     Ok(0) => {
                         debug!("0 bytes read");
-                        break Err(ClientError::ConnectionClosed);
+                        _ = tx.send(Err(ClientError::ConnectionClosed)).await;
+                        break;
                     }
                     Ok(n) => {
                         debug!("{}", String::from_utf8_lossy(&buf[..n]));
-                        parser.parse_buf(&buf[..n]).map_err(|e| {
-                            ClientError::ParseError(format!("error parsing response: {}", e))
-                        })?;
+                        if let Err(e) = parser.parse_buf(&buf[..n]) {
+                            _ = tx.send(Err(ClientError::ParseError(e.to_string()))).await;
+                            break;
+                        }
 
-                        // Clients may leave the connection open, so check to see if we've
-                        // got a full request in. (Otherwise, we just block.)
+                        // No need to wait for a full request. Wait until there's enough data
+                        // in the buffer to parse the headers.
+                        if parser.ready() && !ready {
+                            _ = tx.send(Ok(parser.get_message())).await;
+                            ready = true; // only send the message once
+                        }
+
                         if parser.is_complete() {
-                            break Ok(());
+                            break;
                         }
                     }
                     Err(e) => {
                         debug!("read error: {}", e);
-                        break Err(ClientError::RecvError(e.to_string()));
+                        _ = tx.send(Err(ClientError::RecvError(e.to_string()))).await;
+                        break;
                     }
                 }
-            }?;
-
-            Ok(parser.get_message()) as Result<Message, ClientError>
+            }
         });
 
-        let (result1, result2) = join!(handle1, handle2);
+        let (result1,) = join!(handle1);
+        let message = rx.recv().await;
 
-        // Process join errors
-        if result1.is_err() || result2.is_err() {
+        // Join error in the writer task
+        if result1.is_err() {
             *self.closed.lock().await = true;
         }
 
+        // Get the writer socket back from the writer task, so we can shut it down
         let (e1, writer) = result1.map_err(|e| ClientError::InternalError(e.to_string()))?;
-        let message = result2.map_err(|e| ClientError::InternalError(e.to_string()))?;
 
-        // Error sending data
+        // Error sending data, shut down the socket
         if let Err(e) = e1 {
             *self.closed.lock().await = true;
             Self::close_internal(writer).await?;
             return Err(e);
         }
 
-        // Error receiving data
-        if let Err(e) = message {
+        if let Some(message) = message {
+            // Error receiving data, shut down the socket
+            if message.is_err() {
+                *self.closed.lock().await = true;
+                Self::close_internal(writer).await?;
+            }
+            Ok(message
+                .map_err(|e| {
+                    ClientError::InternalError(format!(
+                        "error receiving response: {}",
+                        e.to_string()
+                    ))
+                })?
+                .into())
+        } else {
             *self.closed.lock().await = true;
             Self::close_internal(writer).await?;
-            return Err(e);
+            Err(ClientError::InternalError(
+                "error receiving response".to_string(),
+            ))
         }
-
-        Ok(message.unwrap().into())
     }
 
     async fn close_internal(

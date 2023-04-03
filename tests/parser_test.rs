@@ -198,11 +198,14 @@ A
     assert!(response.is_some());
     let response = response.unwrap();
     assert_eq!(response.status.code, 200);
-    assert_eq!(response.body.full_content(), "123451234567890");
+    assert_eq!(
+        response.body.read().unwrap().full_content(),
+        "123451234567890"
+    );
 }
 
-#[test]
-fn chunked_body1() {
+#[tokio::test]
+async fn chunked_body1() {
     let response = assert_parse_response_ok(
         r##"HTTP/1.1 200 OK
 Host: localhost:4000
@@ -210,11 +213,12 @@ Set-Cookie: foo=bar
 Transfer-Encoding: chunked
 
 0
+
 "##,
     );
 
     assert!(response.is_some());
     let response = response.unwrap();
     assert_eq!(response.status.code, 200);
-    assert_eq!(response.body.full_content(), "");
+    assert_eq!(response.content().await.unwrap(), "");
 }
