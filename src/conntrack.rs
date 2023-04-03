@@ -3,12 +3,16 @@ use std::{collections::HashMap, fmt, sync::Arc, time::Duration};
 use futures::StreamExt;
 use rand::{thread_rng, Rng};
 use tokio::{
+    io::split,
     select,
     sync::{mpsc, Mutex, Notify, RwLock},
 };
 use tokio_util::time::DelayQueue;
 
-use crate::{client::ConnectedClient, handler::AsyncStream};
+use crate::{
+    client::ConnectedClient,
+    handler::{AsyncReadStream, AsyncStream, AsyncWriteStream},
+};
 
 #[derive(Debug, Clone, Hash, Eq, PartialEq)]
 pub struct ConnId(pub String);
@@ -50,16 +54,6 @@ impl ConnTracker {
         let id = conn.id.clone();
         self.conns.write().unwrap().insert(id.clone(), conn.clone());
         conn
-    }
-
-    pub async fn stream(&self, id: &ConnId) -> Result<Arc<RwLock<Box<dyn AsyncStream>>>, String> {
-        Ok(self
-            .conns
-            .read()
-            .unwrap()
-            .get(id)
-            .ok_or(format!("could not get conn {}", id.0))?
-            .stream())
     }
 
     pub async fn set_keepalive_timeout(&self, id: ConnId, dur: Duration) {
@@ -108,7 +102,8 @@ pub struct ConnState {
 #[derive(Clone)]
 pub struct Conn {
     id: ConnId,
-    stream: Arc<RwLock<Box<dyn AsyncStream>>>,
+    read_stream: Arc<RwLock<Box<dyn AsyncReadStream>>>,
+    write_stream: Arc<RwLock<Box<dyn AsyncWriteStream>>>,
     backend_client: Arc<RwLock<Option<ConnectedClient>>>, // for Lb
     timeout_notifier: Arc<Notify>,
     pub state: Arc<std::sync::RwLock<ConnState>>,
@@ -122,6 +117,8 @@ impl fmt::Debug for Conn {
 
 impl Conn {
     pub fn new(stream: Box<dyn AsyncStream>) -> Self {
+        let (reader, writer) = split(stream);
+
         Self {
             id: ConnId(
                 thread_rng()
@@ -130,7 +127,8 @@ impl Conn {
                     .map(char::from)
                     .collect(),
             ),
-            stream: Arc::new(RwLock::new(stream)),
+            read_stream: Arc::new(RwLock::new(Box::new(reader))),
+            write_stream: Arc::new(RwLock::new(Box::new(writer))),
             backend_client: Arc::new(RwLock::new(None)),
             timeout_notifier: Arc::new(Notify::new()),
             state: Arc::new(std::sync::RwLock::new(ConnState {
@@ -145,8 +143,12 @@ impl Conn {
         &self.id
     }
 
-    pub fn stream(&self) -> Arc<RwLock<Box<dyn AsyncStream>>> {
-        Arc::clone(&self.stream)
+    pub fn reader(&self) -> Arc<RwLock<Box<dyn AsyncReadStream>>> {
+        Arc::clone(&self.read_stream)
+    }
+
+    pub fn writer(&self) -> Arc<RwLock<Box<dyn AsyncWriteStream>>> {
+        Arc::clone(&self.write_stream)
     }
 
     pub fn backend_client(&self) -> Arc<RwLock<Option<ConnectedClient>>> {

@@ -63,9 +63,11 @@ curl --insecure https://localhost:4000
     -   [x] factor Body into parser
     -   [x] support streaming of chunked bodies
         -   [x] futures::Stream implementation for chunked body
-        -   [ ] return error for body() if chunked and not complete
-    -   [ ] plumb chunked streams through server / LB
--   [ ] use futures::Stream for non-chunked bodies too, forward every read
+        -   [x] return error for body() if chunked and not complete
+    -   [x] plumb chunked/content streams through client::Client
+    -   [x] plumb chunked streams through server
+    -   [ ] connect client and server streams through LB
+-   [x] use futures::Stream for non-chunked bodies too, forward every read
 
 ## TODO
 

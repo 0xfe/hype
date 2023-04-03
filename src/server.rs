@@ -203,7 +203,7 @@ impl Server {
 
                 if let Err(err) = stream.process_connection().await {
                     warn!("server error: {err}");
-                    _ = stream.conn.stream().write().await.shutdown().await;
+                    _ = stream.conn.writer().write().await.shutdown().await;
                 }
             });
         }
@@ -266,10 +266,6 @@ impl ConnectedServer {
     }
 
     async fn process_connection(&mut self) -> Result<(), String> {
-        let s1 = self.conn.stream();
-        let mut s = s1.write().await;
-        let timeout_notifier = self.conn.timeout_notifier();
-
         /*
         info!(
             "Connection ID {} received from {:?}",
@@ -278,66 +274,90 @@ impl ConnectedServer {
         );
         */
 
+        // This loop is iterated over for each Request in the same connection.
         'top: loop {
+            let conn = self.conn.clone();
+            let reader = conn.reader();
+            let writer = conn.writer();
+            let timeout_notifier = self.conn.timeout_notifier();
+            let shutdown_notifier = Arc::clone(&self.shutdown_notifier);
+
             if self.close_connection {
                 // We received `Connection: close`
-                _ = s.shutdown().await;
+                _ = conn.writer().write().await.shutdown().await;
                 break;
             }
 
             let mut parser = RequestParser::new();
             parser.set_base_url(&self.base_url);
+            let mut ready = false;
+
+            let (tx, mut rx) = mpsc::channel(1);
 
             // We're trying to keep the connection open here, and keep parsing requests until
             // the socket is closed.
+            tokio::spawn(async move {
+                let mut s = reader.write().await;
 
-            // CHUNK: is_ready()
-            while !parser.is_complete() {
-                let mut buf = [0u8; 16384];
+                while !parser.is_complete() {
+                    let mut buf = [0u8; 16384];
 
-                let result = tokio::select! {
-                    r = s.read(&mut buf) => r,
-                    _ = self.shutdown_notifier.notified() => {
-                        debug!("Shutting down connection {}...", &self.conn.id());
-                        break 'top;
-                    }
-                    _ = timeout_notifier.notified() => {
-                        debug!("Keepalive timeout for connection {}...", &self.conn.id());
-                        break 'top;
-                    }
-                };
+                    let result = tokio::select! {
+                        r = s.read(&mut buf) => r,
+                        _ = shutdown_notifier.notified() => {
+                            debug!("Shutting down connection {}...", &conn.id());
+                            tx.send(Err("Shutting down".to_string())).await.unwrap();
+                            break;
+                        }
+                        _ = timeout_notifier.notified() => {
+                            debug!("Keepalive timeout for connection {}...", &conn.id());
+                            tx.send(Err("Keepalive timeout".to_string())).await.unwrap();
+                            break;
+                        }
+                    };
 
-                match result {
-                    Ok(0) => {
-                        // Connection closed
-                        debug!("read {} bytes", 0);
-                        break 'top;
-                    }
-                    Ok(n) => {
-                        debug!("read {} bytes", n);
-                        parser.parse_buf(&buf[..n]).map_err(|e| e.to_string())?;
-                    }
-                    Err(e) => {
-                        // Socket is closed, exit this method right away.
-                        debug!("connection closed: {:?}", e);
-                        break 'top;
+                    match result {
+                        Ok(0) => {
+                            // Connection closed
+                            debug!("read {} bytes", 0);
+                            tx.send(Err("Connection closed".to_string())).await.unwrap();
+                            break;
+                        }
+                        Ok(n) => {
+                            debug!("read {} bytes", n);
+                            let result = parser.parse_buf(&buf[..n]);
+                            if let Err(e) = result {
+                                tx.send(Err(e.to_string())).await.unwrap();
+                                break;
+                            }
+
+                            if parser.ready() && !ready {
+                                tx.send(Ok(parser.get_message())).await.unwrap();
+                                ready = true; // send this only once
+                            }
+                        }
+                        Err(e) => {
+                            // Socket is closed, exit this method right away.
+                            debug!("connection closed: {:?}", e);
+                            tx.send(Err("Connection closed".to_string())).await.unwrap();
+                            break;
+                        }
                     }
                 }
+            });
+
+            let message = rx.recv().await.unwrap();
+            if message.is_err() {
+                // Connection closed
+                break;
             }
 
-            // CHUNK: inc_chunk_count()
             if self.conn.inc_request_count() {
-                _ = s.shutdown().await;
+                _ = self.conn.writer().write().await.shutdown().await;
                 break 'top;
             }
 
-            // CHUNK: match (request vs. chunk)
-            //  if chunk:
-            //      response.push_chunk(...)
-            //  else:
-            //      follow path below
-            // If we're here, then the parser has parsed a full request payload.
-            let mut request: Request = parser.get_message().into();
+            let mut request: Request = message.unwrap().into();
             request.set_header("X-Hype-Connection-ID", self.conn.id().clone());
             request.set_conn(self.conn.clone());
             self.process_headers(&request.headers).await;
@@ -352,6 +372,7 @@ impl ConnectedServer {
             for handler in self.handlers.read().await.iter() {
                 if let Some(matched_path) = handler.0.matches(&path) {
                     request.handler_path = Some(String::from(matched_path.to_string_lossy()));
+                    let mut s = writer.write().await;
                     if let Err(error) = handler.1.handle(&request, &mut *s).await {
                         error!("Error from handler {:?}: {:?}", handler, error);
                     }
@@ -360,6 +381,7 @@ impl ConnectedServer {
             }
 
             if let Some(handler) = &self.default_handler {
+                let mut s = writer.write().await;
                 if let Err(error) = handler.read().await.handle(&request, &mut *s).await {
                     error!("Error from handler {:?}: {:?}", handler, error);
                 }
@@ -371,6 +393,7 @@ impl ConnectedServer {
             response.set_header("Content-Type", "text/plain");
             response.set_body("Hype: no route handlers installed.".into());
             let buf = response.serialize();
+            let mut s = writer.write().await;
             s.write_all(buf.as_bytes())
                 .await
                 .map_err(|e| format!("could not write to socket: {e}"))?;

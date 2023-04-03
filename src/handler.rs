@@ -65,6 +65,9 @@ impl AsyncStream for Box<dyn AsyncStream> {}
 impl AsyncReadStream for Box<dyn AsyncStream> {}
 impl AsyncWriteStream for Box<dyn AsyncStream> {}
 
+impl AsyncReadStream for Box<dyn AsyncReadStream> {}
+impl AsyncWriteStream for Box<dyn AsyncWriteStream> {}
+
 #[async_trait]
 pub trait Handler: Send + Sync {
     async fn new_connection(&self, _id: ConnId) -> Result<(), Error> {
