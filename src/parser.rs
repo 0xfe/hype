@@ -109,6 +109,7 @@ pub struct Parser {
     expected_chunk_size: usize,
     chunk_pos: usize,
     body: Body,
+    ready: bool,
 }
 
 impl Parser {
@@ -128,8 +129,14 @@ impl Parser {
             message,
             expected_chunk_size: 0,
             chunk_pos: 0,
+            ready: false,
         }
     }
+
+    pub fn ready(&self) -> bool {
+        self.ready
+    }
+
     pub fn set_base_url(&mut self, base_url: impl Into<String>) {
         self.base_url = base_url.into();
     }
@@ -234,6 +241,9 @@ impl Parser {
                     has_body = true;
                 }
             }
+
+            // Exiting headers, ready for body
+            self.ready = true;
 
             if has_body {
                 result = self.update_state(new_state);

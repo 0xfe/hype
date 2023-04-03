@@ -5,7 +5,7 @@ use std::{
     task::{Context, Poll, Waker},
 };
 
-use futures::Stream;
+use futures::{Stream, StreamExt};
 
 #[derive(Debug)]
 pub enum BodyError {
@@ -37,13 +37,10 @@ enum Content {
     Full(Arc<RwLock<ContentState>>),
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct Chunk(pub String);
-
 #[derive(Debug, Clone)]
 struct ChunkState {
     // chunked body
-    chunks: Vec<Chunk>,
+    chunks: Vec<String>,
 
     // no more chunks
     complete: bool,
@@ -138,7 +135,7 @@ impl Body {
                 let mut wakers = vec![];
                 {
                     let mut chunk_state = state.write().unwrap();
-                    chunk_state.chunks.push(Chunk(chunk.into()));
+                    chunk_state.chunks.push(chunk.into());
                     std::mem::swap(&mut wakers, &mut chunk_state.wakers);
                 }
                 wakers.iter().for_each(|w| w.wake_by_ref());
@@ -165,7 +162,7 @@ impl Body {
         }
     }
 
-    pub fn get_chunk(&self, i: usize, waker: Waker) -> Result<Chunk, bool> {
+    pub fn get_chunk(&self, i: usize, waker: Waker) -> Result<String, bool> {
         match &self.content {
             Content::Full(_) => panic!("not chunked"),
             Content::Chunked(state) => {
@@ -251,7 +248,7 @@ impl Body {
                 chunk_state
                     .chunks
                     .iter()
-                    .map(|c| c.0.clone())
+                    .map(|c| c.clone())
                     .collect::<Vec<String>>()
                     .join("")
                     .to_string()
@@ -260,35 +257,25 @@ impl Body {
     }
 
     /// Return the full body as a string, only if it's complete.
-    pub fn content(&self) -> Result<String, BodyError> {
+    pub async fn content(&self) -> Result<String, BodyError> {
         match &self.content {
-            Content::Full(body) => {
-                if !self.full_contents_loaded() {
-                    return Err(BodyError::IncompleteBody);
-                }
-
-                String::from_utf8(body.read().unwrap().content.clone())
-                    .map_err(|e| BodyError::UTF8DecodeFailed(e.to_string()))
-            }
-            Content::Chunked(state) => {
-                let chunk_state = state.read().unwrap();
-
-                if !chunk_state.complete {
-                    Err(BodyError::IncompleteBody)
-                } else {
-                    Ok(chunk_state
-                        .chunks
-                        .iter()
-                        .map(|c| c.0.clone())
-                        .collect::<Vec<String>>()
-                        .join("")
-                        .to_string())
-                }
-            }
+            Content::Full(_) => Ok(String::from_utf8(self.content_stream().concat().await)
+                .map_err(|e| BodyError::UTF8DecodeFailed(e.to_string()))?),
+            Content::Chunked(_) => Ok(String::from_utf8(
+                self.chunk_stream()
+                    .map(|c| c.as_bytes().to_vec())
+                    .concat()
+                    .await,
+            )
+            .map_err(|e| BodyError::UTF8DecodeFailed(e.to_string()))?),
         }
     }
 
     pub fn content_stream(&self) -> ContentStream {
+        if let Content::Chunked(_) = self.content {
+            panic!("content_stream(): chunked content")
+        }
+
         ContentStream {
             current_pos: 0,
             body: self,
@@ -297,7 +284,7 @@ impl Body {
 
     pub fn chunk_stream(&self) -> BodyStream {
         if let Content::Full(_) = self.content {
-            panic!("stream(): not chunked")
+            panic!("chunk_stream(): not chunked")
         }
 
         BodyStream {
@@ -313,9 +300,9 @@ pub struct BodyStream<'a> {
 }
 
 impl<'a> Stream for BodyStream<'a> {
-    type Item = Chunk;
+    type Item = String;
 
-    fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Chunk>> {
+    fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<String>> {
         let chunk = self.body.get_chunk(self.current_chunk, cx.waker().clone());
 
         match chunk {

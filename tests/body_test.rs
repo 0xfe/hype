@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use futures::StreamExt;
-use hype::body::{Body, Chunk};
+use hype::body::Body;
 
 #[tokio::test]
 async fn it_works() {
@@ -14,8 +14,8 @@ async fn it_works() {
 
     let mut stream = body.chunk_stream();
 
-    assert_eq!(stream.next().await.unwrap(), Chunk("foobar".into()));
-    assert_eq!(stream.next().await.unwrap(), Chunk("blah".into()));
+    assert_eq!(stream.next().await.unwrap(), "foobar".to_string());
+    assert_eq!(stream.next().await.unwrap(), "blah".to_string());
     assert_eq!(stream.next().await, None);
 }
 
@@ -72,7 +72,7 @@ async fn it_works_with_multiple_streams() {
     }
 
     while let Some(chunk) = stream2.next().await {
-        println!("got chunk: {}", chunk.0);
+        println!("got chunk: {}", chunk);
         count += 1;
     }
 
@@ -144,4 +144,26 @@ async fn it_works_with_content_stream_multiple_writers() {
     }
 
     assert_eq!(count, 6);
+}
+
+#[tokio::test]
+async fn read_all() {
+    let mut body = Body::new();
+    body.set_content_length(40);
+
+    let body_writer = Arc::new(body);
+    let body_reader = Arc::clone(&body_writer);
+
+    tokio::spawn(async move {
+        for i in 0..5 {
+            body_writer
+                .append(format!("foobar {i}").as_bytes())
+                .unwrap();
+            tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
+        }
+    });
+
+    let data = body_reader.content().await.unwrap();
+
+    assert_eq!(data, "foobar 0foobar 1foobar 2foobar 3foobar 4");
 }
