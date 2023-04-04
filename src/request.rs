@@ -1,8 +1,4 @@
-use std::{
-    collections::HashMap,
-    str::FromStr,
-    sync::{Arc, RwLock},
-};
+use std::{collections::HashMap, str::FromStr};
 
 use url::Url;
 
@@ -50,7 +46,7 @@ pub struct Request {
     pub url: Option<Url>,
     pub base_url: String,
     pub handler_path: Option<String>,
-    pub body: Arc<RwLock<Body>>,
+    pub body: Body,
     conn: Option<Conn>,
 }
 
@@ -79,7 +75,7 @@ impl Request {
             method,
             version: String::new(),
             headers: HashMap::new(),
-            body: Arc::new(RwLock::new(Body::new())),
+            body: Body::new(),
             conn: None,
         };
 
@@ -96,7 +92,7 @@ impl Request {
     }
 
     pub async fn content(&self) -> Result<String, BodyError> {
-        self.body.read().unwrap().content().await
+        self.body.content().await
     }
 
     pub fn set_conn(&mut self, conn: Conn) {
@@ -122,7 +118,7 @@ impl Request {
         let mut result: HashMap<String, String> = HashMap::new();
         if let Some(content_type) = self.headers.get("content-type") {
             if *content_type == "application/x-www-form-urlencoded".to_string() {
-                let content = self.body.read().unwrap().full_content();
+                let content = self.body.full_content();
                 let parts = content.split('&');
 
                 parts.for_each(|part| {
@@ -204,7 +200,7 @@ impl Request {
 
         r.push_str("\r\n");
 
-        let content = self.body.read().unwrap().full_content();
+        let content = self.body.full_content();
         if !content.is_empty() {
             r.push_str(format!("Content-Length: {}\r\n\r\n", content.chars().count()).as_str());
             r.push_str(content.as_str());

@@ -1,11 +1,10 @@
 use std::str;
 
-use std::sync::{Arc, RwLock};
 use std::{collections::HashMap, fmt};
 
 use url::Url;
 
-use crate::body::{Body, BodyError};
+use crate::body::BodyError;
 use crate::message::Message;
 use crate::{
     request::{Request, VALID_METHODS},
@@ -102,36 +101,30 @@ impl ResponseParser {
 #[derive(Debug)]
 pub struct Parser {
     base_url: String,
-    start_state: State,
     state: State,
     buf: Vec<u8>,
     chunk_buf: Vec<u8>,
     message: Message,
     expected_chunk_size: usize,
     chunk_pos: usize,
-    body: Arc<RwLock<Body>>,
     ready: bool,
 }
 
 impl Parser {
-    pub fn new(start_state: State) -> Parser {
+    pub fn new(start_state: State) -> Self {
         let request = Request::new(crate::request::Method::GET, "/");
-        let mut body = Arc::clone(&request.body);
         let mut message = Message::Request(request);
 
         if start_state == State::StartResponse {
             let response = Response::new(status::from(status::OK));
-            body = Arc::clone(&response.body);
             message = Message::Response(response);
         }
 
-        Parser {
+        Self {
             base_url: "http://UNSET".into(),
-            start_state: start_state.clone(),
             state: start_state,
             buf: Vec::with_capacity(16384),
             chunk_buf: Vec::with_capacity(16384),
-            body,
             message,
             expected_chunk_size: 0,
             chunk_pos: 0,
@@ -219,16 +212,9 @@ impl Parser {
         let mut result: Result<(), ParseError> = Ok(());
         let header_line = std::str::from_utf8(&self.buf[..]).unwrap();
 
-        let headers;
-        if self.start_state == State::StartResponse {
-            let response = self.message.response_mut();
-            headers = &mut response.headers;
-        } else {
-            let request = self.message.request_mut();
-            headers = &mut request.headers;
-        }
-
         if header_line == "\r" || header_line == "" {
+            let headers = self.message.headers_mut();
+
             let mut has_body = false;
             let mut new_state = State::InBody;
 
@@ -242,7 +228,8 @@ impl Parser {
                 let parts: Vec<&str> = encoding.split(',').map(|p| p.trim()).collect();
                 if parts.contains(&"chunked") {
                     debug!("expecting chunked encoding");
-                    self.body.write().unwrap().set_chunked();
+                    let body = self.message.body_mut();
+                    body.set_chunked();
                     new_state = State::InChunkedBodySize;
                     has_body = true;
                 }
@@ -262,13 +249,11 @@ impl Parser {
             if let Some((k, v)) = header_line.split_once(':') {
                 let key = k.to_lowercase();
                 if key == "content-length" {
-                    self.body
-                        .write()
-                        .unwrap()
-                        .set_content_length(v.trim().parse::<usize>().unwrap_or(0));
+                    let body = self.message.body_mut();
+                    body.set_content_length(v.trim().parse::<usize>().unwrap_or(0));
                 }
 
-                headers.insert(key, v.trim().into());
+                self.message.headers_mut().insert(key, v.trim().into());
             } else {
                 result = Err(ParseError::BadHeaderLine(header_line.into()));
             }
@@ -326,11 +311,11 @@ impl Parser {
     }
 
     fn consume_body(&mut self, b: &[u8]) -> Result<bool, BodyError> {
-        self.body.read().unwrap().append(b)
+        self.message.body_mut().append(b)
     }
 
     fn commit_chunk(&mut self) {
-        self.body.read().unwrap().push_chunk(
+        self.message.body_mut().push_chunk(
             String::from_utf8(self.chunk_buf.clone()).unwrap_or("UTF-8 decode error".to_string()),
         );
         self.chunk_buf.clear();
@@ -403,13 +388,13 @@ impl Parser {
                 State::InBody => {
                     self.consume_body(&[*c])
                         .map_err(|e| ParseError::BodyError(e.to_string()))?;
-                    if self.body.read().unwrap().full_contents_loaded() {
+                    if self.message.body_mut().full_contents_loaded() {
                         self.parse_eof()?;
                     }
                 }
                 State::EndChunkedBody => {
                     if ch == '\n' {
-                        self.body.read().unwrap().end_chunked();
+                        self.message.body_mut().end_chunked();
                         self.parse_eof()?;
                         break;
                     }

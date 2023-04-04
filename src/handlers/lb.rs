@@ -1,6 +1,7 @@
 use std::sync::Arc;
 
 use async_trait::async_trait;
+use futures::StreamExt;
 use tokio::{io::AsyncWriteExt, sync::RwLock};
 
 use crate::{
@@ -28,7 +29,7 @@ impl<P: Picker<HttpBackend> + Sync + Send> Handler for Lb<P> {
         r: &Request,
         w: &mut dyn AsyncWriteStream,
     ) -> Result<handler::Ok, handler::Error> {
-        let mut response = self
+        let response = self
             .lb
             .read()
             .await
@@ -36,7 +37,23 @@ impl<P: Picker<HttpBackend> + Sync + Send> Handler for Lb<P> {
             .await
             .map_err(|e| handler::Error::Failed(e.to_string()))?;
 
-        w.write_all(response.serialize().as_bytes()).await.unwrap();
+        w.write_all(response.serialize_headers().as_bytes())
+            .await
+            .unwrap();
+
+        w.write_all("\r\n\r\n".as_bytes()).await.unwrap();
+
+        if response.body.chunked() {
+            let mut stream = response.body.chunk_stream();
+            while let Some(chunk) = stream.next().await {
+                w.write_all(chunk.as_bytes()).await.unwrap();
+            }
+        } else {
+            let mut stream = response.body.content_stream();
+            while let Some(content) = stream.next().await {
+                w.write_all(content.as_slice()).await.unwrap();
+            }
+        }
         Ok(handler::Ok::Done)
     }
 }

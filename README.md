@@ -57,17 +57,8 @@ curl --insecure https://localhost:4000
 
 ## In Progress
 
--   [ ] Support chunked forwarding (encoding support done)
-    -   [x] remove pub fields in request and response
-    -   [x] factor Body into request and response
-    -   [x] factor Body into parser
-    -   [x] support streaming of chunked bodies
-        -   [x] futures::Stream implementation for chunked body
-        -   [x] return error for body() if chunked and not complete
-    -   [x] plumb chunked/content streams through client::Client
-    -   [x] plumb chunked streams through server
-    -   [ ] connect client and server streams through LB
--   [x] use futures::Stream for non-chunked bodies too, forward every read
+-   [ ] L4 proxy
+-   [ ] Transfer-Encoding: gzip (note Content-Encoding and Accept-Encoding too)
 
 ## TODO
 
@@ -78,8 +69,6 @@ curl --insecure https://localhost:4000
     -   Keep-Alive, Transfer-Encoding, TE, Connection, Trailer, Upgrade, Proxy-Authorization and Proxy-Authenticate
     -   Maybe okay to propagate keep-alive and connection headers.
 -   [ ] Cache control headers
--   [ ] L4 proxy
--   [ ] Transfer-Encoding: gzip (note Content-Encoding and Accept-Encoding too)
 -   [ ] CLI with https://docs.rs/argh/latest/argh/
 -   [ ] Use templating + #include to make file browser look better
     -   templating engine with https://crates.io/crates/tera
@@ -88,6 +77,18 @@ curl --insecure https://localhost:4000
 -   [ ] Errors should be derived from error::Error -- see cookie.rs
 -   [ ] Support multiple headers with the same key
     -   bad request (400) if multiple host headers
+-   [x] Support streaming forwarding (encoding support done)
+    -   [x] remove pub fields in request and response
+    -   [x] factor Body into request and response
+    -   [x] factor Body into parser
+    -   [x] support streaming of chunked bodies
+        -   [x] futures::Stream implementation for chunked body
+        -   [x] return error for body() if chunked and not complete
+    -   [x] plumb chunked/content streams through client::Client
+    -   [x] plumb chunked streams through server
+    -   [x] connect client and server streams through LB
+-   [x] use futures::Stream for non-chunked bodies too, forward every read
+
 -   [x] Add additional configuration schema for LB handlers
     -   [x] host rewrite
     -   [x] cert files

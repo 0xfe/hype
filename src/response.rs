@@ -1,7 +1,4 @@
-use std::{
-    collections::HashMap,
-    sync::{Arc, RwLock},
-};
+use std::collections::HashMap;
 
 use crate::{
     body::{Body, BodyError},
@@ -15,7 +12,7 @@ pub struct Response {
     pub version: String,
     pub status: status::Status,
     pub headers: HashMap<String, String>,
-    pub body: Arc<RwLock<Body>>,
+    pub body: Body,
     pub cookies: Vec<Cookie>,
 }
 
@@ -28,16 +25,6 @@ impl From<Message> for Response {
         panic!("value is not a response")
     }
 }
-
-// CHUNK:
-//  - response.set_chunked();
-//    response.push_chunk(); ...
-//    response.end_chunks();
-//
-//  response.body only returns full body, or chunk error.
-//  alternate API:
-//  - response.get_chunk();
-//    response.try_get_chunk();
 
 impl Response {
     // This is just for testing. It parses the body as a set of newline strings,
@@ -84,7 +71,7 @@ impl Response {
             status,
             headers,
             cookies: vec![],
-            body: Arc::new(RwLock::new(Body::new())),
+            body: Body::new(),
         })
     }
 
@@ -94,16 +81,16 @@ impl Response {
             status,
             headers: HashMap::new(),
             cookies: vec![],
-            body: Arc::new(RwLock::new(Body::new())),
+            body: Body::new(),
         }
     }
 
-    pub fn set_body(&self, body: Body) {
-        *self.body.write().unwrap() = body;
+    pub fn set_body(&mut self, body: Body) {
+        self.body = body;
     }
 
     pub async fn content(&self) -> Result<String, BodyError> {
-        self.body.read().unwrap().content().await
+        self.body.content().await
     }
 
     pub fn set_header(&mut self, key: impl Into<String>, value: impl Into<String>) -> &mut Self {
@@ -125,9 +112,22 @@ impl Response {
         self
     }
 
+    pub fn serialize_headers(&self) -> String {
+        let status_line = format!("HTTP/1.1 {} {}", self.status.code, self.status.text);
+
+        let headers: String = self
+            .headers
+            .iter()
+            .map(|(k, v)| format!("{}: {}", k, v))
+            .collect::<Vec<String>>()
+            .join("\r\n");
+
+        format!("{status_line}\r\n{headers}")
+    }
+
     pub fn serialize(&mut self) -> String {
         let status_line = format!("HTTP/1.1 {} {}", self.status.code, self.status.text);
-        let length = self.body.read().unwrap().full_content().len();
+        let length = self.body.full_content().len();
         if length > 0 {
             self.set_header("Content-Length", length.to_string());
         }
@@ -148,7 +148,7 @@ impl Response {
 
         let buf = format!(
             "{status_line}\r\n{headers}\r\n{cookie_headers}\r\n{}",
-            self.body.read().unwrap().full_content()
+            self.body.full_content()
         );
 
         buf

@@ -1,4 +1,6 @@
-use crate::{request::Request, response::Response};
+use std::collections::HashMap;
+
+use crate::{body::Body, request::Request, response::Response};
 
 #[derive(Debug, Clone)]
 pub enum Message {
@@ -38,5 +40,21 @@ impl Message {
         }
 
         panic!("message is not a response")
+    }
+
+    pub fn body_mut(&mut self) -> &mut Body {
+        match self {
+            Message::Request(r) => &mut r.body,
+            Message::Response(r) => &mut r.body,
+            _ => panic!("message is not a request or response"),
+        }
+    }
+
+    pub fn headers_mut(&mut self) -> &mut HashMap<String, String> {
+        match self {
+            Message::Request(r) => &mut r.headers,
+            Message::Response(r) => &mut r.headers,
+            _ => panic!("message is not a request or response"),
+        }
     }
 }

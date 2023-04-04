@@ -198,10 +198,7 @@ A
     assert!(response.is_some());
     let response = response.unwrap();
     assert_eq!(response.status.code, 200);
-    assert_eq!(
-        response.body.read().unwrap().full_content(),
-        "123451234567890"
-    );
+    assert_eq!(response.body.full_content(), "123451234567890");
 }
 
 #[tokio::test]
