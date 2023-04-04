@@ -127,7 +127,7 @@ impl Response {
 
     pub fn serialize(&mut self) -> String {
         let status_line = format!("HTTP/1.1 {} {}", self.status.code, self.status.text);
-        let length = self.body.full_content().len();
+        let length = self.body.try_content().len();
         if length > 0 {
             self.set_header("Content-Length", length.to_string());
         }
@@ -148,7 +148,7 @@ impl Response {
 
         let buf = format!(
             "{status_line}\r\n{headers}\r\n{cookie_headers}\r\n{}",
-            self.body.full_content()
+            self.body.try_content()
         );
 
         buf

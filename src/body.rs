@@ -233,17 +233,14 @@ impl Body {
         }
     }
 
-    /// Return the full body as a string
-    pub fn full_content(&self) -> String {
+    /// Return as much of the body as is available.
+    pub fn try_content(&self) -> String {
         match &self.content {
-            Content::Full(body) => String::from_utf8(body.read().unwrap().content.clone())
-                .unwrap_or("UTF-8 Decode Failed".to_string()),
+            Content::Full(body) => {
+                String::from_utf8_lossy(body.read().unwrap().content.as_slice()).to_string()
+            }
             Content::Chunked(state) => {
                 let chunk_state = state.read().unwrap();
-
-                if !chunk_state.complete {
-                    panic!("body(): incomplete chunks")
-                }
 
                 chunk_state
                     .chunks
@@ -256,7 +253,7 @@ impl Body {
         }
     }
 
-    /// Return the full body as a string, only if it's complete.
+    /// Return the full body as a string, blocking until it's complete.
     pub async fn content(&self) -> Result<String, BodyError> {
         match &self.content {
             Content::Full(_) => Ok(String::from_utf8(self.content_stream().concat().await)

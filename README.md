@@ -57,6 +57,7 @@ curl --insecure https://localhost:4000
 
 ## In Progress
 
+-   [ ] Build balancer end-to-end unit tests
 -   [ ] L4 proxy
 -   [ ] Transfer-Encoding: gzip (note Content-Encoding and Accept-Encoding too)
 

@@ -118,7 +118,7 @@ impl Request {
         let mut result: HashMap<String, String> = HashMap::new();
         if let Some(content_type) = self.headers.get("content-type") {
             if *content_type == "application/x-www-form-urlencoded".to_string() {
-                let content = self.body.full_content();
+                let content = self.body.try_content();
                 let parts = content.split('&');
 
                 parts.for_each(|part| {
@@ -200,7 +200,7 @@ impl Request {
 
         r.push_str("\r\n");
 
-        let content = self.body.full_content();
+        let content = self.body.try_content();
         if !content.is_empty() {
             r.push_str(format!("Content-Length: {}\r\n\r\n", content.chars().count()).as_str());
             r.push_str(content.as_str());
