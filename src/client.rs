@@ -3,7 +3,6 @@ use std::{error, fmt, net::SocketAddr, sync::Arc};
 use futures::StreamExt;
 use tokio::{
     io::{AsyncReadExt, AsyncWriteExt},
-    join,
     net::{lookup_host, TcpSocket},
     sync::{mpsc, Mutex},
 };
@@ -187,6 +186,7 @@ impl ConnectedClient {
         }
 
         let writer = Arc::clone(&self.writer);
+        let closed = Arc::clone(&self.closed);
         let reader = Arc::clone(&self.reader);
         let request_data = req.serialize();
 
@@ -199,32 +199,35 @@ impl ConnectedClient {
             content_stream = Some(req.body.content_stream());
         }
 
-        let handle1 = tokio::spawn(async move {
-            let result;
+        tokio::spawn(async move {
+            let mut stream = writer.lock().await;
+            debug!("Sending request:\n{}", request_data);
 
-            {
-                let mut stream = writer.lock().await;
-                debug!("Sending request:\n{}", request_data);
+            if let Err(e) = stream.write_all(request_data.as_bytes()).await {
+                warn!("error writing to socket: {}", e);
+                *closed.lock().await = true;
+                _ = stream.shutdown().await;
+            }
 
-                result = stream
-                    .write_all(request_data.as_bytes())
-                    .await
-                    .map_err(|e| ClientError::SendError(e.to_string()));
-
-                if let Some(mut chunk_stream) = chunk_stream {
-                    while let Some(chunk) = chunk_stream.next().await {
-                        stream.write_all(chunk.as_bytes()).await.unwrap();
-                    }
-                }
-
-                if let Some(mut content_stream) = content_stream {
-                    while let Some(content) = content_stream.next().await {
-                        stream.write_all(content.as_slice()).await.unwrap();
+            if let Some(mut chunk_stream) = chunk_stream {
+                while let Some(chunk) = chunk_stream.next().await {
+                    if let Err(e) = stream.write_all(chunk.as_bytes()).await {
+                        warn!("error writing chunk to socket: {}", e);
+                        *closed.lock().await = true;
+                        _ = stream.shutdown().await;
                     }
                 }
             }
 
-            (result, writer)
+            if let Some(mut content_stream) = content_stream {
+                while let Some(content) = content_stream.next().await {
+                    if let Err(e) = stream.write_all(content.as_slice()).await {
+                        warn!("error writing chunk to socket: {}", e);
+                        *closed.lock().await = true;
+                        _ = stream.shutdown().await;
+                    }
+                }
+            }
         });
 
         let (tx, mut rx) = mpsc::channel(1);
@@ -274,29 +277,12 @@ impl ConnectedClient {
             }
         });
 
-        let (result1,) = join!(handle1);
         let message = rx.recv().await;
-
-        // Join error in the writer task
-        if result1.is_err() {
-            *self.closed.lock().await = true;
-        }
-
-        // Get the writer socket back from the writer task, so we can shut it down
-        let (e1, writer) = result1.map_err(|e| ClientError::InternalError(e.to_string()))?;
-
-        // Error sending data, shut down the socket
-        if let Err(e) = e1 {
-            *self.closed.lock().await = true;
-            Self::close_internal(writer).await?;
-            return Err(e);
-        }
 
         if let Some(message) = message {
             // Error receiving data, shut down the socket
             if message.is_err() {
-                *self.closed.lock().await = true;
-                Self::close_internal(writer).await?;
+                self.close().await?;
             }
             Ok(message
                 .map_err(|e| {
@@ -307,8 +293,7 @@ impl ConnectedClient {
                 })?
                 .into())
         } else {
-            *self.closed.lock().await = true;
-            Self::close_internal(writer).await?;
+            self.close().await?;
             Err(ClientError::InternalError(
                 "error receiving response".to_string(),
             ))
