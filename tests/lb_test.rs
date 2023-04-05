@@ -3,17 +3,21 @@ use std::sync::{Arc, Mutex};
 use async_trait::async_trait;
 
 use hype::{
-    client,
+    client::{self, Client},
+    handlers,
     lb::{
-        backend::Backend,
-        http,
+        backend::{Backend, HttpBackend},
+        http::{self, Http},
         picker::{Picker, RRPicker, RandomPicker, WeightedRRPicker},
     },
-    request::Request,
+    request::{Method, Request},
     response::Response,
+    server::Server,
     status,
 };
+use tokio::sync::{mpsc, Notify};
 
+#[macro_use]
 extern crate log;
 
 #[derive(Debug, Clone)]
@@ -141,4 +145,112 @@ async fn weighted_rr_policy() {
     assert_eq!(results[1].send_request_attempts, 4);
     assert_eq!(results[2].send_request_attempts, 2);
     assert_eq!(results[3].send_request_attempts, 8);
+}
+
+async fn start_server(port: u16, text: String) -> (Arc<mpsc::Sender<bool>>, Arc<Notify>) {
+    let handler = handlers::status::Status::new(status::from(status::OK), text);
+    let mut server = Server::new("localhost", port);
+    server.route_default(Box::new(handler));
+    let ready = server.start_notifier();
+    let shutdown = server.shutdown();
+
+    tokio::spawn(async move { server.start().await.unwrap() });
+    ready.notified().await;
+    shutdown
+}
+
+async fn shutdown_server(shutdown: (Arc<mpsc::Sender<bool>>, Arc<Notify>)) {
+    shutdown.0.send(true).await.unwrap();
+    shutdown.1.notified().await;
+}
+
+async fn start_lb_backends(
+    num_servers: usize,
+    start_port: u16,
+) -> (
+    handlers::lb::Lb<RRPicker>,
+    Vec<(Arc<mpsc::Sender<bool>>, Arc<Notify>)>,
+) {
+    let mut shutdowns = vec![];
+    let mut backends = vec![];
+
+    for i in 0..num_servers {
+        let port = start_port + i as u16;
+        debug!("Starting LB backend server on port: {}", port);
+        let shutdown = start_server(port, format!("server{}", port)).await;
+        shutdowns.push(shutdown);
+        backends.push(HttpBackend::new(format!("localhost:{}", port)));
+    }
+
+    let balancer = Http::new(backends, RRPicker::new());
+    let lb = hype::handlers::lb::Lb::new(balancer);
+
+    (lb, shutdowns)
+}
+
+// Test the load balancer with real client and server tasks
+#[tokio::test]
+async fn lb_with_client_and_server() {
+    hype::logger::init();
+    let mut shutdowns = vec![];
+    let (lb1, shutdowns1) = start_lb_backends(3, 10010).await;
+    let (lb2, shutdowns2) = start_lb_backends(3, 10020).await;
+
+    shutdowns.extend(shutdowns1);
+    shutdowns.extend(shutdowns2);
+
+    let mut lb_server = Server::new("localhost", 10099);
+    lb_server.route("/lb1".to_string(), Box::new(lb1)).await;
+    lb_server.route("/lb2".to_string(), Box::new(lb2)).await;
+
+    let lb_ready = lb_server.start_notifier();
+    let lb_shutdown = lb_server.shutdown();
+    tokio::spawn(async move { lb_server.start().await.unwrap() });
+    lb_ready.notified().await;
+
+    let mut client = Client::new("localhost:10099");
+    let mut client = client.connect().await.unwrap();
+
+    // Hit the first backend in the set
+    let response = client
+        .send_request(&Request::new(Method::GET, "/lb1"))
+        .await
+        .unwrap();
+    assert_eq!(response.body.content().await.unwrap(), "server10010");
+
+    // Connection still open, stay on the first backend
+    let response = client
+        .send_request(&Request::new(Method::GET, "/lb1"))
+        .await
+        .unwrap();
+    assert_eq!(response.body.content().await.unwrap(), "server10010");
+
+    // Force close and reopen connection
+    _ = client.close().await;
+    let mut client = Client::new("localhost:10099");
+    let mut client = client.connect().await.unwrap();
+
+    // This should hit the second backend in the set
+    let response = client
+        .send_request(&Request::new(Method::GET, "/lb1"))
+        .await
+        .unwrap();
+    assert_eq!(response.body.content().await.unwrap(), "server10012");
+
+    // Force close and reopen connection
+    _ = client.close().await;
+    let mut client = Client::new("localhost:10099");
+    let mut client = client.connect().await.unwrap();
+
+    // This should hit the first backend in the second set
+    let response = client
+        .send_request(&Request::new(Method::GET, "/lb2"))
+        .await
+        .unwrap();
+    assert_eq!(response.body.content().await.unwrap(), "server10020");
+
+    for shutdown in shutdowns {
+        shutdown_server(shutdown).await;
+    }
+    shutdown_server(lb_shutdown).await;
 }
