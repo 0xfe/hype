@@ -37,12 +37,15 @@ impl<P: Picker<HttpBackend> + Sync + Send> Handler for Lb<P> {
             .await
             .map_err(|e| handler::Error::Failed(e.to_string()))?;
 
+        // Write response headers
         w.write_all(response.serialize_headers().as_bytes())
             .await
             .unwrap();
 
+        // Write body delimeter
         w.write_all("\r\n\r\n".as_bytes()).await.unwrap();
 
+        // Write body
         if response.body.chunked() {
             let mut stream = response.body.chunk_stream();
             while let Some(chunk) = stream.next().await {

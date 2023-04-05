@@ -1,5 +1,6 @@
 use std::{error, fmt, net::SocketAddr, sync::Arc};
 
+use futures::StreamExt;
 use tokio::{
     io::{AsyncReadExt, AsyncWriteExt},
     join,
@@ -185,19 +186,44 @@ impl ConnectedClient {
             return Err(ClientError::ConnectionClosed);
         }
 
-        let request_data = req.serialize();
-        debug!("Sending request:\n{}", request_data);
-
         let writer = Arc::clone(&self.writer);
         let reader = Arc::clone(&self.reader);
+        let request_data = req.serialize();
+
+        let mut chunk_stream = None;
+        let mut content_stream = None;
+
+        if req.body.chunked() {
+            chunk_stream = Some(req.body.chunk_stream())
+        } else {
+            content_stream = Some(req.body.content_stream());
+        }
 
         let handle1 = tokio::spawn(async move {
-            let result = writer
-                .lock()
-                .await
-                .write_all(request_data.as_bytes())
-                .await
-                .map_err(|e| ClientError::SendError(e.to_string()));
+            let result;
+
+            {
+                let mut stream = writer.lock().await;
+                debug!("Sending request:\n{}", request_data);
+
+                result = stream
+                    .write_all(request_data.as_bytes())
+                    .await
+                    .map_err(|e| ClientError::SendError(e.to_string()));
+
+                if let Some(mut chunk_stream) = chunk_stream {
+                    while let Some(chunk) = chunk_stream.next().await {
+                        stream.write_all(chunk.as_bytes()).await.unwrap();
+                    }
+                }
+
+                if let Some(mut content_stream) = content_stream {
+                    while let Some(content) = content_stream.next().await {
+                        stream.write_all(content.as_slice()).await.unwrap();
+                    }
+                }
+            }
+
             (result, writer)
         });
 

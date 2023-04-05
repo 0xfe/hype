@@ -182,6 +182,24 @@ impl Request {
         }
     }
 
+    pub fn serialize_headers(&self) -> String {
+        let mut r = format!(
+            "{} {} HTTP/1.1\r\n",
+            METHODS_AS_STR.get(&self.method).unwrap(),
+            self.abs_path()
+        );
+
+        r.push_str(
+            self.headers
+                .iter()
+                .map(|(k, v)| format!("{}: {}", k, v))
+                .collect::<Vec<String>>()
+                .join("\r\n")
+                .as_str(),
+        );
+        r
+    }
+
     pub fn serialize(&self) -> String {
         let mut r = format!(
             "{} {} HTTP/1.1\r\n",

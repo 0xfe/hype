@@ -162,40 +162,6 @@ impl Body {
         }
     }
 
-    pub fn get_chunk(&self, i: usize, waker: Waker) -> Result<String, bool> {
-        match &self.content {
-            Content::Full(_) => panic!("not chunked"),
-            Content::Chunked(state) => {
-                let mut chunk_state = state.write().unwrap();
-                if i >= chunk_state.chunks.len() {
-                    if !chunk_state.complete {
-                        chunk_state.wakers.push(waker);
-                    }
-                    return Err(chunk_state.complete);
-                }
-
-                Ok(chunk_state.chunks[i].clone())
-            }
-        }
-    }
-
-    fn get_full_contents(&self, start_pos: usize, waker: Waker) -> Result<Vec<u8>, bool> {
-        match &self.content {
-            Content::Full(state) => {
-                let mut state = state.write().unwrap();
-                if start_pos >= state.content.len() {
-                    if state.content.len() != state.expected_length {
-                        state.wakers.push(waker);
-                    }
-                    return Err(state.content.len() == state.expected_length);
-                }
-
-                Ok(state.content[start_pos..].to_vec())
-            }
-            Content::Chunked(_) => panic!("chunked body"),
-        }
-    }
-
     /// Returns true if the body is complete.
     pub fn full_contents_loaded(&self) -> bool {
         match &self.content {
@@ -269,70 +235,86 @@ impl Body {
     }
 
     pub fn content_stream(&self) -> ContentStream {
-        if let Content::Chunked(_) = self.content {
+        let content_state;
+        if let Content::Full(state) = &self.content {
+            content_state = Arc::clone(&state);
+        } else {
             panic!("content_stream(): chunked content")
         }
 
         ContentStream {
+            state: content_state,
             current_pos: 0,
-            body: self,
         }
     }
 
     pub fn chunk_stream(&self) -> ChunkStream {
-        if let Content::Full(_) = self.content {
+        let chunk_state;
+        if let Content::Chunked(state) = &self.content {
+            chunk_state = Arc::clone(state);
+        } else {
             panic!("chunk_stream(): not chunked")
         }
 
         ChunkStream {
+            state: chunk_state,
             current_chunk: 0,
-            body: self,
         }
     }
 }
 
-pub struct ChunkStream<'a> {
+pub struct ChunkStream {
+    state: Arc<RwLock<ChunkState>>,
     current_chunk: usize,
-    body: &'a Body,
 }
 
-impl<'a> Stream for ChunkStream<'a> {
+impl Stream for ChunkStream {
     type Item = String;
 
     fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<String>> {
-        let chunk = self.body.get_chunk(self.current_chunk, cx.waker().clone());
-
-        match chunk {
-            Ok(chunk) => {
-                self.current_chunk += 1;
-                Poll::Ready(Some(chunk))
+        let current_chunk;
+        {
+            let mut chunk_state = self.state.write().unwrap();
+            if self.current_chunk >= chunk_state.chunks.len() {
+                if !chunk_state.complete {
+                    chunk_state.wakers.push(cx.waker().clone());
+                    return Poll::Pending;
+                }
+                return Poll::Ready(None);
             }
-            Err(true) => Poll::Ready(None),
-            Err(false) => Poll::Pending,
+            current_chunk = chunk_state.chunks[self.current_chunk].clone();
         }
+
+        self.current_chunk += 1;
+        return Poll::Ready(Some(current_chunk));
     }
 }
 
-pub struct ContentStream<'a> {
+pub struct ContentStream {
+    state: Arc<RwLock<ContentState>>,
     current_pos: usize,
-    body: &'a Body,
 }
 
-impl<'a> Stream for ContentStream<'a> {
+impl Stream for ContentStream {
     type Item = Vec<u8>;
 
     fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Vec<u8>>> {
-        let contents = self
-            .body
-            .get_full_contents(self.current_pos, cx.waker().clone());
+        let content;
 
-        match contents {
-            Ok(contents) => {
-                self.current_pos += contents.len();
-                Poll::Ready(Some(contents))
+        {
+            let mut state = self.state.write().unwrap();
+            if self.current_pos >= state.content.len() {
+                if state.content.len() != state.expected_length {
+                    state.wakers.push(cx.waker().clone());
+                    return Poll::Pending;
+                }
+                return Poll::Ready(None);
             }
-            Err(true) => Poll::Ready(None),
-            Err(false) => Poll::Pending,
+
+            content = state.content[self.current_pos..].to_vec();
         }
+
+        self.current_pos += content.len();
+        return Poll::Ready(Some(content));
     }
 }
