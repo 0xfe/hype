@@ -279,24 +279,24 @@ impl Body {
         }
     }
 
-    pub fn chunk_stream(&self) -> BodyStream {
+    pub fn chunk_stream(&self) -> ChunkStream {
         if let Content::Full(_) = self.content {
             panic!("chunk_stream(): not chunked")
         }
 
-        BodyStream {
+        ChunkStream {
             current_chunk: 0,
             body: self,
         }
     }
 }
 
-pub struct BodyStream<'a> {
+pub struct ChunkStream<'a> {
     current_chunk: usize,
     body: &'a Body,
 }
 
-impl<'a> Stream for BodyStream<'a> {
+impl<'a> Stream for ChunkStream<'a> {
     type Item = String;
 
     fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<String>> {
