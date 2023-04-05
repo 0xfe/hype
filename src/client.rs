@@ -188,7 +188,7 @@ impl ConnectedClient {
         let writer = Arc::clone(&self.writer);
         let closed = Arc::clone(&self.closed);
         let reader = Arc::clone(&self.reader);
-        let request_data = req.serialize();
+        let request_data = req.serialize_headers();
 
         let mut chunk_stream = None;
         let mut content_stream = None;
@@ -201,9 +201,12 @@ impl ConnectedClient {
 
         tokio::spawn(async move {
             let mut stream = writer.lock().await;
-            debug!("Sending request:\n{}", request_data);
+            debug!("sending request:\n{}", request_data);
 
-            if let Err(e) = stream.write_all(request_data.as_bytes()).await {
+            if let Err(e) = stream
+                .write_all(format!("{}\r\n\r\n", request_data).as_bytes())
+                .await
+            {
                 warn!("error writing to socket: {}", e);
                 *closed.lock().await = true;
                 _ = stream.shutdown().await;
@@ -251,7 +254,7 @@ impl ConnectedClient {
                         break;
                     }
                     Ok(n) => {
-                        debug!("{}", String::from_utf8_lossy(&buf[..n]));
+                        debug!("client received: {}", String::from_utf8_lossy(&buf[..n]));
                         if let Err(e) = parser.parse_buf(&buf[..n]) {
                             _ = tx.send(Err(ClientError::ParseError(e.to_string()))).await;
                             break;
