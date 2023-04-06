@@ -190,45 +190,26 @@ impl ConnectedClient {
         let reader = Arc::clone(&self.reader);
         let request_data = req.serialize_headers();
 
-        let mut chunk_stream = None;
-        let mut content_stream = None;
-
-        if req.body.chunked() {
-            chunk_stream = Some(req.body.chunk_stream())
-        } else {
-            content_stream = Some(req.body.content_stream());
-        }
+        let mut read_stream = req.body.stream();
 
         tokio::spawn(async move {
-            let mut stream = writer.lock().await;
+            let mut write_stream = writer.lock().await;
             debug!("sending request:\n{}", request_data);
 
-            if let Err(e) = stream
+            if let Err(e) = write_stream
                 .write_all(format!("{}\r\n\r\n", request_data).as_bytes())
                 .await
             {
                 warn!("error writing to socket: {}", e);
                 *closed.lock().await = true;
-                _ = stream.shutdown().await;
+                _ = write_stream.shutdown().await;
             }
 
-            if let Some(mut chunk_stream) = chunk_stream {
-                while let Some(chunk) = chunk_stream.next().await {
-                    if let Err(e) = stream.write_all(chunk.as_slice()).await {
-                        warn!("error writing chunk to socket: {}", e);
-                        *closed.lock().await = true;
-                        _ = stream.shutdown().await;
-                    }
-                }
-            }
-
-            if let Some(mut content_stream) = content_stream {
-                while let Some(content) = content_stream.next().await {
-                    if let Err(e) = stream.write_all(content.as_slice()).await {
-                        warn!("error writing chunk to socket: {}", e);
-                        *closed.lock().await = true;
-                        _ = stream.shutdown().await;
-                    }
+            while let Some(content) = read_stream.next().await {
+                if let Err(e) = write_stream.write_all(content.as_slice()).await {
+                    warn!("error writing chunk to socket: {}", e);
+                    *closed.lock().await = true;
+                    _ = write_stream.shutdown().await;
                 }
             }
         });

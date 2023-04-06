@@ -1,3 +1,6 @@
+/// This file implements the Body type, which is used to store the body of HTTP requests and
+/// responses. It supports chunked encoding, and can be used to stream data to and from the
+/// server.
 use std::{
     error, fmt,
     pin::Pin,
@@ -243,6 +246,14 @@ impl Body {
         ChunkStream {
             state: chunk_state,
             current_chunk: 0,
+        }
+    }
+
+    pub fn stream(&self) -> Pin<Box<dyn Stream<Item = Vec<u8>> + Send + Sync>> {
+        if let Content::Full(_) = &self.content {
+            Box::pin(self.content_stream())
+        } else {
+            Box::pin(self.chunk_stream())
         }
     }
 }
