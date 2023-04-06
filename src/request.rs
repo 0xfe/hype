@@ -2,12 +2,7 @@ use std::{collections::HashMap, str::FromStr};
 
 use url::Url;
 
-use crate::{
-    body::{Body, BodyError},
-    conntrack::Conn,
-    message::Message,
-    parser::RequestParser,
-};
+use crate::{body::Body, conntrack::Conn, message::Message, parser::RequestParser};
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Hash)]
 pub enum Method {
@@ -91,8 +86,8 @@ impl Request {
         Ok(parser.get_message().into())
     }
 
-    pub async fn content(&self) -> Result<String, BodyError> {
-        self.body.content().await
+    pub async fn content(&self) -> String {
+        String::from_utf8_lossy(self.body.content().await.as_slice()).into()
     }
 
     pub fn set_conn(&mut self, conn: Conn) {
@@ -119,6 +114,7 @@ impl Request {
         if let Some(content_type) = self.headers.get("content-type") {
             if *content_type == "application/x-www-form-urlencoded".to_string() {
                 let content = self.body.try_content();
+                let content = String::from_utf8_lossy(content.as_slice());
                 let parts = content.split('&');
 
                 parts.for_each(|part| {
@@ -220,8 +216,8 @@ impl Request {
 
         let content = self.body.try_content();
         if !content.is_empty() {
-            r.push_str(format!("Content-Length: {}\r\n\r\n", content.chars().count()).as_str());
-            r.push_str(content.as_str());
+            r.push_str(format!("Content-Length: {}\r\n\r\n", content.len()).as_str());
+            r.push_str(String::from_utf8_lossy(content.as_slice()).as_ref());
         } else {
             r.push_str("\r\n");
         }

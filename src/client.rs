@@ -214,7 +214,7 @@ impl ConnectedClient {
 
             if let Some(mut chunk_stream) = chunk_stream {
                 while let Some(chunk) = chunk_stream.next().await {
-                    if let Err(e) = stream.write_all(chunk.as_bytes()).await {
+                    if let Err(e) = stream.write_all(chunk.as_slice()).await {
                         warn!("error writing chunk to socket: {}", e);
                         *closed.lock().await = true;
                         _ = stream.shutdown().await;

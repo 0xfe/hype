@@ -8,14 +8,14 @@ async fn it_works() {
     let mut body = Body::new();
 
     body.set_chunked();
-    body.push_chunk("foobar");
-    body.push_chunk("blah");
+    body.push_chunk("foobar".into());
+    body.push_chunk("blah".into());
     body.end_chunked();
 
     let mut stream = body.chunk_stream();
 
-    assert_eq!(stream.next().await.unwrap(), "foobar".to_string());
-    assert_eq!(stream.next().await.unwrap(), "blah".to_string());
+    assert_eq!(stream.next().await.unwrap(), "foobar".as_bytes());
+    assert_eq!(stream.next().await.unwrap(), "blah".as_bytes());
     assert_eq!(stream.next().await, None);
 }
 
@@ -29,7 +29,7 @@ async fn it_works_with_waker() {
 
     tokio::spawn(async move {
         for _ in 0..10 {
-            body_writer.push_chunk("foobar");
+            body_writer.push_chunk("foobar".into());
             tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
         }
 
@@ -56,7 +56,7 @@ async fn it_works_with_multiple_streams() {
 
     tokio::spawn(async move {
         for _ in 0..10 {
-            body_writer.push_chunk("foobar");
+            body_writer.push_chunk("foobar".into());
             tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
         }
 
@@ -71,8 +71,7 @@ async fn it_works_with_multiple_streams() {
         count += 1;
     }
 
-    while let Some(chunk) = stream2.next().await {
-        println!("got chunk: {}", chunk);
+    while let Some(_) = stream2.next().await {
         count += 1;
     }
 
@@ -163,9 +162,9 @@ async fn read_all() {
         }
     });
 
-    let data = body_reader.content().await.unwrap();
+    let data = body_reader.content().await;
 
-    assert_eq!(data, "foobar 0foobar 1foobar 2foobar 3foobar 4");
+    assert_eq!(data, "foobar 0foobar 1foobar 2foobar 3foobar 4".as_bytes());
 }
 
 #[tokio::test]
@@ -178,14 +177,14 @@ async fn read_all_chunks() {
 
     tokio::spawn(async move {
         for i in 0..5 {
-            body_writer.push_chunk(format!("foobar {i}"));
+            body_writer.push_chunk(format!("foobar {i}").into());
             tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
         }
 
         body_writer.end_chunked();
     });
 
-    let data = body_reader.content().await.unwrap();
+    let data = body_reader.content().await;
 
-    assert_eq!(data, "foobar 0foobar 1foobar 2foobar 3foobar 4");
+    assert_eq!(data, "foobar 0foobar 1foobar 2foobar 3foobar 4".as_bytes());
 }

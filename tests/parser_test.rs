@@ -198,7 +198,7 @@ A
     assert!(response.is_some());
     let response = response.unwrap();
     assert_eq!(response.status.code, 200);
-    assert_eq!(response.body.try_content(), "123451234567890");
+    assert_eq!(response.body.try_content(), "123451234567890".as_bytes());
 }
 
 #[tokio::test]
@@ -217,5 +217,5 @@ Transfer-Encoding: chunked
     assert!(response.is_some());
     let response = response.unwrap();
     assert_eq!(response.status.code, 200);
-    assert_eq!(response.content().await.unwrap(), "");
+    assert_eq!(response.content().await, "".to_string());
 }

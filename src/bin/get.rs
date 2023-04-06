@@ -44,5 +44,5 @@ async fn main() {
 
     let response = client.send_request(&request).await.unwrap();
     info!("Headers:\n {:?}", response.serialize_headers());
-    info!("Body:\n {:?}", response.content().await.unwrap());
+    info!("Body:\n {:?}", response.content().await);
 }

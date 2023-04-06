@@ -221,14 +221,14 @@ async fn lb_with_client_and_server() {
         .send_request(&Request::new(Method::GET, "/lb1"))
         .await
         .unwrap();
-    assert_eq!(response.body.content().await.unwrap(), "server10010");
+    assert_eq!(response.body.content().await, "server10010".as_bytes());
 
     // Connection still open, stay on the first backend
     let response = client
         .send_request(&Request::new(Method::GET, "/lb1"))
         .await
         .unwrap();
-    assert_eq!(response.body.content().await.unwrap(), "server10010");
+    assert_eq!(response.body.content().await, "server10010".as_bytes());
 
     // Force close and reopen connection
     _ = client.close().await;
@@ -240,7 +240,7 @@ async fn lb_with_client_and_server() {
         .send_request(&Request::new(Method::GET, "/lb1"))
         .await
         .unwrap();
-    assert_eq!(response.body.content().await.unwrap(), "server10012");
+    assert_eq!(response.body.content().await, "server10012".as_bytes());
 
     // Force close and reopen connection
     _ = client.close().await;
@@ -252,7 +252,7 @@ async fn lb_with_client_and_server() {
         .send_request(&Request::new(Method::GET, "/lb2"))
         .await
         .unwrap();
-    assert_eq!(response.body.content().await.unwrap(), "server10020");
+    assert_eq!(response.body.content().await, "server10020".as_bytes());
 
     for shutdown in shutdowns {
         shutdown_server(shutdown).await;
@@ -280,7 +280,7 @@ impl Handler for EchoHandler {
         if body.chunked() {
             let mut stream = body.chunk_stream();
             while let Some(chunk) = stream.next().await {
-                w.write_all(chunk.as_bytes()).await.unwrap();
+                w.write_all(chunk.as_slice()).await.unwrap();
             }
         } else {
             let mut stream = body.content_stream();

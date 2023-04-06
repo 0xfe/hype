@@ -1,11 +1,6 @@
 use std::collections::HashMap;
 
-use crate::{
-    body::{Body, BodyError},
-    cookie::Cookie,
-    message::Message,
-    status,
-};
+use crate::{body::Body, cookie::Cookie, message::Message, status};
 
 #[derive(Debug, Clone)]
 pub struct Response {
@@ -89,8 +84,8 @@ impl Response {
         self.body = body;
     }
 
-    pub async fn content(&self) -> Result<String, BodyError> {
-        self.body.content().await
+    pub async fn content(&self) -> String {
+        String::from_utf8_lossy(self.body.content().await.as_slice()).into()
     }
 
     pub fn set_header(&mut self, key: impl Into<String>, value: impl Into<String>) -> &mut Self {
@@ -148,7 +143,7 @@ impl Response {
 
         let buf = format!(
             "{status_line}\r\n{headers}\r\n{cookie_headers}\r\n{}",
-            self.body.try_content()
+            String::from_utf8_lossy(self.body.try_content().as_slice())
         );
 
         buf

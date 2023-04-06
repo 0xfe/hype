@@ -40,7 +40,7 @@ enum Content {
 #[derive(Debug, Clone)]
 struct ChunkState {
     // chunked body
-    chunks: Vec<String>,
+    chunks: Vec<Vec<u8>>,
 
     // no more chunks
     complete: bool,
@@ -127,7 +127,7 @@ impl Body {
         return false;
     }
 
-    pub fn push_chunk(&self, chunk: impl Into<String>) {
+    pub fn push_chunk(&self, chunk: Vec<u8>) {
         match &self.content {
             Content::Full(_) => panic!("not chunked"),
             Content::Chunked(state) => {
@@ -200,37 +200,21 @@ impl Body {
     }
 
     /// Return as much of the body as is available.
-    pub fn try_content(&self) -> String {
+    pub fn try_content(&self) -> Vec<u8> {
         match &self.content {
-            Content::Full(body) => {
-                String::from_utf8_lossy(body.read().unwrap().content.as_slice()).to_string()
-            }
+            Content::Full(body) => body.read().unwrap().content.clone(),
             Content::Chunked(state) => {
                 let chunk_state = state.read().unwrap();
-
-                chunk_state
-                    .chunks
-                    .iter()
-                    .map(|c| c.clone())
-                    .collect::<Vec<String>>()
-                    .join("")
-                    .to_string()
+                chunk_state.chunks.concat()
             }
         }
     }
 
     /// Return the full body as a string, blocking until it's complete.
-    pub async fn content(&self) -> Result<String, BodyError> {
+    pub async fn content(&self) -> Vec<u8> {
         match &self.content {
-            Content::Full(_) => Ok(String::from_utf8(self.content_stream().concat().await)
-                .map_err(|e| BodyError::UTF8DecodeFailed(e.to_string()))?),
-            Content::Chunked(_) => Ok(String::from_utf8(
-                self.chunk_stream()
-                    .map(|c| c.as_bytes().to_vec())
-                    .concat()
-                    .await,
-            )
-            .map_err(|e| BodyError::UTF8DecodeFailed(e.to_string()))?),
+            Content::Full(_) => self.content_stream().concat().await,
+            Content::Chunked(_) => self.chunk_stream().concat().await,
         }
     }
 
@@ -269,9 +253,9 @@ pub struct ChunkStream {
 }
 
 impl Stream for ChunkStream {
-    type Item = String;
+    type Item = Vec<u8>;
 
-    fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<String>> {
+    fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Vec<u8>>> {
         let current_chunk;
         {
             let mut chunk_state = self.state.write().unwrap();

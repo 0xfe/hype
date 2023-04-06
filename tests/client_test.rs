@@ -14,5 +14,4 @@ Host: google.com"##;
     let result = client.send_request(&req).await.unwrap();
 
     println!("result: {:?}", result);
-    println!("BODY: {:?}", result.content().await.unwrap());
 }

@@ -49,7 +49,7 @@ impl<P: Picker<HttpBackend> + Sync + Send> Handler for Lb<P> {
         if response.body.chunked() {
             let mut stream = response.body.chunk_stream();
             while let Some(chunk) = stream.next().await {
-                w.write_all(chunk.as_bytes()).await.unwrap();
+                w.write_all(chunk.as_slice()).await.unwrap();
             }
         } else {
             let mut stream = response.body.content_stream();

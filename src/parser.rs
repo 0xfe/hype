@@ -315,9 +315,7 @@ impl Parser {
     }
 
     fn commit_chunk(&mut self) {
-        self.message.body_mut().push_chunk(
-            String::from_utf8(self.chunk_buf.clone()).unwrap_or("UTF-8 decode error".to_string()),
-        );
+        self.message.body_mut().push_chunk(self.chunk_buf.clone());
         self.chunk_buf.clear();
     }
 
