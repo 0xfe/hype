@@ -385,10 +385,9 @@ async fn streaming_lb() {
     shutdown_server(lb_shutdown).await;
 }
 
-/*
 // Test streaming chunked requests throught the load balancer
 #[tokio::test]
-async fn streamixng_lb_chunked() {
+async fn streaming_lb_chunked() {
     hype::logger::init();
     let (lb, shutdowns) = start_streaming_backends(3, 10200).await;
 
@@ -404,39 +403,38 @@ async fn streamixng_lb_chunked() {
     let mut client = client.connect().await.unwrap();
 
     let request = &mut Request::new(Method::GET, "/lb");
-    request.body.set_content_length(18);
+    request.body.set_chunked();
 
     // Hit the first backend in the set
     let response = client.send_request(request).await.unwrap();
 
-    let mut stream = request.body.content_stream();
+    let mut stream = request.body.chunk_stream();
     println!("Response: {:?}", response);
 
-    request.body.append("foobar".as_bytes()).unwrap();
+    request.body.push_chunk("foobar".as_bytes().to_vec());
     assert_eq!(
         "foobar",
         String::from_utf8_lossy(stream.next().await.unwrap().as_slice())
     );
 
-    assert_eq!(request.body.full_contents_loaded(), false);
-
-    request.body.append("foobar".as_bytes()).unwrap();
+    request.body.push_chunk("foobar".as_bytes().to_vec());
     assert_eq!(
         "foobar",
         String::from_utf8_lossy(stream.next().await.unwrap().as_slice())
     );
 
-    request.body.append("foobar".as_bytes()).unwrap();
+    request.body.push_chunk("foobar".as_bytes().to_vec());
     assert_eq!(
         "foobar",
         String::from_utf8_lossy(stream.next().await.unwrap().as_slice())
     );
 
-    assert_eq!(request.body.full_contents_loaded(), true);
+    request.body.end_chunked();
+
+    assert_eq!(stream.next().await, None);
 
     for shutdown in shutdowns {
         shutdown_server(shutdown).await;
     }
     shutdown_server(lb_shutdown).await;
 }
-*/

@@ -138,7 +138,7 @@ impl Body {
                 let mut wakers = vec![];
                 {
                     let mut chunk_state = state.write().unwrap();
-                    chunk_state.chunks.push(chunk.into());
+                    chunk_state.chunks.push(chunk);
                     std::mem::swap(&mut wakers, &mut chunk_state.wakers);
                 }
                 wakers.iter().for_each(|w| w.wake_by_ref());

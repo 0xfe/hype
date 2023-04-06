@@ -382,7 +382,7 @@ impl ConnectedServer {
                     if let Err(error) = handler.1.handle(&request, &mut *s).await {
                         error!("Error from handler {:?}: {:?}", handler, error);
                     }
-                    continue;
+                    continue 'top;
                 }
             }
 
@@ -391,7 +391,7 @@ impl ConnectedServer {
                 if let Err(error) = handler.read().await.handle(&request, &mut *s).await {
                     error!("Error from handler {:?}: {:?}", handler, error);
                 }
-                continue;
+                continue 'top;
             }
 
             // Fell through here, no handlers match
