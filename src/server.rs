@@ -2,6 +2,7 @@
 
 use rustls_pemfile::{certs, rsa_private_keys};
 use tokio::io::AsyncReadExt;
+
 use tokio::{
     io::AsyncWriteExt,
     net::TcpListener,
@@ -23,6 +24,7 @@ use crate::{
     status,
 };
 
+use std::net::SocketAddr;
 use std::{
     collections::HashMap,
     fs::File,
@@ -166,6 +168,10 @@ impl Server {
                 }
             };
 
+            let peer_addr = tcp_socket
+                .peer_addr()
+                .map_err(|e| format!("peer_addr(): {}", e))?;
+
             let socket: Box<dyn AsyncStream>;
 
             // If TLS
@@ -193,6 +199,7 @@ impl Server {
             tokio::spawn(async move {
                 let mut stream = ConnectedServer {
                     conn,
+                    peer_addr,
                     base_url,
                     handlers,
                     default_handler,
@@ -217,12 +224,13 @@ impl Server {
 
 #[derive(Debug)]
 struct ConnectedServer {
+    conn: Conn,
+    peer_addr: SocketAddr,
     base_url: String,
     handlers: Arc<RwLock<Vec<(Matcher, Box<dyn Handler>)>>>,
     default_handler: Option<Arc<RwLock<Box<dyn Handler>>>>,
-    conn_tracker: Arc<RwLock<ConnTracker>>,
-    conn: Conn,
     shutdown_notifier: Arc<Notify>,
+    conn_tracker: Arc<RwLock<ConnTracker>>,
     close_connection: bool,
 }
 
@@ -266,13 +274,11 @@ impl ConnectedServer {
     }
 
     async fn process_connection(&mut self) -> Result<(), String> {
-        /*
         info!(
             "Connection ID {} received from {:?}",
             &self.conn.id(),
-            s.peer_addr().unwrap()
+            self.peer_addr
         );
-        */
 
         // This loop is iterated over for each Request in the same connection.
         'top: loop {
