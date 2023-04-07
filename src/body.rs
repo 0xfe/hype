@@ -215,10 +215,7 @@ impl Body {
 
     /// Return the full body as a string, blocking until it's complete.
     pub async fn content(&self) -> Vec<u8> {
-        match &self.content {
-            Content::Full(_) => self.content_stream().concat().await,
-            Content::Chunked(_) => self.chunk_stream().concat().await,
-        }
+        self.stream().concat().await
     }
 
     pub fn content_stream(&self) -> ContentStream {
@@ -244,6 +241,8 @@ impl Body {
         }
 
         ChunkStream {
+            done: false,
+            raw: false,
             state: chunk_state,
             current_chunk: 0,
         }
@@ -256,9 +255,21 @@ impl Body {
             Box::pin(self.chunk_stream())
         }
     }
+
+    pub fn raw_stream(&self) -> Pin<Box<dyn Stream<Item = Vec<u8>> + Send + Sync>> {
+        if let Content::Full(_) = &self.content {
+            Box::pin(self.content_stream())
+        } else {
+            let mut stream = self.chunk_stream();
+            stream.raw = true;
+            Box::pin(stream)
+        }
+    }
 }
 
 pub struct ChunkStream {
+    raw: bool,
+    done: bool,
     state: Arc<RwLock<ChunkState>>,
     current_chunk: usize,
 }
@@ -267,21 +278,51 @@ impl Stream for ChunkStream {
     type Item = Vec<u8>;
 
     fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Vec<u8>>> {
-        let current_chunk;
+        let mut current_chunk = None;
+        let mut done = self.done;
+        let mut return_val = None;
+
         {
             let mut chunk_state = self.state.write().unwrap();
             if self.current_chunk >= chunk_state.chunks.len() {
                 if !chunk_state.complete {
+                    // More chunks are coming, return Pending
                     chunk_state.wakers.push(cx.waker().clone());
-                    return Poll::Pending;
+                    return_val = Some(Poll::Pending);
+                } else if self.raw && !done {
+                    // No more chunks, send closing '0' chunk
+                    done = true;
+                    let chunk = vec!['0' as u8, '\r' as u8, '\n' as u8, '\r' as u8, '\n' as u8];
+                    return_val = Some(Poll::Ready(Some(chunk)));
+                } else {
+                    // Closing chunk sent, close stream
+                    return_val = Some(Poll::Ready(None));
                 }
-                return Poll::Ready(None);
+            } else {
+                current_chunk = Some(chunk_state.chunks[self.current_chunk].clone());
             }
-            current_chunk = chunk_state.chunks[self.current_chunk].clone();
         }
 
-        self.current_chunk += 1;
-        return Poll::Ready(Some(current_chunk));
+        if done {
+            self.done = true;
+        }
+
+        if let Some(current_chunk) = current_chunk {
+            self.current_chunk += 1;
+            let mut chunk: Vec<u8>;
+            if self.raw {
+                chunk = format!("{:x}", current_chunk.len()).as_bytes().to_vec();
+                chunk.extend(['\r' as u8, '\n' as u8]);
+                chunk.extend(current_chunk);
+                chunk.extend(['\r' as u8, '\n' as u8]);
+            } else {
+                chunk = current_chunk;
+            }
+
+            return Poll::Ready(Some(chunk));
+        } else {
+            return return_val.unwrap();
+        }
     }
 }
 

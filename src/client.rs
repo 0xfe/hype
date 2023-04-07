@@ -190,7 +190,7 @@ impl ConnectedClient {
         let reader = Arc::clone(&self.reader);
         let request_data = req.serialize_headers();
 
-        let mut read_stream = req.body.stream();
+        let mut read_stream = req.body.raw_stream();
 
         tokio::spawn(async move {
             let mut write_stream = writer.lock().await;
@@ -235,7 +235,12 @@ impl ConnectedClient {
                         break;
                     }
                     Ok(n) => {
-                        debug!("client received: {}", String::from_utf8_lossy(&buf[..n]));
+                        debug!(
+                            "client received {} bytes: {}",
+                            n,
+                            String::from_utf8_lossy(&buf[..n])
+                        );
+
                         if let Err(e) = parser.parse_buf(&buf[..n]) {
                             _ = tx.send(Err(ClientError::ParseError(e.to_string()))).await;
                             break;
@@ -267,15 +272,19 @@ impl ConnectedClient {
             // Error receiving data, shut down the socket
             if message.is_err() {
                 self.close().await?;
+                Err(ClientError::InternalError(
+                    "error receiving response".to_string(),
+                ))
+            } else {
+                Ok(message
+                    .map_err(|e| {
+                        ClientError::InternalError(format!(
+                            "error receiving response: {}",
+                            e.to_string()
+                        ))
+                    })?
+                    .into())
             }
-            Ok(message
-                .map_err(|e| {
-                    ClientError::InternalError(format!(
-                        "error receiving response: {}",
-                        e.to_string()
-                    ))
-                })?
-                .into())
         } else {
             self.close().await?;
             Err(ClientError::InternalError(

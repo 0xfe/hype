@@ -271,22 +271,20 @@ impl Handler for EchoHandler {
     ) -> Result<handler::Ok, handler::Error> {
         info!("EchoHandler Request: {:?}", r);
 
-        let response = Response::new(status::from(status::OK));
+        let mut response = Response::new(status::from(status::OK));
+
+        for (key, val) in r.headers.iter() {
+            response.set_header(key, val);
+        }
+
         w.write_all(format!("{}\r\n\r\n", response.serialize_headers()).as_bytes())
             .await
             .unwrap();
 
         let body = &r.body;
-        if body.chunked() {
-            let mut stream = body.chunk_stream();
-            while let Some(chunk) = stream.next().await {
-                w.write_all(chunk.as_slice()).await.unwrap();
-            }
-        } else {
-            let mut stream = body.content_stream();
-            while let Some(content) = stream.next().await {
-                w.write_all(content.as_slice()).await.unwrap();
-            }
+        let mut stream = body.raw_stream();
+        while let Some(chunk) = stream.next().await {
+            w.write_all(chunk.as_slice()).await.unwrap();
         }
 
         Ok(handler::Ok::Next)
@@ -354,7 +352,7 @@ async fn streaming_lb() {
 
     println!("boo");
 
-    let mut stream = request.body.content_stream();
+    let mut stream = response.body.content_stream();
     println!("Response: {:?}", response);
 
     request.body.append("foobar".as_bytes()).unwrap();
@@ -403,13 +401,14 @@ async fn streaming_lb_chunked() {
     let mut client = client.connect().await.unwrap();
 
     let request = &mut Request::new(Method::GET, "/lb");
+    request.set_header("transfer-encoding", "chunked");
     request.body.set_chunked();
 
     // Hit the first backend in the set
     let response = client.send_request(request).await.unwrap();
-
-    let mut stream = request.body.chunk_stream();
     println!("Response: {:?}", response);
+
+    let mut stream = response.body.chunk_stream();
 
     request.body.push_chunk("foobar".as_bytes().to_vec());
     assert_eq!(

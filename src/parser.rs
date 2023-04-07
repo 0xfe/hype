@@ -237,6 +237,7 @@ impl Parser {
 
             // Exiting headers, ready for body
             self.ready = true;
+            debug!("parser ready for body? {} ({:?})", has_body, new_state);
 
             if has_body {
                 result = self.update_state(new_state);

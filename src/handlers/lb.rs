@@ -46,16 +46,9 @@ impl<P: Picker<HttpBackend> + Sync + Send> Handler for Lb<P> {
         w.write_all("\r\n\r\n".as_bytes()).await.unwrap();
 
         // Write body
-        if response.body.chunked() {
-            let mut stream = response.body.chunk_stream();
-            while let Some(chunk) = stream.next().await {
-                w.write_all(chunk.as_slice()).await.unwrap();
-            }
-        } else {
-            let mut stream = response.body.content_stream();
-            while let Some(content) = stream.next().await {
-                w.write_all(content.as_slice()).await.unwrap();
-            }
+        let mut stream = response.body.raw_stream();
+        while let Some(chunk) = stream.next().await {
+            w.write_all(chunk.as_slice()).await.unwrap();
         }
         Ok(handler::Ok::Done)
     }
