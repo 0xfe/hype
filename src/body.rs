@@ -166,13 +166,13 @@ impl Body {
     }
 
     /// Returns true if the body is complete.
-    pub fn full_contents_loaded(&self) -> bool {
+    pub fn complete(&self) -> bool {
         match &self.content {
             Content::Full(state) => {
                 let state = state.read().unwrap();
                 state.content.len() >= state.expected_length
             }
-            Content::Chunked(_) => panic!("chunked body"),
+            Content::Chunked(state) => state.read().unwrap().complete,
         }
     }
 
@@ -244,7 +244,7 @@ impl Body {
             done: false,
             raw: false,
             state: chunk_state,
-            current_chunk: 0,
+            current_pos: 0,
         }
     }
 
@@ -271,7 +271,7 @@ pub struct ChunkStream {
     raw: bool,
     done: bool,
     state: Arc<RwLock<ChunkState>>,
-    current_chunk: usize,
+    current_pos: usize,
 }
 
 impl Stream for ChunkStream {
@@ -284,7 +284,7 @@ impl Stream for ChunkStream {
 
         {
             let mut chunk_state = self.state.write().unwrap();
-            if self.current_chunk >= chunk_state.chunks.len() {
+            if self.current_pos >= chunk_state.chunks.len() {
                 if !chunk_state.complete {
                     // More chunks are coming, return Pending
                     chunk_state.wakers.push(cx.waker().clone());
@@ -299,7 +299,7 @@ impl Stream for ChunkStream {
                     return_val = Some(Poll::Ready(None));
                 }
             } else {
-                current_chunk = Some(chunk_state.chunks[self.current_chunk].clone());
+                current_chunk = Some(chunk_state.chunks[self.current_pos].clone());
             }
         }
 
@@ -308,7 +308,7 @@ impl Stream for ChunkStream {
         }
 
         if let Some(current_chunk) = current_chunk {
-            self.current_chunk += 1;
+            self.current_pos += 1;
             let mut chunk: Vec<u8>;
             if self.raw {
                 chunk = format!("{:x}", current_chunk.len()).as_bytes().to_vec();

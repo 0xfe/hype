@@ -385,7 +385,7 @@ impl Parser {
                 State::InBody => {
                     self.consume_body(&[*c])
                         .map_err(|e| ParseError::BodyError(e.to_string()))?;
-                    if self.message.body_mut().full_contents_loaded() {
+                    if self.message.body_mut().complete() {
                         self.parse_eof()?;
                     }
                 }
