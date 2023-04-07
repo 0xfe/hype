@@ -109,6 +109,16 @@ impl Request {
         self.headers.insert(key.into().to_lowercase(), val.into());
     }
 
+    pub fn set_chunked(&mut self) {
+        if !self.body.chunked() {
+            self.body.set_chunked();
+        }
+
+        if self.headers.get("transfer-encoding").is_none() {
+            self.set_header("Transfer-Encoding", "chunked");
+        }
+    }
+
     pub fn post_params(&mut self) -> Option<HashMap<String, String>> {
         let mut result: HashMap<String, String> = HashMap::new();
         if let Some(content_type) = self.headers.get("content-type") {

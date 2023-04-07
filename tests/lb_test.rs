@@ -401,8 +401,7 @@ async fn streaming_lb_chunked() {
     let mut client = client.connect().await.unwrap();
 
     let request = &mut Request::new(Method::GET, "/lb");
-    request.set_header("transfer-encoding", "chunked");
-    request.body.set_chunked();
+    request.set_chunked();
 
     // Hit the first backend in the set
     let response = client.send_request(request).await.unwrap();

@@ -78,6 +78,38 @@ async fn it_works_with_multiple_streams() {
     assert_eq!(count, 20);
 }
 
+#[tokio::test]
+async fn it_works_with_raw_stream() {
+    let mut body = Body::new();
+    body.set_chunked();
+
+    let body_writer = Arc::new(body);
+    let body_reader = Arc::clone(&body_writer);
+
+    tokio::spawn(async move {
+        for _ in 0..3 {
+            body_writer.push_chunk("foobar".into());
+            tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
+        }
+
+        body_writer.end_chunked();
+    });
+
+    let mut stream = body_reader.raw_stream();
+
+    let data = stream.next().await.unwrap();
+    assert_eq!(String::from_utf8(data).unwrap(), "6\r\nfoobar\r\n");
+
+    let data = stream.next().await.unwrap();
+    assert_eq!(String::from_utf8(data).unwrap(), "6\r\nfoobar\r\n");
+
+    let data = stream.next().await.unwrap();
+    assert_eq!(String::from_utf8(data).unwrap(), "6\r\nfoobar\r\n");
+
+    let data = stream.next().await.unwrap();
+    assert_eq!(String::from_utf8(data).unwrap(), "0\r\n\r\n");
+}
+
 // Test content_stream() with a single writer task and multiple reader tasks
 #[tokio::test]
 async fn it_works_with_content_stream() {

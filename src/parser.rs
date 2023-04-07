@@ -227,7 +227,6 @@ impl Parser {
             if let Some(encoding) = headers.get("transfer-encoding") {
                 let parts: Vec<&str> = encoding.split(',').map(|p| p.trim()).collect();
                 if parts.contains(&"chunked") {
-                    debug!("expecting chunked encoding");
                     let body = self.message.body_mut();
                     body.set_chunked();
                     new_state = State::InChunkedBodySize;
@@ -237,7 +236,6 @@ impl Parser {
 
             // Exiting headers, ready for body
             self.ready = true;
-            debug!("parser ready for body? {} ({:?})", has_body, new_state);
 
             if has_body {
                 result = self.update_state(new_state);

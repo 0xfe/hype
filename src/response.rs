@@ -107,6 +107,16 @@ impl Response {
         self
     }
 
+    pub fn set_chunked(&mut self) {
+        if !self.body.chunked() {
+            self.body.set_chunked();
+        }
+
+        if self.headers.get("transfer-encoding").is_none() {
+            self.set_header("Transfer-Encoding", "chunked");
+        }
+    }
+
     pub fn serialize_headers(&self) -> String {
         let status_line = format!("HTTP/1.1 {} {}", self.status.code, self.status.text);
 
