@@ -188,7 +188,7 @@ impl ConnectedClient {
         let reader = Arc::clone(&self.reader);
         let writer = Arc::clone(&self.writer);
         let closed = Arc::clone(&self.closed);
-        let request_data = req.serialize_headers();
+        let request_data = format!("{}\r\n{}", req.serialize_method(), req.headers.serialize());
 
         let mut read_stream = req.body.raw_stream();
 

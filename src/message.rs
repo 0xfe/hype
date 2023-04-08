@@ -1,6 +1,4 @@
-use std::collections::HashMap;
-
-use crate::{body::Body, request::Request, response::Response};
+use crate::{body::Body, headers::Headers, request::Request, response::Response};
 
 #[derive(Debug, Clone)]
 pub enum Message {
@@ -50,7 +48,7 @@ impl Message {
         }
     }
 
-    pub fn headers_mut(&mut self) -> &mut HashMap<String, String> {
+    pub fn headers_mut(&mut self) -> &mut Headers {
         match self {
             Message::Request(r) => &mut r.headers,
             Message::Response(r) => &mut r.headers,

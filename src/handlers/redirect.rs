@@ -28,7 +28,7 @@ impl Handler for Redirect {
         w: &mut dyn AsyncWriteStream,
     ) -> Result<handler::Ok, handler::Error> {
         let mut response = Response::new(status::from(status::MOVED_PERMANENTLY));
-        response.set_header("Location", self.location.clone());
+        response.headers.set("Location", self.location.clone());
         let buf = response.serialize();
         w.write_all(buf.as_bytes()).await.unwrap();
         Ok(handler::Ok::Done)

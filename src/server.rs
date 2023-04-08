@@ -14,6 +14,7 @@ use tokio_rustls::{
     TlsAcceptor,
 };
 
+use crate::headers::Headers;
 use crate::parser::RequestParser;
 use crate::{
     conntrack::{Conn, ConnTracker},
@@ -26,7 +27,6 @@ use crate::{
 
 use std::net::SocketAddr;
 use std::{
-    collections::HashMap,
     fs::File,
     io,
     path::{Path, PathBuf},
@@ -235,11 +235,11 @@ struct ConnectedServer {
 }
 
 impl ConnectedServer {
-    async fn process_headers(&mut self, headers: &HashMap<String, String>) {
-        if let Some(connection) = headers.get("connection") {
+    async fn process_headers(&mut self, headers: &Headers) {
+        if let Some(connection) = headers.get_first("connection") {
             match connection.to_lowercase().as_ref() {
                 "keep-alive" => {
-                    if let Some(keepalive) = headers.get("keep-alive") {
+                    if let Some(keepalive) = headers.get_first("keep-alive") {
                         let parts: Vec<&str> = keepalive.split(",").map(|s| s.trim()).collect();
                         for part in parts {
                             let kv: Vec<&str> = part.split('=').map(|kv| kv.trim()).collect();
@@ -364,7 +364,9 @@ impl ConnectedServer {
             }
 
             let mut request: Request = message.unwrap().into();
-            request.set_header("X-Hype-Connection-ID", self.conn.id().clone());
+            request
+                .headers
+                .set("X-Hype-Connection-ID", self.conn.id().clone());
             request.set_conn(self.conn.clone());
             self.process_headers(&request.headers).await;
 
@@ -396,7 +398,7 @@ impl ConnectedServer {
 
             // Fell through here, no handlers match
             let mut response = Response::new(status::from(status::NOT_FOUND));
-            response.set_header("Content-Type", "text/plain");
+            response.headers.set("Content-Type", "text/plain");
             response.set_body("Hype: no route handlers installed.".into());
             let buf = response.serialize();
             let mut s = writer.write().await;

@@ -218,13 +218,13 @@ impl Parser {
             let mut has_body = false;
             let mut new_state = State::InBody;
 
-            if let Some(length) = headers.get("content-length") {
+            if let Some(length) = headers.get_first("content-length") {
                 if length.parse::<usize>().unwrap_or(0) != 0 {
                     has_body = true;
                 }
             }
 
-            if let Some(encoding) = headers.get("transfer-encoding") {
+            if let Some(encoding) = headers.get_first("transfer-encoding") {
                 let parts: Vec<&str> = encoding.split(',').map(|p| p.trim()).collect();
                 if parts.contains(&"chunked") {
                     let body = self.message.body_mut();
@@ -252,7 +252,7 @@ impl Parser {
                     body.set_content_length(v.trim().parse::<usize>().unwrap_or(0));
                 }
 
-                self.message.headers_mut().insert(key, v.trim().into());
+                self.message.headers_mut().add(key, v.trim());
             } else {
                 result = Err(ParseError::BadHeaderLine(header_line.into()));
             }

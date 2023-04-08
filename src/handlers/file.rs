@@ -38,7 +38,7 @@ impl File {
         body: String,
     ) -> io::Result<()> {
         let mut response = Response::new(status::from(status));
-        response.set_header("Content-Type", content_type);
+        response.headers.set("Content-Type", content_type);
         response.set_body(body.into());
 
         w.write_all(response.serialize().as_bytes()).await

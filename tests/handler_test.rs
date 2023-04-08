@@ -17,7 +17,7 @@ impl Handler for MyHandler {
         w: &mut dyn AsyncWriteStream,
     ) -> Result<handler::Ok, Error> {
         let mut response = Response::new(status::from(status::OK));
-        response.set_header("foo", "bar");
+        response.headers.set("foo", "bar");
         response.set_body("hello world!\n".into());
 
         w.write_all(response.serialize().as_bytes()).await.unwrap();
@@ -53,7 +53,7 @@ hello world!
     let response = Response::from(expected_buf).unwrap();
 
     assert_eq!(
-        response.headers.get("foo".into()).unwrap(),
+        response.headers.get_first("foo".into()).unwrap(),
         &"bar".to_string()
     );
 }

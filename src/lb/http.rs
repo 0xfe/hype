@@ -42,7 +42,7 @@ impl<T: Backend, P: Picker<T>> Http<T, P> {
 
         // Rewrite headers as needed
         let mut req = req.clone();
-        self.headers.iter().for_each(|(k, v)| req.set_header(k, v));
+        self.headers.iter().for_each(|(k, v)| req.headers.set(k, v));
 
         debug!("LB: sending request to backend {}: {:?}", index, req);
         backends[index].send_request(&req).await

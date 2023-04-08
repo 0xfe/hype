@@ -12,6 +12,7 @@ pub mod content_types;
 pub mod cookie;
 pub mod handler;
 pub mod handlers;
+pub mod headers;
 pub mod lb;
 pub mod lbconfig;
 pub mod logger;

@@ -2,7 +2,9 @@ use std::{collections::HashMap, str::FromStr};
 
 use url::Url;
 
-use crate::{body::Body, conntrack::Conn, message::Message, parser::RequestParser};
+use crate::{
+    body::Body, conntrack::Conn, headers::Headers, message::Message, parser::RequestParser,
+};
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Hash)]
 pub enum Method {
@@ -37,7 +39,7 @@ lazy_static! {
 pub struct Request {
     pub method: Method,
     pub version: String,
-    pub headers: HashMap<String, String>,
+    pub headers: Headers,
     pub url: Option<Url>,
     pub base_url: String,
     pub handler_path: Option<String>,
@@ -69,7 +71,7 @@ impl Request {
             url: None,
             method,
             version: String::new(),
-            headers: HashMap::new(),
+            headers: Headers::new(),
             body: Body::new(),
             conn: None,
         };
@@ -105,23 +107,18 @@ impl Request {
         self.url = Some(url);
     }
 
-    pub fn set_header(&mut self, key: impl Into<String>, val: impl Into<String>) {
-        self.headers.insert(key.into().to_lowercase(), val.into());
-    }
-
     pub fn set_chunked(&mut self) {
         if !self.body.chunked() {
             self.body.set_chunked();
         }
 
-        if self.headers.get("transfer-encoding").is_none() {
-            self.set_header("Transfer-Encoding", "chunked");
-        }
+        self.headers
+            .get_first_or_set("transfer-encoding", "chunked");
     }
 
     pub fn post_params(&mut self) -> Option<HashMap<String, String>> {
         let mut result: HashMap<String, String> = HashMap::new();
-        if let Some(content_type) = self.headers.get("content-type") {
+        if let Some(content_type) = self.headers.get_first("content-type") {
             if *content_type == "application/x-www-form-urlencoded".to_string() {
                 let content = self.body.try_content();
                 let content = String::from_utf8_lossy(content.as_slice());
@@ -153,20 +150,21 @@ impl Request {
     }
 
     pub fn cookies(&self) -> Option<HashMap<&str, &str>> {
-        if let Some(cookies) = self.headers.get("cookie") {
-            let cookies: Vec<&str> = cookies.split(';').map(|c| c.trim()).collect();
+        if let Some(cookie_vals) = self.headers.get("cookie") {
+            let mut result = HashMap::new();
 
-            let mut map: HashMap<&str, &str> = HashMap::new();
+            for cookie_val in cookie_vals {
+                let cookies: Vec<&str> = cookie_val.split(';').map(|c| c.trim()).collect();
+                cookies.iter().for_each(|c| {
+                    let parts = c.split('=').map(|c| c.trim()).collect::<Vec<&str>>();
+                    result.insert(parts[0], parts[1]);
+                });
+            }
 
-            cookies.iter().for_each(|c| {
-                let parts = c.split('=').map(|c| c.trim()).collect::<Vec<&str>>();
-                map.insert(parts[0], parts[1]);
-            });
-
-            return Some(map);
+            Some(result)
+        } else {
+            None
         }
-
-        None
     }
 
     pub fn abs_path(&self) -> String {
@@ -188,22 +186,12 @@ impl Request {
         }
     }
 
-    pub fn serialize_headers(&self) -> String {
-        let mut r = format!(
-            "{} {} HTTP/1.1\r\n",
+    pub fn serialize_method(&self) -> String {
+        format!(
+            "{} {} HTTP/1.1",
             METHODS_AS_STR.get(&self.method).unwrap(),
             self.abs_path()
-        );
-
-        r.push_str(
-            self.headers
-                .iter()
-                .map(|(k, v)| format!("{}: {}", k, v))
-                .collect::<Vec<String>>()
-                .join("\r\n")
-                .as_str(),
-        );
-        r
+        )
     }
 
     pub fn serialize(&self) -> String {
@@ -213,15 +201,7 @@ impl Request {
             self.abs_path()
         );
 
-        r.push_str(
-            self.headers
-                .iter()
-                .map(|(k, v)| format!("{}: {}", k, v))
-                .collect::<Vec<String>>()
-                .join("\r\n")
-                .as_str(),
-        );
-
+        r.push_str(&self.headers.serialize());
         r.push_str("\r\n");
 
         let content = self.body.try_content();

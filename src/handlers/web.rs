@@ -54,7 +54,7 @@ impl Web {
         body: String,
     ) -> io::Result<()> {
         let mut response = Response::new(status::from(status));
-        response.set_header("Content-Type", content_type);
+        response.headers.set("Content-Type", content_type);
         response.set_body(body.into());
 
         w.write_all(response.serialize().as_bytes()).await
@@ -108,7 +108,7 @@ impl Web {
 
         let abs_fs_path = String::from(abs_fs_path);
 
-        if let Some(host) = r.headers.get("host") {
+        if let Some(host) = r.headers.get_first("host") {
             if !self.hosts.is_empty() && !self.hosts.contains(host) {
                 return Err(handler::Error::Failed(format!(
                     "host {} does not match: {:?}",
@@ -161,7 +161,7 @@ impl Handler for Web {
         return match result {
             Ok(handler::Ok::Redirect(to)) => {
                 let mut response = Response::new(status::from(status::MOVED_PERMANENTLY));
-                response.set_header("Location", to);
+                response.headers.set("Location", to);
                 w.write_all(response.serialize().as_bytes()).await.or(Err(
                     handler::Error::Failed("could not write to stream".into()),
                 ))?;

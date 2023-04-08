@@ -1,10 +1,9 @@
-use std::collections::HashMap;
-
 use async_trait::async_trait;
 use tokio::io::AsyncWriteExt;
 
 use crate::{
     handler::{self, AsyncWriteStream, Handler},
+    headers::Headers,
     request::Request,
     response::Response,
     status,
@@ -13,7 +12,7 @@ use crate::{
 pub struct Status {
     status: status::Status,
     body: String,
-    headers: HashMap<String, String>,
+    headers: Headers,
 }
 
 impl Status {
@@ -21,12 +20,8 @@ impl Status {
         return Self {
             status,
             body: message.into(),
-            headers: HashMap::new(),
+            headers: Headers::new(),
         };
-    }
-
-    pub fn set_header(&mut self, key: impl Into<String>, val: impl Into<String>) {
-        self.headers.insert(key.into(), val.into());
     }
 }
 
@@ -38,11 +33,9 @@ impl Handler for Status {
         w: &mut dyn AsyncWriteStream,
     ) -> Result<handler::Ok, handler::Error> {
         let mut response = Response::new(self.status.clone());
+        response.headers = self.headers.clone();
         response.set_body(self.body.clone().into());
 
-        for header in &self.headers {
-            response.set_header(header.0, header.1);
-        }
         let buf = response.serialize();
         w.write_all(buf.as_bytes()).await.unwrap();
         Ok(handler::Ok::Done)

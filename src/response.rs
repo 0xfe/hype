@@ -1,12 +1,10 @@
-use std::collections::HashMap;
-
-use crate::{body::Body, cookie::Cookie, message::Message, status};
+use crate::{body::Body, cookie::Cookie, headers::Headers, message::Message, status};
 
 #[derive(Debug, Clone)]
 pub struct Response {
     pub version: String,
     pub status: status::Status,
-    pub headers: HashMap<String, String>,
+    pub headers: Headers,
     pub body: Body,
     pub cookies: Vec<Cookie>,
 }
@@ -50,15 +48,14 @@ impl Response {
             text: status_parts[2].clone(),
         };
 
-        let mut headers: HashMap<String, String> = HashMap::new();
+        let mut headers = Headers::new();
 
         for line in &lines[1..] {
             if line.is_empty() {
                 break;
             }
 
-            let header: Vec<String> = line.split(':').map(|l| l.trim().to_string()).collect();
-            headers.insert(header[0].clone().to_lowercase(), header[1].clone());
+            headers.add_from(line);
         }
 
         Ok(Response {
@@ -74,7 +71,7 @@ impl Response {
         Response {
             version: "HTTP/1.1".to_string(),
             status,
-            headers: HashMap::new(),
+            headers: Headers::new(),
             cookies: vec![],
             body: Body::new(),
         }
@@ -88,23 +85,11 @@ impl Response {
         String::from_utf8_lossy(self.body.content().await.as_slice()).into()
     }
 
-    pub fn set_header(&mut self, key: impl Into<String>, value: impl Into<String>) -> &mut Self {
-        let key = key.into().to_lowercase();
-        let value = value.into();
-
-        if key == "set-cookie" {
-            if let Ok(cookie) = Cookie::try_from(value.clone().as_str()) {
-                self.set_cookie(cookie);
-            }
-        }
-
-        self.headers.insert(key, value.into());
-        self
-    }
-
-    pub fn set_cookie(&mut self, cookie: Cookie) -> &mut Self {
-        self.cookies.push(cookie);
-        self
+    pub fn set_cookie(&mut self, cookie: Cookie) {
+        _ = cookie.serialize().and_then(|cookie| {
+            self.headers.add("set-cookie", cookie);
+            Ok(())
+        });
     }
 
     pub fn set_chunked(&mut self) {
@@ -112,47 +97,26 @@ impl Response {
             self.body.set_chunked();
         }
 
-        if self.headers.get("transfer-encoding").is_none() {
-            self.set_header("Transfer-Encoding", "chunked");
-        }
+        self.headers
+            .get_first_or_set("transfer-encoding", "chunked");
     }
 
-    pub fn serialize_headers(&self) -> String {
-        let status_line = format!("HTTP/1.1 {} {}", self.status.code, self.status.text);
-
-        let headers: String = self
-            .headers
-            .iter()
-            .map(|(k, v)| format!("{}: {}", k, v))
-            .collect::<Vec<String>>()
-            .join("\r\n");
-
-        format!("{status_line}\r\n{headers}")
+    pub fn serialize_status(&self) -> String {
+        format!("HTTP/1.1 {} {}", self.status.code, self.status.text)
     }
 
     pub fn serialize(&mut self) -> String {
         let status_line = format!("HTTP/1.1 {} {}", self.status.code, self.status.text);
         let length = self.body.try_content().len();
         if length > 0 {
-            self.set_header("Content-Length", length.to_string());
+            self.headers
+                .get_first_or_set("Content-Length", length.to_string());
         }
 
-        let headers: String = self
-            .headers
-            .iter()
-            .map(|(k, v)| format!("{}: {}", k, v))
-            .collect::<Vec<String>>()
-            .join("\r\n");
-
-        let cookie_headers: String = self
-            .cookies
-            .iter()
-            .map(|c| c.serialize().unwrap())
-            .collect::<Vec<String>>()
-            .join("\r\n");
+        let headers: String = self.headers.serialize();
 
         let buf = format!(
-            "{status_line}\r\n{headers}\r\n{cookie_headers}\r\n{}",
+            "{status_line}\r\n{headers}\r\n\r\n{}",
             String::from_utf8_lossy(self.body.try_content().as_slice())
         );
 

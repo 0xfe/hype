@@ -37,8 +37,16 @@ impl<P: Picker<HttpBackend> + Sync + Send> Handler for Lb<P> {
             .await
             .map_err(|e| handler::Error::Failed(e.to_string()))?;
 
+        // Write response status
+        w.write_all(response.serialize_status().as_bytes())
+            .await
+            .unwrap();
+
+        // Write status delimeter
+        w.write_all("\r\n".as_bytes()).await.unwrap();
+
         // Write response headers
-        w.write_all(response.serialize_headers().as_bytes())
+        w.write_all(response.headers.serialize().as_bytes())
             .await
             .unwrap();
 
@@ -47,8 +55,8 @@ impl<P: Picker<HttpBackend> + Sync + Send> Handler for Lb<P> {
 
         // Write body
         let mut stream = response.body.raw_stream();
-        while let Some(chunk) = stream.next().await {
-            w.write_all(chunk.as_slice()).await.unwrap();
+        while let Some(content) = stream.next().await {
+            w.write_all(content.as_slice()).await.unwrap();
         }
         Ok(handler::Ok::Done)
     }

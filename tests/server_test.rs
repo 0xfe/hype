@@ -28,7 +28,7 @@ impl Handler for MyHandler {
         let mut response = Response::new(status::from(status::OK));
         response.set_body("OK".into());
 
-        response.set_header(
+        response.headers.set(
             "x-hype-test-keepalive-timeout",
             r.conn()
                 .unwrap()
@@ -41,7 +41,7 @@ impl Handler for MyHandler {
                 .to_string(),
         );
 
-        response.set_header(
+        response.headers.set(
             "x-hype-test-keepalive-max",
             r.conn()
                 .unwrap()
@@ -132,8 +132,8 @@ async fn process_headers() {
     let mut client = client.connect().await.unwrap();
 
     let mut request = Request::default();
-    request.set_header("Connection", "Keep-Alive");
-    request.set_header("Keep-Alive", "timeout=10, max=5");
+    request.headers.set("Connection", "Keep-Alive");
+    request.headers.set("Keep-Alive", "timeout=10, max=5");
 
     let response = client.send_request(&request).await.unwrap();
     assert_eq!(response.status.code, 200);
@@ -141,12 +141,15 @@ async fn process_headers() {
     assert_eq!(
         response
             .headers
-            .get("x-hype-test-keepalive-timeout")
+            .get_first("x-hype-test-keepalive-timeout")
             .unwrap(),
         "10"
     );
     assert_eq!(
-        response.headers.get("x-hype-test-keepalive-max").unwrap(),
+        response
+            .headers
+            .get_first("x-hype-test-keepalive-max")
+            .unwrap(),
         "5"
     );
 
@@ -160,8 +163,8 @@ async fn keep_alive_timeout() {
     let shutdown = start_server(port).await;
 
     let mut request = Request::default();
-    request.set_header("Connection", "Keep-Alive");
-    request.set_header("Keep-Alive", "timeout=1");
+    request.headers.set("Connection", "Keep-Alive");
+    request.headers.set("Keep-Alive", "timeout=1");
 
     // Create new connection
     let mut client = Client::new(address.clone());
@@ -189,8 +192,8 @@ async fn keep_alive_max() {
     let shutdown = start_server(port).await;
 
     let mut request = Request::default();
-    request.set_header("Connection", "Keep-Alive");
-    request.set_header("Keep-Alive", "max=2");
+    request.headers.set("Connection", "Keep-Alive");
+    request.headers.set("Keep-Alive", "max=2");
 
     // Create new connection
     let mut client = Client::new(address.clone());
@@ -220,7 +223,7 @@ async fn connection_close() {
     let shutdown = start_server(port).await;
 
     let mut request = Request::default();
-    request.set_header("Connection", "close");
+    request.headers.set("Connection", "close");
 
     // Create new connection
     let mut client = Client::new(address.clone());

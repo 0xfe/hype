@@ -272,14 +272,18 @@ impl Handler for EchoHandler {
         info!("EchoHandler Request: {:?}", r);
 
         let mut response = Response::new(status::from(status::OK));
+        response.headers = r.headers.clone();
 
-        for (key, val) in r.headers.iter() {
-            response.set_header(key, val);
-        }
-
-        w.write_all(format!("{}\r\n\r\n", response.serialize_headers()).as_bytes())
-            .await
-            .unwrap();
+        w.write_all(
+            format!(
+                "{}\r\n{}\r\n\r\n",
+                response.serialize_status(),
+                response.headers.serialize()
+            )
+            .as_bytes(),
+        )
+        .await
+        .unwrap();
 
         let body = &r.body;
         let mut stream = body.raw_stream();
@@ -344,13 +348,11 @@ async fn streaming_lb() {
     let mut client = client.connect().await.unwrap();
 
     let request = &mut Request::new(Method::GET, "/lb");
-    request.set_header("content-length", "18");
+    request.headers.set("content-length", "18");
     request.body.set_content_length(18);
 
     // Hit the first backend in the set
     let response = client.send_request(request).await.unwrap();
-
-    println!("boo");
 
     let mut stream = response.body.content_stream();
     println!("Response: {:?}", response);

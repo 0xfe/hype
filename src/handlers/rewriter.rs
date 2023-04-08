@@ -41,7 +41,7 @@ impl Handler for Rewriter {
         let location = self.url_match_re.replace(path.as_str(), &self.substitution);
 
         if location != path {
-            response.set_header("Location", location);
+            response.headers.set("Location", location);
             let buf = response.serialize();
             w.write_all(buf.as_bytes()).await.unwrap();
             return Ok(handler::Ok::Done);
@@ -72,8 +72,8 @@ merchantID=2003&foo=bar"##;
         println!("{:?}", String::from_utf8_lossy(&stream));
 
         assert_eq!(
+            "HTTP/1.1 301 Moved Permanently\r\nlocation: /foo/bar/\r\n\r\n",
             std::str::from_utf8(&stream).unwrap(),
-            "HTTP/1.1 301 Moved Permanently\r\nlocation: /foo/bar/\r\n\r\n"
         );
     }
 

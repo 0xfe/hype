@@ -43,6 +43,7 @@ async fn main() {
     let request = Request::new(hype::request::Method::GET, "/");
 
     let response = client.send_request(&request).await.unwrap();
-    info!("Headers:\n {:?}", response.serialize_headers());
+    info!("Status:\n {:?}", response.serialize_status());
+    info!("Headers:\n {:?}", response.headers.serialize());
     info!("Body:\n {:?}", response.content().await);
 }
