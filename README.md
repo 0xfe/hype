@@ -57,9 +57,13 @@ curl --insecure https://localhost:4000
 
 ## In Progress
 
--   [x] Build balancer end-to-end unit tests
--   [x] Implement multimap-based headers and rewriting
--   [ ] L4 proxy
+-   [ ] Improve matcher rules system
+    -   [ ] Support prefix vs. exact matches
+    -   [ ] Ignore trailing slashes for prefix matches
+    -   [ ] Support longest matching path
+    -   [ ] Conflict resolution: longest match, exact match, then first match
+    -   See rules at: https://kubernetes.io/docs/concepts/services-networking/ingress/
+-   [ ] Implement wildcard host matching and rewriting
 -   [ ] Transfer-Encoding: gzip (note Content-Encoding and Accept-Encoding too)
 
 ## TODO
@@ -71,14 +75,15 @@ curl --insecure https://localhost:4000
     -   Keep-Alive, Transfer-Encoding, TE, Connection, Trailer, Upgrade, Proxy-Authorization and Proxy-Authenticate
     -   Maybe okay to propagate keep-alive and connection headers.
 -   [ ] Cache control headers
--   [ ] CLI with https://docs.rs/argh/latest/argh/
+-   [ ] REST command server and CLI with https://docs.rs/argh/latest/argh/
 -   [ ] Use templating + #include to make file browser look better
     -   templating engine with https://crates.io/crates/tera
--   [ ] gRPC API - https://github.com/hyperium/tonic
--   [ ] Implement access log
--   [ ] Errors should be derived from error::Error -- see cookie.rs
--   [ ] Support multiple headers with the same key
+-   [ ] L4 proxy
+-   [x] Build balancer end-to-end unit tests
+-   [x] Implement multimap-based headers and rewriting
+-   [x] Support multiple headers with the same key
     -   bad request (400) if multiple host headers
+-   [ ] Use https://github.com/dtolnay/thiserror and anyhow::Error for error management
 -   [x] Support streaming forwarding (encoding support done)
     -   [x] remove pub fields in request and response
     -   [x] factor Body into request and response

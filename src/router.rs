@@ -1,7 +1,15 @@
 use std::path::{Path, PathBuf};
 
 #[derive(Debug)]
+pub enum PathType {
+    Prefix,
+    Exact,
+    Pattern,
+}
+
+#[derive(Debug)]
 pub struct Matcher {
+    pub path_type: PathType,
     pub pattern: String,
 }
 
@@ -11,11 +19,12 @@ pub struct Matcher {
 impl Matcher {
     pub fn new<T: Into<String>>(pattern: T) -> Matcher {
         Matcher {
+            path_type: PathType::Pattern,
             pattern: pattern.into(),
         }
     }
 
-    // AsRed + ?Sized here allows you to accept &str or &String
+    // AsRef + ?Sized here allows you to accept &str or &String
     pub fn matches<T: AsRef<str> + ?Sized>(&self, route: &T) -> Option<PathBuf> {
         let mut path_i = Path::new(route.as_ref()).components();
         let mut patt_i = Path::new(self.pattern.as_str()).components();

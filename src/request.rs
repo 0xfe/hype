@@ -40,10 +40,10 @@ pub struct Request {
     pub method: Method,
     pub version: String,
     pub headers: Headers,
+    pub body: Body,
     pub url: Option<Url>,
     pub base_url: String,
     pub handler_path: Option<String>,
-    pub body: Body,
     conn: Option<Conn>,
 }
 
