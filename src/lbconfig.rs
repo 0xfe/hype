@@ -1,5 +1,6 @@
 use std::{error, fmt};
 
+use rand::{distributions::Alphanumeric, Rng};
 use serde::Deserialize;
 
 #[derive(Debug, Deserialize)]
@@ -11,12 +12,28 @@ pub enum LogLevel {
     Error,
 }
 
+fn random_string(len: usize) -> String {
+    rand::thread_rng()
+        .sample_iter(&Alphanumeric)
+        .take(len)
+        .map(char::from)
+        .collect::<String>()
+}
+
 fn default_tls_cert_file() -> String {
     String::from("localhost.crt")
 }
 
 fn default_tls_key_file() -> String {
     String::from("localhost.key")
+}
+
+fn default_backend_id() -> String {
+    format!("backend-{}", random_string(7))
+}
+
+fn default_route_id() -> String {
+    format!("route-{}", random_string(7))
 }
 
 #[derive(Debug, Deserialize)]
@@ -34,8 +51,23 @@ pub struct Server {
     pub tls_key_file: String,
 }
 
+impl Default for Server {
+    fn default() -> Self {
+        Self {
+            listen_ip: String::from("localhost"),
+            port: 8000,
+            log_level: LogLevel::Info,
+            enable_tls: false,
+            tls_cert_file: default_tls_cert_file(),
+            tls_key_file: default_tls_key_file(),
+        }
+    }
+}
+
 #[derive(Debug, Deserialize)]
 pub struct Backend {
+    #[serde(default = "default_backend_id")]
+    pub id: String,
     pub host: String,
     pub port: u16,
 
@@ -48,6 +80,8 @@ pub struct Backend {
 
 #[derive(Debug, Deserialize)]
 pub struct Route {
+    #[serde(default = "default_route_id")]
+    pub id: String,
     pub location: String,
     pub host_header: Option<String>,
     pub backends: Vec<Backend>,
@@ -76,5 +110,14 @@ impl Config {
         let config =
             serde_yaml::from_str(config_str.as_ref()).map_err(|e| ConfigError(e.to_string()))?;
         Ok(config)
+    }
+}
+
+impl Default for Config {
+    fn default() -> Self {
+        Self {
+            server: Server::default(),
+            routes: vec![],
+        }
     }
 }

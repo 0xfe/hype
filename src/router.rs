@@ -1,16 +1,15 @@
 use std::path::{Path, PathBuf};
 
 #[derive(Debug)]
-pub enum PathType {
-    Prefix,
-    Exact,
-    Pattern,
+pub enum MatchType {
+    Prefix(String),
+    Exact(String),
+    Pattern(String),
 }
 
 #[derive(Debug)]
 pub struct Matcher {
-    pub path_type: PathType,
-    pub pattern: String,
+    pub pattern: MatchType,
 }
 
 /// Matches a URL path to a specified routing pattern. Returns the path
@@ -19,15 +18,22 @@ pub struct Matcher {
 impl Matcher {
     pub fn new<T: Into<String>>(pattern: T) -> Matcher {
         Matcher {
-            path_type: PathType::Pattern,
-            pattern: pattern.into(),
+            pattern: MatchType::Pattern(pattern.into()),
+        }
+    }
+
+    pub fn matches<T: AsRef<str> + ?Sized>(&self, route: &T) -> Option<PathBuf> {
+        match self.pattern {
+            MatchType::Prefix(ref prefix) => Self::pattern_matches(route, prefix),
+            MatchType::Exact(ref exact) => Self::pattern_matches(route, exact),
+            MatchType::Pattern(ref pattern) => Self::pattern_matches(route, pattern),
         }
     }
 
     // AsRef + ?Sized here allows you to accept &str or &String
-    pub fn matches<T: AsRef<str> + ?Sized>(&self, route: &T) -> Option<PathBuf> {
+    pub fn pattern_matches<T: AsRef<str> + ?Sized>(route: &T, pattern: &String) -> Option<PathBuf> {
         let mut path_i = Path::new(route.as_ref()).components();
-        let mut patt_i = Path::new(self.pattern.as_str()).components();
+        let mut patt_i = Path::new(pattern.as_str()).components();
 
         let mut matched_path = PathBuf::new();
 

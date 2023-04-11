@@ -156,32 +156,6 @@ impl Handler for Web {
         r: &Request,
         w: &mut dyn AsyncWriteStream,
     ) -> Result<handler::Ok, handler::Error> {
-        let result = self.handle_path(r, w).await;
-
-        return match result {
-            Ok(handler::Ok::Redirect(to)) => {
-                let mut response = Response::new(status::from(status::MOVED_PERMANENTLY));
-                response.headers.set("Location", to);
-                w.write_all(response.serialize().as_bytes()).await.or(Err(
-                    handler::Error::Failed("could not write to stream".into()),
-                ))?;
-                Ok(handler::Ok::Done)
-            }
-            Ok(ok) => Ok(ok),
-            Err(handler::Error::Failed(msg)) => {
-                Web::write_response(
-                    w,
-                    status::NOT_FOUND,
-                    "text/plain".into(),
-                    format!("404 NOT FOUND - {}", msg),
-                )
-                .await
-                .or(Err(handler::Error::Failed(
-                    "could not write to stream".into(),
-                )))?;
-
-                Err(handler::Error::Failed(msg))
-            }
-        };
+        self.handle_path(r, w).await
     }
 }

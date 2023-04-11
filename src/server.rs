@@ -1,3 +1,4 @@
+use async_trait::async_trait;
 /// This file implements the main rx/tx logic for the network server.
 use rustls_pemfile::{certs, rsa_private_keys};
 use tokio::io::AsyncReadExt;
@@ -13,6 +14,7 @@ use tokio_rustls::{
     TlsAcceptor,
 };
 
+use crate::handler::{self, AsyncWriteStream, ErrorHandler};
 use crate::headers::Headers;
 use crate::parser::RequestParser;
 use crate::{
@@ -46,6 +48,9 @@ pub struct Server {
 
     /// This handler is called if no matchers match the request path.
     default_handler: Option<Arc<RwLock<Box<dyn Handler>>>>,
+
+    /// This handler is called if any handler returns an error.
+    error_handler: Arc<RwLock<Box<dyn ErrorHandler>>>,
 
     /// This tracks all the connections, and performs general housekeeping like
     /// keepalive timeouts, and closing idle connections.
@@ -81,6 +86,88 @@ fn load_keys(path: &Path) -> io::Result<Vec<PrivateKey>> {
         .map(|mut keys| keys.drain(..).map(PrivateKey).collect())
 }
 
+struct DefaultErrorHandler;
+
+impl DefaultErrorHandler {
+    async fn write_response<'b>(
+        w: &mut dyn AsyncWriteStream,
+        status: status::Code<'b>,
+        content_type: String,
+        body: String,
+    ) -> io::Result<()> {
+        let mut response = Response::new(status::from(status));
+        response.headers.set("Content-Type", content_type);
+        response.set_body(body.into());
+
+        w.write_all(response.serialize().as_bytes()).await
+    }
+}
+
+#[async_trait]
+impl ErrorHandler for DefaultErrorHandler {
+    async fn handle(
+        &self,
+        _r: &Request,
+        w: &mut dyn AsyncWriteStream,
+        err: Result<handler::Ok, handler::Error>,
+    ) -> Result<handler::Ok, handler::Error> {
+        return match err {
+            Ok(handler::Ok::Done) => Ok(handler::Ok::Done),
+            Ok(handler::Ok::Next) => Ok(handler::Ok::Next),
+            Ok(handler::Ok::Redirect(to)) => {
+                let mut response = Response::new(status::from(status::MOVED_PERMANENTLY));
+                response.headers.set("Location", to);
+                w.write_all(response.serialize().as_bytes()).await.or(Err(
+                    handler::Error::Failed("could not write to stream".into()),
+                ))?;
+                Ok(handler::Ok::Done)
+            }
+            Err(handler::Error::Failed(msg)) => {
+                Self::write_response(
+                    w,
+                    status::SERVER_ERROR,
+                    "text/plain".into(),
+                    format!("500 INTERNAL SERVER ERROR - {}", msg),
+                )
+                .await
+                .or(Err(handler::Error::Failed(
+                    "could not write to stream".into(),
+                )))?;
+
+                Ok(handler::Ok::Done)
+            }
+            Err(handler::Error::Status(status)) => {
+                Self::write_response(
+                    w,
+                    (status.code, status.text.as_ref()),
+                    "text/plain".into(),
+                    format!("{} {}", status.code, status.text),
+                )
+                .await
+                .or(Err(handler::Error::Failed(
+                    "could not write to stream".into(),
+                )))?;
+
+                Ok(handler::Ok::Done)
+            }
+            Err(handler::Error::CustomStatus(code, msg)) => {
+                Self::write_response(
+                    w,
+                    (code, msg.as_ref()),
+                    "text/plain".into(),
+                    format!("{} {}", code, msg),
+                )
+                .await
+                .or(Err(handler::Error::Failed(
+                    "could not write to stream".into(),
+                )))?;
+
+                Ok(handler::Ok::Done)
+            }
+        };
+    }
+}
+
 impl Server {
     /// Create a new server instance listening on the given address and port.
     pub fn new<T: Into<String> + Clone>(address: T, port: u16) -> Self {
@@ -92,6 +179,7 @@ impl Server {
             port,
             handlers: Arc::new(RwLock::new(Vec::new())),
             default_handler: None,
+            error_handler: Arc::new(RwLock::new(Box::new(DefaultErrorHandler {}))),
             base_url,
             conn_tracker: Arc::new(RwLock::new(ConnTracker::new())),
             start_notifier: Arc::new(Notify::new()),
@@ -116,15 +204,20 @@ impl Server {
         self.base_url = base_url.into();
     }
 
+    /// Add a new handler to the server. This handler will be called if the request path matches the given path.
+    pub async fn route(&self, path: impl Into<String>, handler: Box<dyn Handler>) {
+        let mut handlers = self.handlers.write().await;
+        handlers.push((Matcher::new(&path.into()), handler));
+    }
+
     /// Set the default handler for the server. This is called if no other handlers match the request.
     pub fn route_default(&mut self, handler: Box<dyn Handler>) {
         self.default_handler = Some(Arc::new(RwLock::new(handler)));
     }
 
-    /// Add a new handler to the server. This handler will be called if the request path matches the given path.
-    pub async fn route(&self, path: String, handler: Box<dyn Handler>) {
-        let mut handlers = self.handlers.write().await;
-        handlers.push((Matcher::new(&path), handler));
+    /// Set the error handler for the server. This is called if any handler returns an error.
+    pub async fn route_error(&mut self, handler: Box<dyn ErrorHandler>) {
+        self.error_handler = Arc::new(RwLock::new(handler));
     }
 
     /// Get a reference to the start notifier. This is used to notify the user that the server has started.
@@ -227,6 +320,8 @@ impl Server {
                 .as_ref()
                 .and_then(|h| Some(Arc::clone(&h)));
 
+            let error_handler = Arc::clone(&self.error_handler);
+
             // Spawn a new task to handle the connection.
             tokio::spawn(async move {
                 let mut stream = ConnectedServer {
@@ -235,6 +330,7 @@ impl Server {
                     base_url,
                     handlers,
                     default_handler,
+                    error_handler,
                     shutdown_notifier,
                     conn_tracker,
                     close_connection: false,
@@ -272,6 +368,7 @@ struct ConnectedServer {
     base_url: String,
     handlers: Arc<RwLock<Vec<(Matcher, Box<dyn Handler>)>>>,
     default_handler: Option<Arc<RwLock<Box<dyn Handler>>>>,
+    error_handler: Arc<RwLock<Box<dyn ErrorHandler>>>,
     shutdown_notifier: Arc<Notify>,
     conn_tracker: Arc<RwLock<ConnTracker>>,
 }
@@ -440,18 +537,26 @@ impl ConnectedServer {
                 if let Some(matched_path) = handler.0.matches(&path) {
                     request.handler_path = Some(String::from(matched_path.to_string_lossy()));
                     let mut s = writer.write().await;
-                    if let Err(error) = handler.1.handle(&request, &mut *s).await {
-                        error!("Error from handler {:?}: {:?}", handler, error);
-                    }
+                    let result = handler.1.handle(&request, &mut *s).await;
+                    self.error_handler
+                        .read()
+                        .await
+                        .handle(&request, &mut *s, result)
+                        .await
+                        .map_err(|e| format!("Error running error handler: {:?}", e))?;
                     continue 'top;
                 }
             }
 
             if let Some(handler) = &self.default_handler {
                 let mut s = writer.write().await;
-                if let Err(error) = handler.read().await.handle(&request, &mut *s).await {
-                    error!("Error from handler {:?}: {:?}", handler, error);
-                }
+                let result = handler.read().await.handle(&request, &mut *s).await;
+                self.error_handler
+                    .read()
+                    .await
+                    .handle(&request, &mut *s, result)
+                    .await
+                    .map_err(|e| format!("Error running error handler: {:?}", e))?;
                 continue 'top;
             }
 
