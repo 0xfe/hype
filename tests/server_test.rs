@@ -25,6 +25,55 @@ impl Handler for MyHandler {
         r: &Request,
         w: &mut dyn AsyncWriteStream,
     ) -> Result<handler::Ok, handler::Error> {
+        if r.headers.get_first("x-hype-test-force-error").is_some() {
+            match r
+                .headers
+                .get_first("x-hype-test-force-error")
+                .unwrap()
+                .as_str()
+            {
+                "Next" => {
+                    let mut response = Response::new(status::from(status::OK));
+                    response.set_body("Next".into());
+                    let buf = response.serialize();
+                    w.write_all(buf.as_bytes()).await.unwrap();
+                    return Ok(handler::Ok::Next);
+                }
+                "Done" => {
+                    let mut response = Response::new(status::from(status::OK));
+                    response.set_body("Done".into());
+                    let buf = response.serialize();
+                    w.write_all(buf.as_bytes()).await.unwrap();
+                    return Ok(handler::Ok::Done);
+                }
+                "Redirect" => {
+                    return Ok(handler::Ok::Redirect(
+                        r.headers
+                            .get_first("x-hype-test-redirect-location")
+                            .unwrap()
+                            .to_string(),
+                    ));
+                }
+                "Failed" => {
+                    return Err(handler::Error::Failed("Forced error".to_string()));
+                }
+                "CustomStatus" => {
+                    return Err(handler::Error::CustomStatus(
+                        r.headers
+                            .get_first("x-hype-test-customstatus-code")
+                            .unwrap()
+                            .parse()
+                            .unwrap(),
+                        r.headers
+                            .get_first("x-hype-test-customstatus-message")
+                            .unwrap()
+                            .to_string(),
+                    ));
+                }
+                _ => {}
+            }
+        }
+
         let mut response = Response::new(status::from(status::OK));
         response.set_body("OK".into());
 
@@ -55,6 +104,7 @@ impl Handler for MyHandler {
 
         let buf = response.serialize();
         w.write_all(buf.as_bytes()).await.unwrap();
+
         Ok(handler::Ok::Done)
     }
 }
@@ -237,5 +287,64 @@ async fn connection_close() {
     assert_eq!(response.is_err(), true);
     assert_eq!(client.is_closed().await, true);
 
+    shutdown_server(shutdown).await;
+}
+
+#[tokio::test]
+async fn default_error() {
+    let port = 8861;
+    let address = format!("{}:{}", HOST, port);
+    let shutdown = start_server(port).await;
+
+    let mut client = Client::new(address.clone());
+    let mut client = client.connect().await.unwrap();
+
+    let mut request = Request::default();
+    request
+        .headers
+        .set("x-hype-test-force-error", "CustomStatus");
+    request.headers.set("x-hype-test-customstatus-code", "600");
+    request
+        .headers
+        .set("x-hype-test-customstatus-message", "CustomStatus");
+
+    let response = client.send_request(&request).await.unwrap();
+    assert_eq!(response.status.code, 600);
+    assert_eq!(response.content().await, "600 CustomStatus");
+
+    let mut request = Request::default();
+    request.headers.set("x-hype-test-force-error", "Failed");
+    let response = client.send_request(&request).await.unwrap();
+    assert_eq!(response.status.code, 500);
+    assert_eq!(
+        response.content().await,
+        "500 INTERNAL SERVER ERROR - Forced error"
+    );
+
+    let mut request = Request::default();
+    request.headers.set("x-hype-test-force-error", "Redirect");
+    request
+        .headers
+        .set("x-hype-test-redirect-location", "http://foo");
+    let response = client.send_request(&request).await.unwrap();
+    assert_eq!(response.status.code, 301);
+    assert_eq!(
+        response.headers.get_first("location").unwrap(),
+        "http://foo"
+    );
+
+    let mut request = Request::default();
+    request.headers.set("x-hype-test-force-error", "Done");
+    let response = client.send_request(&request).await.unwrap();
+    assert_eq!(response.status.code, 200);
+    assert_eq!(response.content().await, "Done");
+
+    let mut request = Request::default();
+    request.headers.set("x-hype-test-force-error", "Next");
+    let response = client.send_request(&request).await.unwrap();
+    assert_eq!(response.status.code, 200);
+    assert_eq!(response.content().await, "Next");
+
+    // Shutdown server
     shutdown_server(shutdown).await;
 }
