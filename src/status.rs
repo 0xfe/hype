@@ -2,6 +2,7 @@ pub type Code<'a> = (u16, &'a str);
 
 pub const OK: Code = (200, "OK");
 pub const MOVED_PERMANENTLY: Code = (301, "Moved Permanently");
+pub const UNAUTHORIZED: Code = (401, "Unauthorized");
 pub const NOT_FOUND: Code = (404, "Not Found");
 pub const SERVER_ERROR: Code = (500, "Server Error");
 

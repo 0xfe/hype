@@ -1,5 +1,6 @@
-use std::{collections::HashMap, str::FromStr};
+use std::{collections::HashMap, str::FromStr, sync::Arc};
 
+use tokio::sync::RwLock;
 use url::Url;
 
 use crate::{
@@ -44,6 +45,7 @@ pub struct Request {
     pub url: Option<Url>,
     pub base_url: String,
     pub handler_path: Option<String>,
+    pub context: Arc<RwLock<HashMap<String, String>>>,
     conn: Option<Conn>,
 }
 
@@ -73,6 +75,7 @@ impl Request {
             version: String::new(),
             headers: Headers::new(),
             body: Body::new(),
+            context: Arc::new(RwLock::new(HashMap::new())),
             conn: None,
         };
 

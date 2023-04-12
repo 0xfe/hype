@@ -86,6 +86,8 @@ fn load_keys(path: &Path) -> io::Result<Vec<PrivateKey>> {
         .map(|mut keys| keys.drain(..).map(PrivateKey).collect())
 }
 
+/// This is the default error handler, which is called when a route handler returns an error.
+#[derive(Debug, Clone)]
 struct DefaultErrorHandler;
 
 impl DefaultErrorHandler {
@@ -98,7 +100,6 @@ impl DefaultErrorHandler {
         let mut response = Response::new(status::from(status));
         response.headers.set("Content-Type", content_type);
         response.set_body(body.into());
-
         w.write_all(response.serialize().as_bytes()).await
     }
 }
@@ -519,6 +520,7 @@ impl ConnectedServer {
                 break 'top;
             }
 
+            // Extract the request from the parser
             let mut request: Request = message.unwrap().into();
             request
                 .headers
@@ -533,6 +535,7 @@ impl ConnectedServer {
                 path = url.path().into()
             }
 
+            // Go through our route handlers ands see if any of them match the request path.
             for handler in self.handlers.read().await.iter() {
                 if let Some(matched_path) = handler.0.matches(&path) {
                     request.handler_path = Some(String::from(matched_path.to_string_lossy()));
@@ -548,6 +551,7 @@ impl ConnectedServer {
                 }
             }
 
+            // No route handlers matched, try the default handler.
             if let Some(handler) = &self.default_handler {
                 let mut s = writer.write().await;
                 let result = handler.read().await.handle(&request, &mut *s).await;
@@ -560,7 +564,8 @@ impl ConnectedServer {
                 continue 'top;
             }
 
-            // Fell through here, no handlers match
+            // Fell through here, no route handlers installed, and there's no default handler. Return
+            // a 404.
             let mut response = Response::new(status::from(status::NOT_FOUND));
             response.headers.set("Content-Type", "text/plain");
             response.set_body("Hype: no route handlers installed.".into());
@@ -571,7 +576,7 @@ impl ConnectedServer {
                 .map_err(|e| format!("could not write to socket: {e}"))?;
         }
 
-        debug!("Closed connection {}", &self.conn.id());
+        info!("Closed connection {}", &self.conn.id());
         Ok(())
         // If we're here, then the connection is closed, there's nothing to do.
     }

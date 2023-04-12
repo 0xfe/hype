@@ -9,6 +9,7 @@ use async_trait::async_trait;
 use hype::{
     handler::{self, AsyncWriteStream, Handler},
     handlers, lbconfig,
+    middleware::Stack,
     request::{Method, Request},
     response::Response,
     server::Server,
@@ -28,13 +29,38 @@ struct Args {
     port: u16,
 }
 
+#[derive(Clone, Debug)]
+struct AuthHandler {
+    token: String,
+}
+
+#[async_trait]
+impl Handler for AuthHandler {
+    async fn handle(
+        &self,
+        r: &Request,
+        _w: &mut dyn AsyncWriteStream,
+    ) -> Result<handler::Ok, handler::Error> {
+        let token = r
+            .headers
+            .get_first("x-hype-auth-token")
+            .ok_or(handler::Error::Status(status::from(status::UNAUTHORIZED)))?;
+
+        if *token != self.token {
+            return Err(handler::Error::Status(status::from(status::UNAUTHORIZED)));
+        }
+
+        Ok(handler::Ok::Next)
+    }
+}
+
 struct BackendHandler {
     _config: Arc<RwLock<lbconfig::Config>>,
     backends: Arc<RwLock<Vec<lbconfig::Backend>>>,
 }
 
 // Test with:
-//   curl -d '{ "host": "foobar", "port": 3000 }' -X POST http://localhost:5000/backends
+//   curl -d '{ "host": "foobar", "port": 3000 }'  -H "x-hype-auth-token: foo" -X POST http://localhost:5000/backends
 #[async_trait]
 impl Handler for BackendHandler {
     async fn handle(
@@ -72,15 +98,16 @@ async fn main() {
 
     let config = Arc::new(RwLock::new(lbconfig::Config::default()));
 
-    server
-        .route(
-            "/backends",
-            Box::new(BackendHandler {
-                _config: Arc::clone(&config),
-                backends: Arc::new(RwLock::new(vec![])),
-            }),
-        )
-        .await;
+    let mut stack = Stack::new();
+    stack.push_handler(Box::new(AuthHandler {
+        token: "foo".into(),
+    }));
+    stack.push_handler(Box::new(BackendHandler {
+        _config: Arc::clone(&config),
+        backends: Arc::new(RwLock::new(vec![])),
+    }));
+
+    server.route("/backends", Box::new(stack)).await;
 
     server.route_default(Box::new(handlers::status::NotFoundHandler()));
     server.start().await.unwrap();
