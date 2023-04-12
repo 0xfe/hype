@@ -41,3 +41,17 @@ fn matched_path() {
     let r = Matcher::new("/*/admin").matches("/x/admin/dist/README.md");
     assert_eq!(r.unwrap().to_string_lossy(), "/x/admin");
 }
+
+#[test]
+fn extract_params() {
+    let r = Matcher::new("/files/:name");
+    let r = r.extract_params("/files/README.md").unwrap();
+    assert_eq!(r.0.to_string_lossy(), "/files/README.md");
+    assert_eq!(r.1.get("name").unwrap(), &"README.md");
+
+    let r = Matcher::new("/files/:name/*/:ext");
+    let r = r.extract_params("/files/README/dist/md").unwrap();
+    assert_eq!(r.0.to_string_lossy(), "/files/README/dist/md");
+    assert_eq!(r.1.get("name").unwrap(), &"README");
+    assert_eq!(r.1.get("ext").unwrap(), &"md");
+}

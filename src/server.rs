@@ -209,6 +209,9 @@ impl Server {
     pub async fn route(&self, path: impl Into<String>, handler: Box<dyn Handler>) {
         let mut handlers = self.handlers.write().await;
         handlers.push((Matcher::new(&path.into()), handler));
+
+        // Sort by matcher length, so that the longest matchers are checked first.
+        handlers.sort_by(|a, b| b.0.len().cmp(&a.0.len()));
     }
 
     /// Set the default handler for the server. This is called if no other handlers match the request.
@@ -535,10 +538,15 @@ impl ConnectedServer {
                 path = url.path().into()
             }
 
-            // Go through our route handlers ands see if any of them match the request path.
+            // Go through our route handlers ands see if any of them match the request path. The routes
+            // are sorted by length, so the first match is the longest match.
             for handler in self.handlers.read().await.iter() {
-                if let Some(matched_path) = handler.0.matches(&path) {
+                if let Some((matched_path, params)) = handler.0.extract_params(&path) {
                     request.handler_path = Some(String::from(matched_path.to_string_lossy()));
+                    request.params = params
+                        .iter()
+                        .map(|(k, v)| (k.to_string(), v.to_string()))
+                        .collect();
                     let mut s = writer.write().await;
                     let result = handler.1.handle(&request, &mut *s).await;
                     self.error_handler

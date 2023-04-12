@@ -1,7 +1,7 @@
 #[macro_use]
 extern crate log;
 
-use std::sync::Arc;
+use std::{collections::HashMap, sync::Arc};
 
 use argh::FromArgs;
 
@@ -56,11 +56,12 @@ impl Handler for AuthHandler {
 
 struct BackendHandler {
     _config: Arc<RwLock<lbconfig::Config>>,
-    backends: Arc<RwLock<Vec<lbconfig::Backend>>>,
+    backends: Arc<RwLock<HashMap<String, lbconfig::Backend>>>,
 }
 
 // Test with:
 //   curl -d '{ "host": "foobar", "port": 3000 }'  -H "x-hype-auth-token: foo" -X POST http://localhost:5000/backends
+//   curl -H "x-hype-auth-token: foo" http://localhost:5000/backends/backend-ayGoPVg
 #[async_trait]
 impl Handler for BackendHandler {
     async fn handle(
@@ -72,10 +73,28 @@ impl Handler for BackendHandler {
         response.set_body(format!("<html>Path: {}</html>\n", r.path()).into());
 
         match (r.method, r.path().as_str()) {
-            (Method::POST, "") => {
+            (Method::POST, _) => {
                 let backend: lbconfig::Backend = handler::parse_json(&r.body.content().await)?;
-                response.set_body(format!("Got backend: {:#?}", backend).into());
-                self.backends.write().await.push(backend);
+                response.set_body(format!("Got backend: {:#?}", &backend).into());
+                self.backends
+                    .write()
+                    .await
+                    .insert(backend.id.clone(), backend);
+            }
+            (Method::GET, _) => {
+                response.set_body(
+                    format!(
+                        "{:#?}",
+                        self.backends
+                            .read()
+                            .await
+                            .get(r.params.get("id").ok_or(handler::Error::Failed(
+                                "missing parameter: id".to_string()
+                            ))?)
+                            .ok_or(handler::Error::Status(status::from(status::NOT_FOUND)))?
+                    )
+                    .into(),
+                );
             }
             _ => {
                 return Err(handler::Error::Failed("Invalid request".to_string()));
@@ -97,6 +116,7 @@ async fn main() {
     info!("Starting hype admin server on {}:{}", args.host, args.port);
 
     let config = Arc::new(RwLock::new(lbconfig::Config::default()));
+    let backends = Arc::new(RwLock::new(HashMap::new()));
 
     let mut stack = Stack::new();
     stack.push_handler(Box::new(AuthHandler {
@@ -104,10 +124,21 @@ async fn main() {
     }));
     stack.push_handler(Box::new(BackendHandler {
         _config: Arc::clone(&config),
-        backends: Arc::new(RwLock::new(vec![])),
+        backends: Arc::clone(&backends),
     }));
 
     server.route("/backends", Box::new(stack)).await;
+
+    let mut stack = Stack::new();
+    stack.push_handler(Box::new(AuthHandler {
+        token: "foo".into(),
+    }));
+    stack.push_handler(Box::new(BackendHandler {
+        _config: Arc::clone(&config),
+        backends: Arc::clone(&backends),
+    }));
+
+    server.route("/backends/:id", Box::new(stack)).await;
 
     server.route_default(Box::new(handlers::status::NotFoundHandler()));
     server.start().await.unwrap();

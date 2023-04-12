@@ -58,16 +58,17 @@ curl --insecure https://localhost:4000
 ## In Progress
 
 -   [ ] Improve matcher rules system
-    -   [ ] Support prefix vs. exact matches
     -   [ ] Ignore trailing slashes for prefix matches
-    -   [ ] Support longest matching path
-    -   [ ] Conflict resolution: longest match, exact match, then first match
-    -   See rules at: https://kubernetes.io/docs/concepts/services-networking/ingress/
--   [ ] Implement wildcard host matching and rewriting
--   [ ] Transfer-Encoding: gzip (note Content-Encoding and Accept-Encoding too)
+    -   [x] Support longest matching path
+    -   [x] Support positional parameters
+-   [ ] REST command server and CLI with https://docs.rs/argh/latest/argh/
+    -   [x] POST /admin/backends
+    -   [x] GET /admin/backends/:id
 
 ## TODO
 
+-   [ ] Implement gzip transfer encoding
+-   [ ] Implement wildcard host matching and rewriting
 -   [ ] Support path override in LB configuration
 -   [ ] Support X-Forwarded-For
 -   [ ] Backend healthchecking for balancer targets
@@ -75,7 +76,6 @@ curl --insecure https://localhost:4000
     -   Keep-Alive, Transfer-Encoding, TE, Connection, Trailer, Upgrade, Proxy-Authorization and Proxy-Authenticate
     -   Maybe okay to propagate keep-alive and connection headers.
 -   [ ] Cache control headers
--   [ ] REST command server and CLI with https://docs.rs/argh/latest/argh/
 -   [ ] Use templating + #include to make file browser look better
     -   templating engine with https://crates.io/crates/tera
 -   [ ] L4 proxy

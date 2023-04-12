@@ -45,6 +45,7 @@ pub struct Request {
     pub url: Option<Url>,
     pub base_url: String,
     pub handler_path: Option<String>,
+    pub params: HashMap<String, String>,
     pub context: Arc<RwLock<HashMap<String, String>>>,
     conn: Option<Conn>,
 }
@@ -75,6 +76,7 @@ impl Request {
             version: String::new(),
             headers: Headers::new(),
             body: Body::new(),
+            params: HashMap::new(),
             context: Arc::new(RwLock::new(HashMap::new())),
             conn: None,
         };
