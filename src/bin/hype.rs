@@ -120,13 +120,13 @@ async fn main() {
     let backends = Arc::new(RwLock::new(HashMap::new()));
 
     let mut stack = Stack::new();
-    stack.push_handler(Box::new(AuthHandler {
+    stack.push_handler(RouteHandler::new(Box::new(AuthHandler {
         token: "foo".into(),
-    }));
-    stack.push_handler(Box::new(BackendHandler {
+    })));
+    stack.push_handler(RouteHandler::new(Box::new(BackendHandler {
         _config: Arc::clone(&config),
         backends: Arc::clone(&backends),
-    }));
+    })));
 
     let stack = RouteHandler::new(Box::new(stack));
 

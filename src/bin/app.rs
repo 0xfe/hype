@@ -136,8 +136,8 @@ async fn main() {
 
     let mut stack = middleware::Stack::new();
     stack.push_handlers(&mut vec![
-        Box::new(LogHandler {}),
-        Box::new(MyHandler::new(app.clone())),
+        RouteHandler::new(Box::new(LogHandler {})),
+        RouteHandler::new(Box::new(MyHandler::new(app.clone()))),
     ]);
     server.route_default(RouteHandler::new(Box::new(stack)));
 

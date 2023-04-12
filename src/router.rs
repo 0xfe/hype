@@ -12,6 +12,8 @@ use crate::{
 
 /// This is a wrapper around Handler that allows us easily clone and use them
 /// in different routes in multi-threaded contexts.
+///
+/// Safe to clone.
 #[derive(Debug)]
 pub struct RouteHandler(Arc<tokio::sync::RwLock<Box<dyn Handler>>>);
 
@@ -34,6 +36,8 @@ impl Clone for RouteHandler {
 
 /// This is the main router struct. It holds a list of routes and their handlers, and
 /// finds the best handler for a given request based on the longest matching route.
+///
+/// Safe to clone.
 #[derive(Debug)]
 pub struct Router {
     /// List of routes and their handlers.
