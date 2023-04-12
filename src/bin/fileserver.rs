@@ -3,7 +3,7 @@ extern crate log;
 
 use std::{env, process::exit};
 
-use hype::{handlers, server::Server};
+use hype::{handlers, router::RouteHandler, server::Server};
 
 #[tokio::main]
 async fn main() {
@@ -24,10 +24,12 @@ async fn main() {
     server
         .route(
             "/files".to_string(),
-            Box::new(hype::handlers::file::File::new(args[1].clone())),
+            RouteHandler::new(Box::new(hype::handlers::file::File::new(args[1].clone()))),
         )
         .await;
-    server.route_default(Box::new(handlers::status::NotFoundHandler()));
+    server.route_default(RouteHandler::new(Box::new(
+        handlers::status::NotFoundHandler(),
+    )));
 
     server.start().await.unwrap();
 }

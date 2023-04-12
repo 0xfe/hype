@@ -12,6 +12,7 @@ use hype::{
     middleware::Stack,
     request::{Method, Request},
     response::Response,
+    router::RouteHandler,
     server::Server,
     status,
 };
@@ -127,19 +128,13 @@ async fn main() {
         backends: Arc::clone(&backends),
     }));
 
-    server.route("/backends", Box::new(stack)).await;
+    let stack = RouteHandler::new(Box::new(stack));
 
-    let mut stack = Stack::new();
-    stack.push_handler(Box::new(AuthHandler {
-        token: "foo".into(),
-    }));
-    stack.push_handler(Box::new(BackendHandler {
-        _config: Arc::clone(&config),
-        backends: Arc::clone(&backends),
-    }));
+    server.route("/backends", stack.clone()).await;
+    server.route("/backends/:id", stack.clone()).await;
 
-    server.route("/backends/:id", Box::new(stack)).await;
-
-    server.route_default(Box::new(handlers::status::NotFoundHandler()));
+    server.route_default(RouteHandler::new(Box::new(
+        handlers::status::NotFoundHandler(),
+    )));
     server.start().await.unwrap();
 }

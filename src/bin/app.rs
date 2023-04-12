@@ -9,6 +9,7 @@ use hype::{
     middleware,
     request::{Method, Request},
     response::Response,
+    router::RouteHandler,
     server::Server,
     status::{self},
 };
@@ -138,7 +139,7 @@ async fn main() {
         Box::new(LogHandler {}),
         Box::new(MyHandler::new(app.clone())),
     ]);
-    server.route_default(Box::new(stack));
+    server.route_default(RouteHandler::new(Box::new(stack)));
 
     server.start().await.unwrap();
 }

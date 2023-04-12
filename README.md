@@ -64,6 +64,7 @@ curl --insecure https://localhost:4000
 -   [ ] REST command server and CLI with https://docs.rs/argh/latest/argh/
     -   [x] POST /admin/backends
     -   [x] GET /admin/backends/:id
+-   [ ] Make it easy to share middleware across routes
 
 ## TODO
 

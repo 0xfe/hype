@@ -6,7 +6,6 @@ use std::fs;
 use argh::FromArgs;
 
 use hype::{
-    handlers,
     lb::{
         backend::{Backend, HttpBackend},
         http::Http,
@@ -58,9 +57,12 @@ async fn main() {
         }
 
         let lb = hype::handlers::lb::Lb::new(balancer);
-        server.route(route.location, Box::new(lb)).await;
+        server
+            .route(
+                route.location,
+                hype::router::RouteHandler::new(Box::new(lb)),
+            )
+            .await;
     }
-
-    server.route_default(Box::new(handlers::status::NotFoundHandler()));
     server.start().await.unwrap();
 }

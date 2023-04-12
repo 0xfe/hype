@@ -70,6 +70,6 @@ async fn main() {
         server.enable_tls(args.cert_file.into(), args.key_file.into());
     }
 
-    server.route_default(Box::new(MyHandler {}));
+    server.route_default(hype::router::RouteHandler::new(Box::new(MyHandler {})));
     server.start().await.unwrap();
 }

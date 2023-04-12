@@ -10,6 +10,7 @@ use hype::{
     handlers,
     request::Request,
     response::Response,
+    router::RouteHandler,
     server::Server,
     status,
 };
@@ -60,9 +61,11 @@ async fn main() {
             config::Handler::Web(params) => Box::new(handlers::web::Web::from(params)),
         };
 
-        server.route(route.location.clone(), handler).await;
+        server
+            .route(route.location.clone(), RouteHandler::new(handler))
+            .await;
     }
 
-    server.route_default(Box::new(MyHandler {}));
+    server.route_default(RouteHandler::new(Box::new(MyHandler {})));
     server.start().await.unwrap();
 }

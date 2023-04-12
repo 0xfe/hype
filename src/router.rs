@@ -1,7 +1,96 @@
 use std::{
     collections::HashMap,
     path::{Path, PathBuf},
+    sync::{Arc, RwLock},
 };
+
+use crate::{
+    handler::{self, AsyncWriteStream, Handler},
+    handlers,
+    request::Request,
+};
+
+/// This is a wrapper around Handler that allows us easily clone and use them
+/// in different routes in multi-threaded contexts.
+#[derive(Debug)]
+pub struct RouteHandler(Arc<tokio::sync::RwLock<Box<dyn Handler>>>);
+
+impl RouteHandler {
+    pub fn new(handler: Box<dyn Handler>) -> RouteHandler {
+        RouteHandler(Arc::new(tokio::sync::RwLock::new(handler)))
+    }
+
+    pub fn handler(&self) -> Arc<tokio::sync::RwLock<Box<dyn Handler>>> {
+        let RouteHandler(handler) = self;
+        Arc::clone(handler)
+    }
+}
+
+impl Clone for RouteHandler {
+    fn clone(&self) -> Self {
+        RouteHandler(Arc::clone(&self.0))
+    }
+}
+
+/// This is the main router struct. It holds a list of routes and their handlers, and
+/// finds the best handler for a given request based on the longest matching route.
+#[derive(Debug)]
+pub struct Router {
+    /// List of routes and their handlers.
+    handlers: Arc<RwLock<Vec<(Matcher, RouteHandler)>>>,
+    pub default_handler: RouteHandler,
+}
+
+impl Clone for Router {
+    fn clone(&self) -> Self {
+        Router {
+            handlers: Arc::clone(&self.handlers),
+            default_handler: self.default_handler.clone(),
+        }
+    }
+}
+
+impl Router {
+    pub fn new() -> Router {
+        Router {
+            handlers: Arc::new(RwLock::new(Vec::new())),
+            default_handler: RouteHandler::new(Box::new(handlers::status::NotFoundHandler())),
+        }
+    }
+
+    /// Associate a handler with a route.
+    pub fn add_route(&self, matcher: Matcher, handler: RouteHandler) {
+        let mut handlers = self.handlers.write().unwrap();
+        handlers.push((matcher, handler));
+        // Sort by matcher length, so that the longest matchers are checked first.
+        handlers.sort_by(|a, b| b.0.len().cmp(&a.0.len()));
+    }
+
+    pub async fn handle(
+        &self,
+        r: &mut Request,
+        w: &mut dyn AsyncWriteStream,
+    ) -> Result<handler::Ok, handler::Error> {
+        let path = r.url.as_ref().unwrap().path();
+
+        let mut h = self.default_handler.clone();
+
+        // Go through our route handlers ands see if any of them match the request path. The routes
+        // are sorted by length, so the first match is the longest match.
+        for handler in self.handlers.read().unwrap().iter() {
+            if let Some((matched_path, params)) = handler.0.extract_params(&path) {
+                r.handler_path = Some(String::from(matched_path.to_string_lossy()));
+                r.params = params
+                    .iter()
+                    .map(|(k, v)| (k.to_string(), v.to_string()))
+                    .collect();
+                h = handler.1.clone();
+            }
+        }
+
+        h.handler().read().await.handle(&r, w).await
+    }
+}
 
 #[derive(Debug)]
 pub struct Matcher {
@@ -20,44 +109,6 @@ impl Matcher {
 
     pub fn len(&self) -> usize {
         self.pattern.components().count()
-    }
-
-    // AsRef + ?Sized here allows you to accept &str or &String
-    pub fn matches<T: AsRef<str> + ?Sized>(&self, route: &T) -> Option<PathBuf> {
-        let pattern = &self.pattern;
-        let mut path_i = Path::new(route.as_ref()).components();
-        let mut patt_i = pattern.components();
-
-        let mut matched_path = PathBuf::new();
-
-        loop {
-            let path = path_i.next();
-            let patt = patt_i.next();
-
-            debug!("Matching pattern {:?} against path {:?}", patt, path);
-
-            if let (Some(path), Some(patt)) = (path, patt) {
-                if patt != path && patt.as_os_str() != "*" {
-                    return None;
-                }
-                matched_path.push(path);
-            } else if let (None, Some(patt)) = (path, patt) {
-                if patt.as_os_str() != "*" {
-                    return None;
-                }
-            } else if let (Some(_), None) = (path, patt) {
-                // we've come this far, return true
-                debug!("Matched path: {:?}", matched_path);
-                return Some(matched_path);
-            }
-
-            if path == None && patt == None {
-                break;
-            }
-        }
-
-        debug!("Matched path: {:?}", matched_path);
-        Some(matched_path)
     }
 
     pub fn extract_params<'a, T: AsRef<str> + ?Sized>(

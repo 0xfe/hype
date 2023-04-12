@@ -17,9 +17,10 @@ use tokio_rustls::{
 use crate::handler::{self, AsyncWriteStream, ErrorHandler};
 use crate::headers::Headers;
 use crate::parser::RequestParser;
+use crate::router::{RouteHandler, Router};
 use crate::{
     conntrack::{Conn, ConnTracker},
-    handler::{AsyncStream, Handler},
+    handler::AsyncStream,
     request::Request,
     response::Response,
     router::Matcher,
@@ -44,10 +45,7 @@ pub struct Server {
 
     /// These handlers are called based on the request path. Every handler here
     /// has a corresponding matcher to determine if it should be called.
-    handlers: Arc<RwLock<Vec<(Matcher, Box<dyn Handler>)>>>,
-
-    /// This handler is called if no matchers match the request path.
-    default_handler: Option<Arc<RwLock<Box<dyn Handler>>>>,
+    router: Router,
 
     /// This handler is called if any handler returns an error.
     error_handler: Arc<RwLock<Box<dyn ErrorHandler>>>,
@@ -178,8 +176,7 @@ impl Server {
         Self {
             address: address.into(),
             port,
-            handlers: Arc::new(RwLock::new(Vec::new())),
-            default_handler: None,
+            router: Router::new(),
             error_handler: Arc::new(RwLock::new(Box::new(DefaultErrorHandler {}))),
             base_url,
             conn_tracker: Arc::new(RwLock::new(ConnTracker::new())),
@@ -206,17 +203,13 @@ impl Server {
     }
 
     /// Add a new handler to the server. This handler will be called if the request path matches the given path.
-    pub async fn route(&self, path: impl Into<String>, handler: Box<dyn Handler>) {
-        let mut handlers = self.handlers.write().await;
-        handlers.push((Matcher::new(&path.into()), handler));
-
-        // Sort by matcher length, so that the longest matchers are checked first.
-        handlers.sort_by(|a, b| b.0.len().cmp(&a.0.len()));
+    pub async fn route(&self, path: impl Into<String>, handler: RouteHandler) {
+        self.router.add_route(Matcher::new(&path.into()), handler);
     }
 
     /// Set the default handler for the server. This is called if no other handlers match the request.
-    pub fn route_default(&mut self, handler: Box<dyn Handler>) {
-        self.default_handler = Some(Arc::new(RwLock::new(handler)));
+    pub fn route_default(&mut self, handler: RouteHandler) {
+        self.router.default_handler = handler;
     }
 
     /// Set the error handler for the server. This is called if any handler returns an error.
@@ -318,12 +311,7 @@ impl Server {
 
             let conn = self.conn_tracker.write().await.push_stream(socket);
             let base_url = self.base_url.clone();
-            let handlers = Arc::clone(&self.handlers);
-            let default_handler: Option<Arc<RwLock<Box<dyn Handler>>>> = self
-                .default_handler
-                .as_ref()
-                .and_then(|h| Some(Arc::clone(&h)));
-
+            let router = self.router.clone();
             let error_handler = Arc::clone(&self.error_handler);
 
             // Spawn a new task to handle the connection.
@@ -332,8 +320,7 @@ impl Server {
                     conn,
                     peer_addr,
                     base_url,
-                    handlers,
-                    default_handler,
+                    router,
                     error_handler,
                     shutdown_notifier,
                     conn_tracker,
@@ -370,8 +357,7 @@ struct ConnectedServer {
 
     /// Configuration from the server.
     base_url: String,
-    handlers: Arc<RwLock<Vec<(Matcher, Box<dyn Handler>)>>>,
-    default_handler: Option<Arc<RwLock<Box<dyn Handler>>>>,
+    router: Router,
     error_handler: Arc<RwLock<Box<dyn ErrorHandler>>>,
     shutdown_notifier: Arc<Notify>,
     conn_tracker: Arc<RwLock<ConnTracker>>,
@@ -533,55 +519,14 @@ impl ConnectedServer {
 
             debug!("Request: {:?}", request);
 
-            let mut path = String::from("/__bad_path__");
-            if let Some(url) = &request.url {
-                path = url.path().into()
-            }
-
-            // Go through our route handlers ands see if any of them match the request path. The routes
-            // are sorted by length, so the first match is the longest match.
-            for handler in self.handlers.read().await.iter() {
-                if let Some((matched_path, params)) = handler.0.extract_params(&path) {
-                    request.handler_path = Some(String::from(matched_path.to_string_lossy()));
-                    request.params = params
-                        .iter()
-                        .map(|(k, v)| (k.to_string(), v.to_string()))
-                        .collect();
-                    let mut s = writer.write().await;
-                    let result = handler.1.handle(&request, &mut *s).await;
-                    self.error_handler
-                        .read()
-                        .await
-                        .handle(&request, &mut *s, result)
-                        .await
-                        .map_err(|e| format!("Error running error handler: {:?}", e))?;
-                    continue 'top;
-                }
-            }
-
-            // No route handlers matched, try the default handler.
-            if let Some(handler) = &self.default_handler {
-                let mut s = writer.write().await;
-                let result = handler.read().await.handle(&request, &mut *s).await;
-                self.error_handler
-                    .read()
-                    .await
-                    .handle(&request, &mut *s, result)
-                    .await
-                    .map_err(|e| format!("Error running error handler: {:?}", e))?;
-                continue 'top;
-            }
-
-            // Fell through here, no route handlers installed, and there's no default handler. Return
-            // a 404.
-            let mut response = Response::new(status::from(status::NOT_FOUND));
-            response.headers.set("Content-Type", "text/plain");
-            response.set_body("Hype: no route handlers installed.".into());
-            let buf = response.serialize();
             let mut s = writer.write().await;
-            s.write_all(buf.as_bytes())
+            let result = self.router.handle(&mut request, &mut *s).await;
+            self.error_handler
+                .read()
                 .await
-                .map_err(|e| format!("could not write to socket: {e}"))?;
+                .handle(&request, &mut *s, result)
+                .await
+                .map_err(|e| format!("Error running error handler: {:?}", e))?;
         }
 
         info!("Closed connection {}", &self.conn.id());

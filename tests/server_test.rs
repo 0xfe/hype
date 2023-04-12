@@ -6,6 +6,7 @@ use hype::{
     handler::{self, AsyncWriteStream, Handler},
     request::Request,
     response::Response,
+    router::RouteHandler,
     server::Server,
     status,
 };
@@ -111,7 +112,7 @@ impl Handler for MyHandler {
 
 async fn start_server(port: u16) -> (Arc<mpsc::Sender<bool>>, Arc<Notify>) {
     let mut server = Server::new(HOST, port);
-    server.route_default(Box::new(MyHandler {}));
+    server.route_default(RouteHandler::new(Box::new(MyHandler {})));
     let ready = server.start_notifier();
     let shutdown = server.shutdown();
 
