@@ -54,18 +54,16 @@ async fn main() {
     let mut server = Server::new(config.server.listen_ip, config.server.port);
 
     for route in &config.routes {
-        let handler: Box<dyn Handler> = match &route.handler {
+        let handler: RouteHandler = match &route.handler {
             config::Handler::File(params) => {
-                Box::new(handlers::file::File::new(params.fs_path.clone()))
+                handlers::file::File::new(params.fs_path.clone()).into()
             }
-            config::Handler::Web(params) => Box::new(handlers::web::Web::from(params)),
+            config::Handler::Web(params) => handlers::web::Web::from(params).into(),
         };
 
-        server
-            .route(route.location.clone(), RouteHandler::new(handler))
-            .await;
+        server.route(route.location.clone(), handler).await;
     }
 
-    server.route_default(RouteHandler::new(Box::new(MyHandler {})));
+    server.route_default(MyHandler {});
     server.start().await.unwrap();
 }

@@ -12,7 +12,6 @@ use hype::{
     middleware::Stack,
     request::{Method, Request},
     response::Response,
-    router::RouteHandler,
     server::Server,
     status,
 };
@@ -119,23 +118,21 @@ async fn main() {
     let config = Arc::new(RwLock::new(lbconfig::Config::default()));
     let backends = Arc::new(RwLock::new(HashMap::new()));
 
-    let mut stack = Stack::new();
-    stack.push_handler(RouteHandler::new(Box::new(handlers::log::Log {})));
-    stack.push_handler(RouteHandler::new(Box::new(AuthHandler {
+    let auth_handler = AuthHandler {
         token: "foo".into(),
-    })));
-    stack.push_handler(RouteHandler::new(Box::new(BackendHandler {
+    };
+
+    let mut stack = Stack::new();
+    stack.push(handlers::log::Log {});
+    stack.push(auth_handler);
+    stack.push(BackendHandler {
         _config: Arc::clone(&config),
         backends: Arc::clone(&backends),
-    })));
-
-    let stack = RouteHandler::new(Box::new(stack));
+    });
 
     server.route("/backends", stack.clone()).await;
     server.route("/backends/:id", stack.clone()).await;
 
-    server.route_default(RouteHandler::new(Box::new(
-        handlers::status::NotFoundHandler(),
-    )));
+    server.route_default(handlers::status::NotFoundHandler());
     server.start().await.unwrap();
 }

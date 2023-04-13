@@ -22,6 +22,10 @@ impl RouteHandler {
         RouteHandler(Arc::new(tokio::sync::RwLock::new(handler)))
     }
 
+    pub fn new_unboxed(handler: impl Handler + 'static) -> RouteHandler {
+        RouteHandler(Arc::new(tokio::sync::RwLock::new(Box::new(handler))))
+    }
+
     pub fn handler(&self) -> Arc<tokio::sync::RwLock<Box<dyn Handler>>> {
         let RouteHandler(handler) = self;
         Arc::clone(handler)
@@ -31,6 +35,12 @@ impl RouteHandler {
 impl Clone for RouteHandler {
     fn clone(&self) -> Self {
         RouteHandler(Arc::clone(&self.0))
+    }
+}
+
+impl<T: Handler + 'static> From<T> for RouteHandler {
+    fn from(handler: T) -> RouteHandler {
+        RouteHandler::new(Box::new(handler))
     }
 }
 
@@ -63,9 +73,9 @@ impl Router {
     }
 
     /// Associate a handler with a route.
-    pub fn add_route(&self, matcher: Matcher, handler: RouteHandler) {
+    pub fn add_route(&self, matcher: Matcher, handler: impl Into<RouteHandler>) {
         let mut handlers = self.handlers.write().unwrap();
-        handlers.push((matcher, handler));
+        handlers.push((matcher, handler.into()));
         // Sort by matcher length, so that the longest matchers are checked first.
         handlers.sort_by(|a, b| b.0.len().cmp(&a.0.len()));
     }

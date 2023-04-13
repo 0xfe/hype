@@ -57,12 +57,7 @@ async fn main() {
         }
 
         let lb = hype::handlers::lb::Lb::new(balancer);
-        server
-            .route(
-                route.location,
-                hype::router::RouteHandler::new(Box::new(lb)),
-            )
-            .await;
+        server.route(route.location, lb).await;
     }
     server.start().await.unwrap();
 }

@@ -6,6 +6,7 @@ use crate::{
     router::RouteHandler,
 };
 
+#[derive(Clone, Debug)]
 pub struct Stack {
     handlers: Vec<RouteHandler>,
 }
@@ -15,14 +16,32 @@ impl Stack {
         Stack { handlers: vec![] }
     }
 
+    pub fn push(&mut self, handler: impl Into<RouteHandler>) {
+        self.handlers.push(handler.into())
+    }
+
     pub fn push_handler(&mut self, handler: RouteHandler) {
         self.handlers.push(handler)
     }
 
-    pub fn push_handlers(&mut self, handlers: &mut Vec<RouteHandler>) {
-        self.handlers.append(handlers)
+    pub fn extend(&mut self, handlers: Vec<RouteHandler>) {
+        self.handlers.append(
+            handlers
+                .into_iter()
+                .map(|h| h.into())
+                .collect::<Vec<_>>()
+                .as_mut(),
+        )
     }
 }
+
+/*
+impl From<Stack> for RouteHandler {
+    fn from(stack: Stack) -> RouteHandler {
+        RouteHandler::new_unboxed(stack)
+    }
+}
+*/
 
 #[async_trait]
 impl Handler for Stack {

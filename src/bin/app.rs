@@ -9,7 +9,6 @@ use hype::{
     middleware,
     request::{Method, Request},
     response::Response,
-    router::RouteHandler,
     server::Server,
     status::{self},
 };
@@ -135,11 +134,11 @@ async fn main() {
     let app = Arc::new(Mutex::new(App::new()));
 
     let mut stack = middleware::Stack::new();
-    stack.push_handlers(&mut vec![
-        RouteHandler::new(Box::new(LogHandler {})),
-        RouteHandler::new(Box::new(MyHandler::new(app.clone()))),
+    stack.extend(vec![
+        LogHandler {}.into(),
+        MyHandler::new(app.clone()).into(),
     ]);
-    server.route_default(RouteHandler::new(Box::new(stack)));
+    server.route_default(stack);
 
     server.start().await.unwrap();
 }

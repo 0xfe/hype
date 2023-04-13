@@ -203,13 +203,13 @@ impl Server {
     }
 
     /// Add a new handler to the server. This handler will be called if the request path matches the given path.
-    pub async fn route(&self, path: impl Into<String>, handler: RouteHandler) {
+    pub async fn route(&self, path: impl Into<String>, handler: impl Into<RouteHandler>) {
         self.router.add_route(Matcher::new(&path.into()), handler);
     }
 
-    /// Set the default handler for the server. This is called if no other handlers match the request.
-    pub fn route_default(&mut self, handler: RouteHandler) {
-        self.router.default_handler = handler;
+    /// Set the default handler for the server. This is called if n.o other handlers match the request.
+    pub fn route_default(&mut self, handler: impl Into<RouteHandler>) {
+        self.router.default_handler = handler.into();
     }
 
     /// Set the error handler for the server. This is called if any handler returns an error.
