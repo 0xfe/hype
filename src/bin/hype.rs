@@ -107,6 +107,13 @@ impl Handler for BackendHandler {
     }
 }
 
+async fn add_backend(_r: Request, backend: lbconfig::Backend) -> (status::Status, String) {
+    (
+        status::from(status::OK),
+        format!("Got backend: {:#?}", &backend),
+    )
+}
+
 #[tokio::main]
 async fn main() {
     hype::logger::init();
@@ -130,6 +137,9 @@ async fn main() {
         backends: Arc::clone(&backends),
     });
 
+    server
+        .route("/test_add_backend", handler::post(add_backend))
+        .await;
     server.route("/backends", stack.clone()).await;
     server.route("/backends/:id", stack.clone()).await;
 

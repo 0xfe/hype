@@ -57,6 +57,7 @@ curl --insecure https://localhost:4000
 
 ## In Progress
 
+-   [ ] Simplified handler APIs
 -   [ ] Improve matcher rules system
     -   [ ] Ignore trailing slashes for prefix matches
     -   [x] Support longest matching path
@@ -64,7 +65,7 @@ curl --insecure https://localhost:4000
 -   [ ] REST command server and CLI with https://docs.rs/argh/latest/argh/
     -   [x] POST /admin/backends
     -   [x] GET /admin/backends/:id
--   [ ] Make it easy to share middleware across routes
+-   [x] Make it easy to share middleware across routes
 
 ## TODO
 
@@ -79,7 +80,9 @@ curl --insecure https://localhost:4000
 -   [ ] Cache control headers
 -   [ ] Use templating + #include to make file browser look better
     -   templating engine with https://crates.io/crates/tera
--   [ ] L4 proxy
+
+## DONE
+
 -   [x] Build balancer end-to-end unit tests
 -   [x] Implement multimap-based headers and rewriting
 -   [x] Support multiple headers with the same key

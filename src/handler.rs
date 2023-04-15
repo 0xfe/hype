@@ -5,7 +5,7 @@ use std::{error, fmt, io::Cursor};
 use async_trait::async_trait;
 
 use futures::{future::BoxFuture, Future};
-use serde::Deserialize;
+use serde::{de::DeserializeOwned, Deserialize};
 use tokio::{
     io::{AsyncRead, AsyncWrite, AsyncWriteExt},
     net::TcpStream,
@@ -81,7 +81,7 @@ impl AsyncReadStream for Box<dyn AsyncReadStream> {}
 impl AsyncWriteStream for Box<dyn AsyncWriteStream> {}
 
 #[async_trait]
-pub trait Handler: Send + Sync + 'static {
+pub trait Handler: Send + Sync {
     async fn new_connection(&self, _id: ConnId) -> Result<(), Error> {
         Ok(())
     }
@@ -147,5 +147,35 @@ where
 {
     GetHandler {
         f: Box::new(move |a| Box::pin(func(a))),
+    }
+}
+
+pub struct PostHandler<T> {
+    f: Box<dyn Fn(Request, T) -> BoxFuture<'static, (status::Status, String)> + Send + Sync>,
+}
+
+#[async_trait]
+impl<T: Send + Sync + DeserializeOwned> Handler for PostHandler<T> {
+    async fn handle(&self, r: &Request, w: &mut dyn AsyncWriteStream) -> Result<Ok, Error> {
+        let content = r.body.content().await.clone();
+        let json: T = parse_json(&content)?;
+
+        let result = (self.f)(r.clone(), json).await;
+        let mut response = Response::new(result.0);
+        response.set_body(result.1.into());
+
+        let buf = response.serialize();
+        w.write_all(buf.as_bytes()).await.unwrap();
+        Ok(Ok::Done)
+    }
+}
+
+pub fn post<'de, Func: Send + Sync, Fut, T>(func: Func) -> PostHandler<T>
+where
+    Func: Send + 'static + Fn(Request, T) -> Fut,
+    Fut: Send + 'static + Future<Output = (status::Status, String)>,
+{
+    PostHandler {
+        f: Box::new(move |a, b| Box::pin(func(a, b))),
     }
 }
