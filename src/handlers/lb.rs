@@ -23,7 +23,7 @@ impl<P: Picker<HttpBackend>> Lb<P> {
 }
 
 #[async_trait]
-impl<P: Picker<HttpBackend> + Sync + Send> Handler for Lb<P> {
+impl<P: Picker<HttpBackend> + Sync + Send + 'static> Handler for Lb<P> {
     async fn handle(
         &self,
         r: &Request,

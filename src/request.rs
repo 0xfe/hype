@@ -142,16 +142,15 @@ impl Request {
         }
     }
 
-    pub fn query_params(&self) -> Option<HashMap<String, String>> {
+    pub fn query_params(&self) -> HashMap<String, String> {
         if let Some(url) = &self.url {
-            return Some(
-                url.query_pairs()
-                    .into_owned()
-                    .collect::<HashMap<String, String>>(),
-            );
+            return url
+                .query_pairs()
+                .into_owned()
+                .collect::<HashMap<String, String>>();
         }
 
-        None
+        HashMap::new()
     }
 
     pub fn cookies(&self) -> Option<HashMap<&str, &str>> {

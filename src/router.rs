@@ -22,10 +22,6 @@ impl RouteHandler {
         RouteHandler(Arc::new(tokio::sync::RwLock::new(handler)))
     }
 
-    pub fn new_unboxed(handler: impl Handler + 'static) -> RouteHandler {
-        RouteHandler(Arc::new(tokio::sync::RwLock::new(Box::new(handler))))
-    }
-
     pub fn handler(&self) -> Arc<tokio::sync::RwLock<Box<dyn Handler>>> {
         let RouteHandler(handler) = self;
         Arc::clone(handler)

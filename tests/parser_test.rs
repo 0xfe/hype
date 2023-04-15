@@ -152,9 +152,7 @@ Content-Type: application/x-www-form-urlencoded"##;
     let request = request.unwrap();
     assert!(request.url.is_some());
     let query_params = request.query_params();
-    assert!(query_params.is_some());
 
-    let query_params = query_params.unwrap();
     assert_eq!(query_params.get("user").unwrap(), &"foo".to_string());
     assert_eq!(query_params.get("action").unwrap(), &"delete".to_string());
 }

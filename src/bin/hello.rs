@@ -55,6 +55,19 @@ impl Handler for MyHandler {
     }
 }
 
+async fn hello(r: Request) -> (status::Status, String) {
+    (
+        status::from(status::OK),
+        format!(
+            "Hello, {}: {}!",
+            r.path(),
+            r.query_params()
+                .get("name")
+                .unwrap_or(&String::from("world"))
+        ),
+    )
+}
+
 #[tokio::main]
 async fn main() {
     // Set default log level to info. To change, set RUST_LOG as so:
@@ -70,6 +83,13 @@ async fn main() {
         server.enable_tls(args.cert_file.into(), args.key_file.into());
     }
 
+    server
+        .route(
+            "/boo",
+            handler::get(|_| async move { (status::from(status::OK), "boo!".to_string()) }),
+        )
+        .await;
+    server.route("/hello", handler::get(hello)).await;
     server.route_default(MyHandler {});
     server.start().await.unwrap();
 }
