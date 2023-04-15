@@ -7,7 +7,7 @@ use std::{
 use crate::{
     handler::{self, AsyncWriteStream, Handler},
     handlers,
-    request::Request,
+    request::{Method, Request},
 };
 
 /// This is a wrapper around Handler that allows us easily clone and use them
@@ -88,7 +88,7 @@ impl Router {
         // Go through our route handlers ands see if any of them match the request path. The routes
         // are sorted by length, so the first match is the longest match.
         for handler in self.handlers.read().unwrap().iter() {
-            if let Some((matched_path, params)) = handler.0.extract_params(&path) {
+            if let Some((matched_path, params)) = handler.0.extract_params(&path, Some(r.method)) {
                 r.handler_path = Some(String::from(matched_path.to_string_lossy()));
                 r.params = params
                     .iter()
@@ -105,25 +105,39 @@ impl Router {
 #[derive(Debug)]
 pub struct Matcher {
     pub pattern: PathBuf,
+    pub methods: Vec<Method>,
 }
 
 /// Matches a URL path to a specified routing pattern. Returns the path
 /// that was matched, which can be used to construct an absolute path, or
 /// to let handler functions know the relative path from the handler.
 impl Matcher {
-    pub fn new<T: Into<String>>(pattern: T) -> Matcher {
+    pub fn new(pattern: impl Into<String>) -> Matcher {
         Matcher {
             pattern: Path::new(&pattern.into()).into(),
+            methods: vec![],
         }
     }
 
+    /// Match only if the request method is the specified method.
+    pub fn push_method(&mut self, method: Method) {
+        self.methods.push(method)
+    }
+
+    /// Match only if the request method is one of the specified methods.
+    pub fn push_methods(&mut self, methods: Vec<Method>) {
+        self.methods.extend(methods)
+    }
+
+    // If there are specific methods to match against, then prioritize this matcher higher.
     pub fn len(&self) -> usize {
-        self.pattern.components().count()
+        self.pattern.components().count() + if self.methods.len() == 0 { 0 } else { 1 }
     }
 
     pub fn extract_params<'a, T: AsRef<str> + ?Sized>(
         &'a self,
         route: &'a T,
+        method: Option<Method>,
     ) -> Option<(PathBuf, HashMap<&'a str, &'a str>)> {
         let pattern = &self.pattern;
         let mut path_i = Path::new(route.as_ref()).components();
@@ -160,7 +174,7 @@ impl Matcher {
             } else if let (Some(_), None) = (path, patt) {
                 // we've come this far, return true
                 debug!("Matched path: {:?}", matched_path);
-                return Some((matched_path, params));
+                break;
             }
 
             if path == None && patt == None {
@@ -169,6 +183,9 @@ impl Matcher {
         }
 
         debug!("Matched path: {:?}", matched_path);
-        Some((matched_path, params))
+        if self.methods.len() == 0 || self.methods.contains(&method.unwrap()) {
+            return Some((matched_path, params));
+        }
+        None
     }
 }

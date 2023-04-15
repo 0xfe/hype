@@ -17,6 +17,7 @@ use tokio_rustls::{
 use crate::handler::{self, AsyncWriteStream, ErrorHandler};
 use crate::headers::Headers;
 use crate::parser::RequestParser;
+use crate::request::Method;
 use crate::router::{RouteHandler, Router};
 use crate::{
     conntrack::{Conn, ConnTracker},
@@ -205,6 +206,31 @@ impl Server {
     /// Add a new handler to the server. This handler will be called if the request path matches the given path.
     pub async fn route(&self, path: impl Into<String>, handler: impl Into<RouteHandler>) {
         self.router.add_route(Matcher::new(&path.into()), handler);
+    }
+
+    /// Add a new method handler to the server. This handler will be called if the request path matches the given
+    /// path and the request method matches the given method.
+    pub async fn route_method(
+        &self,
+        method: Method,
+        path: impl Into<String>,
+        handler: impl Into<RouteHandler>,
+    ) {
+        let mut matcher = Matcher::new(&path.into());
+        matcher.push_method(method);
+        self.router.add_route(matcher, handler);
+    }
+
+    /// Route multiple methods to the same handler.
+    pub async fn route_methods(
+        &self,
+        methods: Vec<Method>,
+        path: impl Into<String>,
+        handler: impl Into<RouteHandler>,
+    ) {
+        let mut matcher = Matcher::new(&path.into());
+        matcher.push_methods(methods);
+        self.router.add_route(matcher, handler);
     }
 
     /// Set the default handler for the server. This is called if n.o other handlers match the request.

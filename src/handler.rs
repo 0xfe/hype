@@ -18,18 +18,35 @@ use crate::{
     status::{self, Status},
 };
 
-#[derive(Debug, Clone)]
-pub enum Error {
-    Failed(String),
-    Status(Status),
-    CustomStatus(u16, String),
-}
-
+/// Handlers can return a follow up action, or an error. Actions may lead too
+/// another handler, or a redirect, or an immediate response. Errors always lead
+/// to an immediate response.
+///
+/// Handlers are acted upon by server::Server and middleware::Stack.
 #[derive(Debug, Clone)]
 pub enum Action {
+    /// Continue to next handler in the stack.
     Next,
+
+    /// Respond immediately with a 401 Redirect to a new location. Does not
+    /// continue to next handler in the stack.
     Redirect(String),
+
+    /// This session is complete. Do not continue to next handler in the stack.
     Done,
+}
+
+/// A failed handler returns an Error.
+#[derive(Debug, Clone)]
+pub enum Error {
+    /// Return a 500 Internal Server Error with a message.
+    Failed(String),
+
+    /// Return a status code with a standard status message.
+    Status(Status),
+
+    /// Return a status code with a custom message.
+    CustomStatus(u16, String),
 }
 
 impl fmt::Display for Error {
@@ -129,7 +146,6 @@ pub struct GetHandler {
 #[async_trait]
 impl Handler for GetHandler {
     async fn handle(&self, r: &Request, w: &mut dyn AsyncWriteStream) -> Result<Action, Error> {
-        _ = r.body.content().await;
         let result = (self.f)(r.clone()).await;
         let mut response = Response::new(result.0);
         response.set_body(result.1.into());
