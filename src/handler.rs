@@ -26,7 +26,7 @@ pub enum Error {
 }
 
 #[derive(Debug, Clone)]
-pub enum Ok {
+pub enum Action {
     Next,
     Redirect(String),
     Done,
@@ -86,7 +86,7 @@ pub trait Handler: Send + Sync {
         Ok(())
     }
 
-    async fn handle(&self, r: &Request, w: &mut dyn AsyncWriteStream) -> Result<Ok, Error>;
+    async fn handle(&self, r: &Request, w: &mut dyn AsyncWriteStream) -> Result<Action, Error>;
 }
 
 #[async_trait]
@@ -95,8 +95,8 @@ pub trait ErrorHandler: Send + Sync {
         &self,
         r: &Request,
         w: &mut dyn AsyncWriteStream,
-        err: Result<Ok, Error>,
-    ) -> Result<Ok, Error>;
+        err: Result<Action, Error>,
+    ) -> Result<Action, Error>;
 }
 
 struct HandlerParams<'a, 'b>(&'a Request, &'b mut dyn AsyncWriteStream);
@@ -128,7 +128,7 @@ pub struct GetHandler {
 
 #[async_trait]
 impl Handler for GetHandler {
-    async fn handle(&self, r: &Request, w: &mut dyn AsyncWriteStream) -> Result<Ok, Error> {
+    async fn handle(&self, r: &Request, w: &mut dyn AsyncWriteStream) -> Result<Action, Error> {
         _ = r.body.content().await;
         let result = (self.f)(r.clone()).await;
         let mut response = Response::new(result.0);
@@ -136,7 +136,7 @@ impl Handler for GetHandler {
 
         let buf = response.serialize();
         w.write_all(buf.as_bytes()).await.unwrap();
-        Ok(Ok::Done)
+        Ok(Action::Done)
     }
 }
 
@@ -156,7 +156,7 @@ pub struct PostHandler<T> {
 
 #[async_trait]
 impl<T: Send + Sync + DeserializeOwned> Handler for PostHandler<T> {
-    async fn handle(&self, r: &Request, w: &mut dyn AsyncWriteStream) -> Result<Ok, Error> {
+    async fn handle(&self, r: &Request, w: &mut dyn AsyncWriteStream) -> Result<Action, Error> {
         let content = r.body.content().await.clone();
         let json: T = parse_json(&content)?;
 
@@ -166,7 +166,7 @@ impl<T: Send + Sync + DeserializeOwned> Handler for PostHandler<T> {
 
         let buf = response.serialize();
         w.write_all(buf.as_bytes()).await.unwrap();
-        Ok(Ok::Done)
+        Ok(Action::Done)
     }
 }
 

@@ -80,7 +80,7 @@ impl Router {
         &self,
         r: &mut Request,
         w: &mut dyn AsyncWriteStream,
-    ) -> Result<handler::Ok, handler::Error> {
+    ) -> Result<handler::Action, handler::Error> {
         let path = r.url.as_ref().unwrap().path();
 
         let mut h = self.default_handler.clone();

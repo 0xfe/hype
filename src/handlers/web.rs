@@ -87,7 +87,7 @@ impl Web {
         &self,
         r: &Request,
         w: &mut dyn AsyncWriteStream,
-    ) -> Result<handler::Ok, handler::Error> {
+    ) -> Result<handler::Action, handler::Error> {
         let mut abs_fs_path = PathBuf::new();
         abs_fs_path.push(self.base_fs_path.as_str());
 
@@ -120,7 +120,7 @@ impl Web {
         if metadata.is_dir() {
             if self.trailing_slashes && !r.abs_path().ends_with("/") {
                 info!("Redirecting {} to {}", r.abs_path(), r.abs_path() + "/");
-                return Ok(handler::Ok::Redirect(r.abs_path() + "/"));
+                return Ok(handler::Action::Redirect(r.abs_path() + "/"));
             }
 
             for index in &self.index_files {
@@ -134,7 +134,7 @@ impl Web {
                     )
                     .await
                     .or(Err(handler::Error::Failed("could not open file".into())))?;
-                    return Ok(handler::Ok::Done);
+                    return Ok(handler::Action::Done);
                 }
             }
 
@@ -145,7 +145,7 @@ impl Web {
                 .or(Err(handler::Error::Failed("could not open file".into())))?;
         }
 
-        Ok(handler::Ok::Done)
+        Ok(handler::Action::Done)
     }
 }
 
@@ -155,7 +155,7 @@ impl Handler for Web {
         &self,
         r: &Request,
         w: &mut dyn AsyncWriteStream,
-    ) -> Result<handler::Ok, handler::Error> {
+    ) -> Result<handler::Action, handler::Error> {
         self.handle_path(r, w).await
     }
 }

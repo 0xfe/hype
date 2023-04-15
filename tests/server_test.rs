@@ -25,7 +25,7 @@ impl Handler for MyHandler {
         &self,
         r: &Request,
         w: &mut dyn AsyncWriteStream,
-    ) -> Result<handler::Ok, handler::Error> {
+    ) -> Result<handler::Action, handler::Error> {
         if r.headers.get_first("x-hype-test-force-error").is_some() {
             match r
                 .headers
@@ -38,17 +38,17 @@ impl Handler for MyHandler {
                     response.set_body("Next".into());
                     let buf = response.serialize();
                     w.write_all(buf.as_bytes()).await.unwrap();
-                    return Ok(handler::Ok::Next);
+                    return Ok(handler::Action::Next);
                 }
                 "Done" => {
                     let mut response = Response::new(status::from(status::OK));
                     response.set_body("Done".into());
                     let buf = response.serialize();
                     w.write_all(buf.as_bytes()).await.unwrap();
-                    return Ok(handler::Ok::Done);
+                    return Ok(handler::Action::Done);
                 }
                 "Redirect" => {
-                    return Ok(handler::Ok::Redirect(
+                    return Ok(handler::Action::Redirect(
                         r.headers
                             .get_first("x-hype-test-redirect-location")
                             .unwrap()
@@ -106,7 +106,7 @@ impl Handler for MyHandler {
         let buf = response.serialize();
         w.write_all(buf.as_bytes()).await.unwrap();
 
-        Ok(handler::Ok::Done)
+        Ok(handler::Action::Done)
     }
 }
 

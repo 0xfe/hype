@@ -28,7 +28,7 @@ impl<P: Picker<HttpBackend> + Sync + Send + 'static> Handler for Lb<P> {
         &self,
         r: &Request,
         w: &mut dyn AsyncWriteStream,
-    ) -> Result<handler::Ok, handler::Error> {
+    ) -> Result<handler::Action, handler::Error> {
         let response = self
             .lb
             .read()
@@ -58,6 +58,6 @@ impl<P: Picker<HttpBackend> + Sync + Send + 'static> Handler for Lb<P> {
         while let Some(content) = stream.next().await {
             w.write_all(content.as_slice()).await.unwrap();
         }
-        Ok(handler::Ok::Done)
+        Ok(handler::Action::Done)
     }
 }

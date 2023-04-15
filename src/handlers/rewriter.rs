@@ -35,7 +35,7 @@ impl Handler for Rewriter {
         &self,
         r: &Request,
         w: &mut dyn AsyncWriteStream,
-    ) -> Result<handler::Ok, handler::Error> {
+    ) -> Result<handler::Action, handler::Error> {
         let mut response = Response::new(status::from(status::MOVED_PERMANENTLY));
         let path = r.abs_path();
         let location = self.url_match_re.replace(path.as_str(), &self.substitution);
@@ -44,10 +44,10 @@ impl Handler for Rewriter {
             response.headers.set("Location", location);
             let buf = response.serialize();
             w.write_all(buf.as_bytes()).await.unwrap();
-            return Ok(handler::Ok::Done);
+            return Ok(handler::Action::Done);
         }
 
-        Ok(handler::Ok::Next)
+        Ok(handler::Action::Next)
     }
 }
 

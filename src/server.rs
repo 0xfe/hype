@@ -108,18 +108,18 @@ impl ErrorHandler for DefaultErrorHandler {
         &self,
         _r: &Request,
         w: &mut dyn AsyncWriteStream,
-        err: Result<handler::Ok, handler::Error>,
-    ) -> Result<handler::Ok, handler::Error> {
+        err: Result<handler::Action, handler::Error>,
+    ) -> Result<handler::Action, handler::Error> {
         return match err {
-            Ok(handler::Ok::Done) => Ok(handler::Ok::Done),
-            Ok(handler::Ok::Next) => Ok(handler::Ok::Next),
-            Ok(handler::Ok::Redirect(to)) => {
+            Ok(handler::Action::Done) => Ok(handler::Action::Done),
+            Ok(handler::Action::Next) => Ok(handler::Action::Next),
+            Ok(handler::Action::Redirect(to)) => {
                 let mut response = Response::new(status::from(status::MOVED_PERMANENTLY));
                 response.headers.set("Location", to);
                 w.write_all(response.serialize().as_bytes()).await.or(Err(
                     handler::Error::Failed("could not write to stream".into()),
                 ))?;
-                Ok(handler::Ok::Done)
+                Ok(handler::Action::Done)
             }
             Err(handler::Error::Failed(msg)) => {
                 Self::write_response(
@@ -133,7 +133,7 @@ impl ErrorHandler for DefaultErrorHandler {
                     "could not write to stream".into(),
                 )))?;
 
-                Ok(handler::Ok::Done)
+                Ok(handler::Action::Done)
             }
             Err(handler::Error::Status(status)) => {
                 Self::write_response(
@@ -147,7 +147,7 @@ impl ErrorHandler for DefaultErrorHandler {
                     "could not write to stream".into(),
                 )))?;
 
-                Ok(handler::Ok::Done)
+                Ok(handler::Action::Done)
             }
             Err(handler::Error::CustomStatus(code, msg)) => {
                 Self::write_response(
@@ -161,7 +161,7 @@ impl ErrorHandler for DefaultErrorHandler {
                     "could not write to stream".into(),
                 )))?;
 
-                Ok(handler::Ok::Done)
+                Ok(handler::Action::Done)
             }
         };
     }

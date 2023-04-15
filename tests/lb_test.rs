@@ -273,7 +273,7 @@ impl Handler for EchoHandler {
         &self,
         r: &Request,
         w: &mut dyn AsyncWriteStream,
-    ) -> Result<handler::Ok, handler::Error> {
+    ) -> Result<handler::Action, handler::Error> {
         info!("EchoHandler Request: {:?}", r);
 
         let mut response = Response::new(status::from(status::OK));
@@ -296,7 +296,7 @@ impl Handler for EchoHandler {
             w.write_all(chunk.as_slice()).await.unwrap();
         }
 
-        Ok(handler::Ok::Next)
+        Ok(handler::Action::Next)
     }
 }
 

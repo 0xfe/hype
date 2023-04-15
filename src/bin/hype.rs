@@ -40,7 +40,7 @@ impl Handler for AuthHandler {
         &self,
         r: &Request,
         _w: &mut dyn AsyncWriteStream,
-    ) -> Result<handler::Ok, handler::Error> {
+    ) -> Result<handler::Action, handler::Error> {
         let token = r
             .headers
             .get_first("x-hype-auth-token")
@@ -50,7 +50,7 @@ impl Handler for AuthHandler {
             return Err(handler::Error::Status(status::from(status::UNAUTHORIZED)));
         }
 
-        Ok(handler::Ok::Next)
+        Ok(handler::Action::Next)
     }
 }
 
@@ -68,7 +68,7 @@ impl Handler for BackendHandler {
         &self,
         r: &Request,
         w: &mut dyn AsyncWriteStream,
-    ) -> Result<handler::Ok, handler::Error> {
+    ) -> Result<handler::Action, handler::Error> {
         let mut response = Response::new(status::from(status::OK));
         response.set_body(format!("<html>Path: {}</html>\n", r.path()).into());
 
@@ -103,7 +103,7 @@ impl Handler for BackendHandler {
 
         let buf = response.serialize();
         w.write_all(buf.as_bytes()).await.unwrap();
-        Ok(handler::Ok::Done)
+        Ok(handler::Action::Done)
     }
 }
 

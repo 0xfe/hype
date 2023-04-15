@@ -40,9 +40,9 @@ impl Handler for LogHandler {
         &self,
         r: &Request,
         _: &mut dyn AsyncWriteStream,
-    ) -> Result<handler::Ok, handler::Error> {
+    ) -> Result<handler::Action, handler::Error> {
         info!("Request: {:?}", r);
-        Ok(handler::Ok::Next)
+        Ok(handler::Action::Next)
     }
 }
 
@@ -70,42 +70,42 @@ impl MyHandler {
         &self,
         _r: &Request,
         w: &mut dyn AsyncWriteStream,
-    ) -> Result<handler::Ok, handler::Error> {
+    ) -> Result<handler::Action, handler::Error> {
         MyHandler::write_response(w, status::OK, "<html>hi!</html>\n".into()).await;
-        Ok(handler::Ok::Done)
+        Ok(handler::Action::Done)
     }
 
     async fn handle_get_counter(
         &self,
         _r: &Request,
         w: &mut dyn AsyncWriteStream,
-    ) -> Result<handler::Ok, handler::Error> {
+    ) -> Result<handler::Action, handler::Error> {
         MyHandler::write_response(
             w,
             status::OK,
             format!("<html>count: {}</html>\n", self.app.lock().await.get()),
         )
         .await;
-        Ok(handler::Ok::Done)
+        Ok(handler::Action::Done)
     }
 
     async fn handle_post_inc(
         &self,
         _r: &Request,
         w: &mut dyn AsyncWriteStream,
-    ) -> Result<handler::Ok, handler::Error> {
+    ) -> Result<handler::Action, handler::Error> {
         self.app.lock().await.inc();
         MyHandler::write_response(w, status::OK, "{ \"op\": \"inc\" }\n".into()).await;
-        Ok(handler::Ok::Done)
+        Ok(handler::Action::Done)
     }
 
     async fn handle_not_found(
         &self,
         _r: &Request,
         w: &mut dyn AsyncWriteStream,
-    ) -> Result<handler::Ok, handler::Error> {
+    ) -> Result<handler::Action, handler::Error> {
         MyHandler::write_response(w, status::NOT_FOUND, "<html>NOT FOUND!</html>\n".into()).await;
-        Ok(handler::Ok::Done)
+        Ok(handler::Action::Done)
     }
 }
 
@@ -115,7 +115,7 @@ impl Handler for MyHandler {
         &self,
         r: &Request,
         w: &mut dyn AsyncWriteStream,
-    ) -> Result<handler::Ok, handler::Error> {
+    ) -> Result<handler::Action, handler::Error> {
         match (r.method, r.path().as_str()) {
             (Method::GET | Method::POST, "/") => self.handle_root(r, w).await,
             (Method::GET, "/counter") => self.handle_get_counter(r, w).await,

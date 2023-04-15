@@ -15,13 +15,13 @@ impl Handler for MyHandler {
         &self,
         _: &Request,
         w: &mut dyn AsyncWriteStream,
-    ) -> Result<handler::Ok, Error> {
+    ) -> Result<handler::Action, Error> {
         let mut response = Response::new(status::from(status::OK));
         response.headers.set("foo", "bar");
         response.set_body("hello world!\n".into());
 
         w.write_all(response.serialize().as_bytes()).await.unwrap();
-        Ok(handler::Ok::Done)
+        Ok(handler::Action::Done)
     }
 }
 

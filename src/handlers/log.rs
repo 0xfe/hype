@@ -13,8 +13,8 @@ impl Handler for Log {
         &self,
         r: &Request,
         _w: &mut dyn AsyncWriteStream,
-    ) -> Result<handler::Ok, handler::Error> {
+    ) -> Result<handler::Action, handler::Error> {
         info!("Request {}", r.url.as_ref().unwrap());
-        Ok(handler::Ok::Next)
+        Ok(handler::Action::Next)
     }
 }

@@ -31,14 +31,14 @@ impl Handler for Status {
         &self,
         _r: &Request,
         w: &mut dyn AsyncWriteStream,
-    ) -> Result<handler::Ok, handler::Error> {
+    ) -> Result<handler::Action, handler::Error> {
         let mut response = Response::new(self.status.clone());
         response.headers = self.headers.clone();
         response.set_body(self.body.clone().into());
 
         let buf = response.serialize();
         w.write_all(buf.as_bytes()).await.unwrap();
-        Ok(handler::Ok::Done)
+        Ok(handler::Action::Done)
     }
 }
 

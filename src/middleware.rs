@@ -49,14 +49,14 @@ impl Handler for Stack {
         &self,
         r: &Request,
         w: &mut dyn AsyncWriteStream,
-    ) -> Result<handler::Ok, handler::Error> {
+    ) -> Result<handler::Action, handler::Error> {
         let mut iter = self.handlers.iter();
-        let mut last_result = Ok(handler::Ok::Done);
+        let mut last_result = Ok(handler::Action::Done);
         loop {
             if let Some(handler) = iter.next() {
                 last_result = handler.handler().read().await.handle(r, w).await;
                 match last_result {
-                    Ok(handler::Ok::Next) => {}
+                    Ok(handler::Action::Next) => {}
                     Ok(ok) => break Ok(ok),
                     Err(err) => break Err(err),
                 }
