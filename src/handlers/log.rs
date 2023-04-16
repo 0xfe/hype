@@ -5,6 +5,7 @@ use crate::{
     request::Request,
 };
 
+#[derive(Clone, Debug)]
 pub struct Log;
 
 #[async_trait]

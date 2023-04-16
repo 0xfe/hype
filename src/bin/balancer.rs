@@ -6,11 +6,7 @@ use std::fs;
 use argh::FromArgs;
 
 use hype::{
-    lb::{
-        backend::{Backend, HttpBackend},
-        http::Http,
-        picker::RRPicker,
-    },
+    lb::{picker::RRPicker, Backend, Http, HttpBackend},
     lbconfig::{self},
     server::Server,
 };
@@ -56,7 +52,7 @@ async fn main() {
             balancer.rewrite_header("host", host_header);
         }
 
-        let lb = hype::handlers::lb::Lb::new(balancer);
+        let lb = hype::handlers::Lb::new(balancer);
         server.route(route.location, lb).await;
     }
     server.start().await.unwrap();

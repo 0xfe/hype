@@ -16,12 +16,9 @@ impl Stack {
         Stack { handlers: vec![] }
     }
 
-    pub fn push(&mut self, handler: impl Into<RouteHandler>) {
-        self.handlers.push(handler.into())
-    }
-
-    pub fn push_handler(&mut self, handler: RouteHandler) {
-        self.handlers.push(handler)
+    pub fn push(mut self, handler: impl Into<RouteHandler>) -> Self {
+        self.handlers.push(handler.into());
+        self
     }
 
     pub fn extend(&mut self, handlers: Vec<RouteHandler>) {

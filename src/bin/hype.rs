@@ -98,6 +98,7 @@ async fn main() {
     let mut server = Server::new(&args.host, args.port);
     info!("Starting hype admin server on {}:{}", args.host, args.port);
 
+    let log_handler = handlers::Log {};
     let auth_handler = AuthHandler {
         token: "foo".into(),
     };
@@ -106,20 +107,27 @@ async fn main() {
         backends: Arc::new(RwLock::new(HashMap::new())),
     };
 
-    let mut add_stack = Stack::new();
-    add_stack.push(handlers::log::Log {});
-    add_stack.push(auth_handler.clone());
-    add_stack.push(handler::json(add_backend, state.clone()));
     server
-        .route_method(Method::POST, "/backends", add_stack)
+        .route_method(
+            Method::POST,
+            "/backends",
+            Stack::new()
+                .push(log_handler.clone())
+                .push(auth_handler.clone())
+                .push(handler::json(add_backend, state.clone())),
+        )
         .await;
 
-    let mut get_stack = Stack::new();
-    get_stack.push(handlers::log::Log {});
-    get_stack.push(auth_handler);
-    get_stack.push(handler::get(get_backend, state.clone()));
-    server.route("/backends/:id", get_stack).await;
+    server
+        .route(
+            "/backends/:id",
+            Stack::new()
+                .push(log_handler)
+                .push(auth_handler)
+                .push(handler::get(get_backend, state.clone())),
+        )
+        .await;
 
-    server.route_default(handlers::status::NotFoundHandler());
+    server.route_default(handlers::NotFoundHandler());
     server.start().await.unwrap();
 }
