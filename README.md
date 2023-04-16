@@ -55,14 +55,6 @@ async fn main() {
 ## Hello Loadbalancer!
 
 ```rust
-fn build_backend(backend: &lbconfig::Backend) -> HttpBackend {
-    let mut b = HttpBackend::new(format!("{}:{}", backend.host, backend.port));
-    if backend.enable_tls {
-        b.enable_tls(backend.host.clone());
-    }
-    b
-}
-
 #[tokio::main]
 async fn main() {
     hype::logger::init();
