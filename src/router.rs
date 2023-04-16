@@ -73,7 +73,7 @@ impl Router {
         let mut handlers = self.handlers.write().unwrap();
         handlers.push((matcher, handler.into()));
         // Sort by matcher length, so that the longest matchers are checked first.
-        handlers.sort_by(|a, b| b.0.len().cmp(&a.0.len()));
+        handlers.sort_by(|a, b| a.0.len().cmp(&b.0.len()));
     }
 
     pub async fn handle(

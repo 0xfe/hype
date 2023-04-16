@@ -11,11 +11,10 @@ use hype::{
     handlers, lbconfig,
     middleware::Stack,
     request::{Method, Request},
-    response::Response,
     server::Server,
     status,
 };
-use tokio::{io::AsyncWriteExt, sync::RwLock};
+use tokio::sync::RwLock;
 
 #[derive(FromArgs)]
 /// Hype Load Balancer
@@ -54,64 +53,41 @@ impl Handler for AuthHandler {
     }
 }
 
-struct BackendHandler {
-    _config: Arc<RwLock<lbconfig::Config>>,
-    backends: Arc<RwLock<HashMap<String, lbconfig::Backend>>>,
-}
-
 // Test with:
 //   curl -d '{ "host": "foobar", "port": 3000 }'  -H "x-hype-auth-token: foo" -X POST http://localhost:5000/backends
 //   curl -H "x-hype-auth-token: foo" http://localhost:5000/backends/backend-ayGoPVg
-#[async_trait]
-impl Handler for BackendHandler {
-    async fn handle(
-        &self,
-        r: &Request,
-        w: &mut dyn AsyncWriteStream,
-    ) -> Result<handler::Action, handler::Error> {
-        let mut response = Response::new(status::from(status::OK));
-        response.set_body(format!("<html>Path: {}</html>\n", r.path()).into());
 
-        match (r.method, r.path().as_str()) {
-            (Method::POST, _) => {
-                let backend: lbconfig::Backend = handler::parse_json(&r.body.content().await)?;
-                response.set_body(format!("Got backend: {:#?}", &backend).into());
-                self.backends
-                    .write()
-                    .await
-                    .insert(backend.id.clone(), backend);
-            }
-            (Method::GET, _) => {
-                response.set_body(
-                    format!(
-                        "{:#?}",
-                        self.backends
-                            .read()
-                            .await
-                            .get(r.params.get("id").ok_or(handler::Error::Failed(
-                                "missing parameter: id".to_string()
-                            ))?)
-                            .ok_or(handler::Error::Status(status::from(status::NOT_FOUND)))?
-                    )
-                    .into(),
-                );
-            }
-            _ => {
-                return Err(handler::Error::Failed("Invalid request".to_string()));
-            }
-        }
-
-        let buf = response.serialize();
-        w.write_all(buf.as_bytes()).await.unwrap();
-        Ok(handler::Action::Done)
-    }
+#[derive(Debug, Clone)]
+struct State {
+    backends: Arc<RwLock<HashMap<String, lbconfig::Backend>>>,
 }
 
-async fn add_backend(_r: Request, backend: lbconfig::Backend) -> (status::Status, String) {
-    (
-        status::from(status::OK),
-        format!("Got backend: {:#?}", &backend),
+async fn add_backend(
+    _: Request,
+    backend: lbconfig::Backend,
+    state: State,
+) -> (status::Status, String) {
+    let id = backend.id.clone();
+    state.backends.write().await.insert(id.clone(), backend);
+    (status::from(status::OK), format!("Got backend: {:?}", id))
+}
+
+async fn get_backend(r: Request, state: State) -> Result<(status::Status, String), handler::Error> {
+    let response = format!(
+        "{:#?}",
+        state
+            .backends
+            .read()
+            .await
+            .get(
+                r.params
+                    .get("id")
+                    .ok_or(handler::Error::Failed("missing parameter: id".to_string()))?
+            )
+            .ok_or(handler::Error::Status(status::from(status::NOT_FOUND)))?
     )
+    .into();
+    Ok((status::from(status::OK), response))
 }
 
 #[tokio::main]
@@ -122,26 +98,27 @@ async fn main() {
     let mut server = Server::new(&args.host, args.port);
     info!("Starting hype admin server on {}:{}", args.host, args.port);
 
-    let config = Arc::new(RwLock::new(lbconfig::Config::default()));
-    let backends = Arc::new(RwLock::new(HashMap::new()));
-
     let auth_handler = AuthHandler {
         token: "foo".into(),
     };
 
-    let mut stack = Stack::new();
-    stack.push(handlers::log::Log {});
-    stack.push(auth_handler);
-    stack.push(BackendHandler {
-        _config: Arc::clone(&config),
-        backends: Arc::clone(&backends),
-    });
+    let state = State {
+        backends: Arc::new(RwLock::new(HashMap::new())),
+    };
 
+    let mut add_stack = Stack::new();
+    add_stack.push(handlers::log::Log {});
+    add_stack.push(auth_handler.clone());
+    add_stack.push(handler::json(add_backend, state.clone()));
     server
-        .route("/test_add_backend", handler::post(add_backend))
+        .route_method(Method::POST, "/backends", add_stack)
         .await;
-    server.route("/backends", stack.clone()).await;
-    server.route("/backends/:id", stack.clone()).await;
+
+    let mut get_stack = Stack::new();
+    get_stack.push(handlers::log::Log {});
+    get_stack.push(auth_handler);
+    get_stack.push(handler::get(get_backend, state.clone()));
+    server.route("/backends/:id", get_stack).await;
 
     server.route_default(handlers::status::NotFoundHandler());
     server.start().await.unwrap();

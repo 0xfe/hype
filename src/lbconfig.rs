@@ -64,7 +64,7 @@ impl Default for Server {
     }
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Clone)]
 pub struct Backend {
     #[serde(default = "default_backend_id")]
     pub id: String,

@@ -2,16 +2,14 @@
 extern crate log;
 
 use argh::FromArgs;
-use async_trait::async_trait;
 
+use hype::handler::{self};
 use hype::{
-    handler::{self, AsyncWriteStream, Handler},
+    handlers::status::NotFoundHandler,
     request::Request,
-    response::Response,
     server::Server,
     status::{self},
 };
-use tokio::io::AsyncWriteExt;
 
 #[derive(FromArgs)]
 /// Reach new heights.
@@ -37,26 +35,8 @@ struct Args {
     key_file: String,
 }
 
-struct MyHandler {}
-
-#[async_trait]
-impl Handler for MyHandler {
-    async fn handle(
-        &self,
-        _r: &Request,
-        w: &mut dyn AsyncWriteStream,
-    ) -> Result<handler::Action, handler::Error> {
-        let mut response = Response::new(status::from(status::OK));
-        response.set_body("<html>Hello world!</html>\n".into());
-
-        let buf = response.serialize();
-        w.write_all(buf.as_bytes()).await.unwrap();
-        Ok(handler::Action::Done)
-    }
-}
-
-async fn hello(r: Request) -> (status::Status, String) {
-    (
+async fn hello(r: Request, _: ()) -> Result<(status::Status, String), handler::Error> {
+    Ok((
         status::from(status::OK),
         format!(
             "Hello, {}: {}!",
@@ -65,7 +45,7 @@ async fn hello(r: Request) -> (status::Status, String) {
                 .get("name")
                 .unwrap_or(&String::from("world"))
         ),
-    )
+    ))
 }
 
 #[tokio::main]
@@ -86,10 +66,13 @@ async fn main() {
     server
         .route(
             "/boo",
-            handler::get(|_| async move { (status::from(status::OK), "boo!".to_string()) }),
+            handler::get(
+                |_, _| async move { Ok((status::from(status::OK), "boo!".to_string())) },
+                (),
+            ),
         )
         .await;
-    server.route("/hello", handler::get(hello)).await;
-    server.route_default(MyHandler {});
+    server.route("/hello", handler::get(hello, ())).await;
+    server.route_default(NotFoundHandler());
     server.start().await.unwrap();
 }
