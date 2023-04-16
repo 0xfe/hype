@@ -37,8 +37,7 @@ async fn hello1(_: Request, _: ()) -> Result<impl Into<String>, handler::Error> 
 }
 
 async fn hello2(_: Request, _: ()) -> Result<Response, handler::Error> {
-    let r = Response::new(status::from(status::OK)).with_body("yooo!");
-    Ok(r)
+    Ok(Response::new(status::OK).with_body("yooo!"))
 }
 
 async fn hello3(r: Request, _: ()) -> Result<String, handler::Error> {
@@ -54,7 +53,9 @@ async fn hello3(r: Request, _: ()) -> Result<String, handler::Error> {
 async fn hello4(r: Request, _: ()) -> Result<String, handler::Error> {
     Ok(format!(
         "Hello, {}!",
-        r.params.get("name").unwrap_or(&String::from("world"))
+        r.params
+            .get("name")
+            .ok_or(handler::Error::Status(status::NOT_FOUND.into()))?
     ))
 }
 

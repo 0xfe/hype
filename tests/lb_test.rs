@@ -59,7 +59,7 @@ impl Backend for MockBackend {
         stats.requests.push(req.clone());
 
         // self.send_result.take().unwrap()
-        Ok(Response::new(status::from(status::OK)))
+        Ok(Response::new(status::OK))
     }
 }
 
@@ -153,7 +153,7 @@ async fn weighted_rr_policy() {
 }
 
 async fn start_server(port: u16, text: String) -> (Arc<mpsc::Sender<bool>>, Arc<Notify>) {
-    let handler = handlers::status::Status::new(status::from(status::OK), text);
+    let handler = handlers::status::Status::new(status::OK, text);
     let mut server = Server::new("localhost", port);
     server.route_default(handler);
     let ready = server.start_notifier();
@@ -271,7 +271,7 @@ impl Handler for EchoHandler {
     ) -> Result<handler::Action, handler::Error> {
         info!("EchoHandler Request: {:?}", r);
 
-        let mut response = Response::new(status::from(status::OK));
+        let mut response = Response::new(status::OK);
         response.headers = r.headers.clone();
 
         w.write_all(

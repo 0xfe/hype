@@ -21,7 +21,7 @@ impl From<Message> for Response {
 
 impl<T: Into<Body>> From<T> for Response {
     fn from(value: T) -> Self {
-        let mut r = Response::new(status::from(status::OK));
+        let mut r = Response::new(status::OK);
         r.set_body(value.into());
         r
     }
@@ -75,10 +75,10 @@ impl Response {
         })
     }
 
-    pub fn new(status: status::Status) -> Response {
+    pub fn new(status: impl Into<status::Status>) -> Response {
         Response {
             version: "HTTP/1.1".to_string(),
-            status,
+            status: status.into(),
             headers: Headers::new(),
             cookies: vec![],
             body: Body::new(),

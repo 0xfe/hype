@@ -36,7 +36,7 @@ impl Handler for Rewriter {
         r: &Request,
         w: &mut dyn AsyncWriteStream,
     ) -> Result<handler::Action, handler::Error> {
-        let mut response = Response::new(status::from(status::MOVED_PERMANENTLY));
+        let mut response = Response::new(status::MOVED_PERMANENTLY);
         let path = r.abs_path();
         let location = self.url_match_re.replace(path.as_str(), &self.substitution);
 

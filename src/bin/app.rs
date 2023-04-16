@@ -60,7 +60,7 @@ impl MyHandler {
         status: status::Code<'a>,
         body: String,
     ) {
-        let mut response = Response::new(status::from(status));
+        let mut response = Response::new(status);
         response.set_body(body);
 
         w.write_all(response.serialize().as_bytes()).await.unwrap();

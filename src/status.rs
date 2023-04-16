@@ -12,10 +12,12 @@ pub struct Status {
     pub text: String,
 }
 
-pub fn from(c: Code) -> Status {
-    Status {
-        code: c.0,
-        text: c.1.into(),
+impl<T: Into<String>> From<(u16, T)> for Status {
+    fn from(c: (u16, T)) -> Self {
+        Status {
+            code: c.0,
+            text: c.1.into(),
+        }
     }
 }
 
@@ -25,13 +27,13 @@ mod tests {
 
     #[test]
     fn it_works() {
-        assert_eq!(from(OK).code, 200);
-        assert_eq!(from(OK).text, "OK");
+        assert_eq!(Status::from(OK).code, 200);
+        assert_eq!(Status::from(OK).text, "OK");
     }
 
     #[test]
     fn it_works_with_var() {
-        let code = from(NOT_FOUND);
+        let code = Status::from(NOT_FOUND);
         assert_eq!(code.code, 404);
     }
 }

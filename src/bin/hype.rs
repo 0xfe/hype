@@ -41,10 +41,10 @@ async fn auth(r: Request, state: AuthState) -> Result<Action, handler::Error> {
     let token = r
         .headers
         .get_first("x-hype-auth-token")
-        .ok_or(handler::Error::Status(status::from(status::UNAUTHORIZED)))?;
+        .ok_or(handler::Error::Status(status::UNAUTHORIZED.into()))?;
 
     if *token != state.token {
-        return Err(handler::Error::Status(status::from(status::UNAUTHORIZED)));
+        return Err(handler::Error::Status((401, "Unauthorized").into()));
     }
 
     // Don't return a response as yet, simply pass the request on to the next handler.
@@ -72,7 +72,7 @@ async fn get_backend(r: Request, state: AppState) -> Result<String, handler::Err
     let lock = state.backends.read().await;
     let backend = lock
         .get(id)
-        .ok_or(handler::Error::Status(status::from(status::NOT_FOUND)))?;
+        .ok_or(handler::Error::Status(status::NOT_FOUND.into()))?;
 
     Ok(format!("{:#?}", backend))
 }

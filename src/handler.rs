@@ -40,23 +40,25 @@ impl<T: Into<Response>> From<T> for Action {
 
 /// A failed handler returns an Error.
 #[derive(Debug, Clone)]
-pub enum Error {
+pub enum Error<S = Status>
+where
+    S: Into<Status> + Clone,
+{
     /// Return a 500 Internal Server Error with a message.
     Failed(String),
 
     /// Return a status code with a standard status message.
-    Status(Status),
-
-    /// Return a status code with a custom message.
-    CustomStatus(u16, String),
+    Status(S),
 }
 
-impl fmt::Display for Error {
+impl<S: Into<Status> + Clone> fmt::Display for Error<S> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         let e = match self {
             Error::Failed(msg) => format!("Failed: {}", msg),
-            Error::Status(status) => format!("Failed({}): {}", status.code, status.text),
-            Error::CustomStatus(code, msg) => format!("Failed({}): {}", code, msg),
+            Error::Status(status) => {
+                let status: Status = status.clone().into();
+                format!("Failed({}): {}", status.code, status.text)
+            }
         };
 
         write!(f, "Handler error: {}", e)

@@ -53,7 +53,7 @@ impl Web {
         content_type: String,
         body: String,
     ) -> io::Result<()> {
-        let mut response = Response::new(status::from(status));
+        let mut response = Response::new(status);
         response.headers.set("Content-Type", content_type);
         response.set_body(body);
 

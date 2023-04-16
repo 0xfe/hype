@@ -96,7 +96,7 @@ impl DefaultErrorHandler {
         content_type: String,
         body: String,
     ) -> io::Result<()> {
-        let mut response = Response::new(status::from(status));
+        let mut response = Response::new(status);
         response.headers.set("Content-Type", content_type);
         response.set_body(body);
         w.write_all(response.serialize().as_bytes()).await
@@ -121,7 +121,7 @@ impl ErrorHandler for DefaultErrorHandler {
                 Ok(handler::Action::Done)
             }
             Ok(handler::Action::Redirect(to)) => {
-                let mut response = Response::new(status::from(status::MOVED_PERMANENTLY));
+                let mut response = Response::new(status::MOVED_PERMANENTLY);
                 response.headers.set("Location", to);
                 w.write_all(response.serialize().as_bytes()).await.or(Err(
                     handler::Error::Failed("could not write to stream".into()),
@@ -148,20 +148,6 @@ impl ErrorHandler for DefaultErrorHandler {
                     (status.code, status.text.as_ref()),
                     "text/plain".into(),
                     format!("{} {}", status.code, status.text),
-                )
-                .await
-                .or(Err(handler::Error::Failed(
-                    "could not write to stream".into(),
-                )))?;
-
-                Ok(handler::Action::Done)
-            }
-            Err(handler::Error::CustomStatus(code, msg)) => {
-                Self::write_response(
-                    w,
-                    (code, msg.as_ref()),
-                    "text/plain".into(),
-                    format!("{} {}", code, msg),
                 )
                 .await
                 .or(Err(handler::Error::Failed(

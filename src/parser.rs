@@ -116,7 +116,7 @@ impl Parser {
         let mut message = Message::Request(request);
 
         if start_state == State::StartResponse {
-            let response = Response::new(status::from(status::OK));
+            let response = Response::new(status::OK);
             message = Message::Response(response);
         }
 

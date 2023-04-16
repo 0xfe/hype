@@ -23,10 +23,7 @@ async fn hello2(_: Request, _: ()) -> Result<Response, handler::Error> {
 }
 
 async fn hello3(r: Request, _: ()) -> Result<String, handler::Error> {
-    Ok(format!(
-        "Hello, {}!",
-        r.params.get("name").unwrap_or(&String::from("world"))
-    ))
+    Ok(format!( "Hello, {}!", r.params.get("name")?))
 }
 
 #[tokio::main]
@@ -152,14 +149,14 @@ curl --insecure https://localhost:4000
 -   [ ] Cache control headers
 -   [ ] Use templating + #include to make file browser look better
     -   templating engine with https://crates.io/crates/tera
+-   [ ] Use https://github.com/dtolnay/thiserror and anyhow::Error for error management
 
 ## DONE
 
 -   [x] Build balancer end-to-end unit tests
 -   [x] Implement multimap-based headers and rewriting
 -   [x] Support multiple headers with the same key
-    -   bad request (400) if multiple host headers
--   [ ] Use https://github.com/dtolnay/thiserror and anyhow::Error for error management
+    -   [ ] bad request (400) if multiple host headers
 -   [x] Support streaming forwarding (encoding support done)
     -   [x] remove pub fields in request and response
     -   [x] factor Body into request and response
@@ -171,7 +168,6 @@ curl --insecure https://localhost:4000
     -   [x] plumb chunked streams through server
     -   [x] connect client and server streams through LB
 -   [x] use futures::Stream for non-chunked bodies too, forward every read
-
 -   [x] Add additional configuration schema for LB handlers
     -   [x] host rewrite
     -   [x] cert files
@@ -208,8 +204,3 @@ curl --insecure https://localhost:4000
 -   [x] API for URL parameters
 -   [x] API to get form POST parameters
 -   [x] serve files
--   [x] more unit tests
-
-```
-
-```

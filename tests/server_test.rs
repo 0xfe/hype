@@ -33,14 +33,14 @@ impl Handler for MyHandler {
                 .as_str()
             {
                 "Next" => {
-                    let mut response = Response::new(status::from(status::OK));
+                    let mut response = Response::new(status::OK);
                     response.set_body("Next");
                     let buf = response.serialize();
                     w.write_all(buf.as_bytes()).await.unwrap();
                     return Ok(handler::Action::Next);
                 }
                 "Done" => {
-                    let mut response = Response::new(status::from(status::OK));
+                    let mut response = Response::new(status::OK);
                     response.set_body("Done");
                     let buf = response.serialize();
                     w.write_all(buf.as_bytes()).await.unwrap();
@@ -58,23 +58,26 @@ impl Handler for MyHandler {
                     return Err(handler::Error::Failed("Forced error".to_string()));
                 }
                 "CustomStatus" => {
-                    return Err(handler::Error::CustomStatus(
-                        r.headers
-                            .get_first("x-hype-test-customstatus-code")
-                            .unwrap()
-                            .parse()
-                            .unwrap(),
-                        r.headers
-                            .get_first("x-hype-test-customstatus-message")
-                            .unwrap()
-                            .to_string(),
+                    return Err(handler::Error::Status(
+                        (
+                            r.headers
+                                .get_first("x-hype-test-customstatus-code")
+                                .unwrap()
+                                .parse()
+                                .unwrap(),
+                            r.headers
+                                .get_first("x-hype-test-customstatus-message")
+                                .unwrap()
+                                .to_string(),
+                        )
+                            .into(),
                     ));
                 }
                 _ => {}
             }
         }
 
-        let mut response = Response::new(status::from(status::OK));
+        let mut response = Response::new(status::OK);
         response.set_body("OK");
 
         response.headers.set(

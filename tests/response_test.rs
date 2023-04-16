@@ -4,7 +4,7 @@ use hype::status;
 
 #[test]
 fn it_works_with_body() {
-    let mut response = Response::new(status::from(status::OK));
+    let mut response = Response::new(status::OK);
     response.set_body("<HTML><b>Hello world!</b></HTML>");
     assert_eq!(
         response.serialize(),
@@ -17,7 +17,7 @@ content-length: 32\r
 
 #[test]
 fn it_works_with_cookies() {
-    let mut response = Response::new(status::from(status::OK));
+    let mut response = Response::new(status::OK);
     response.set_body("<HTML><b>Hello world!</b></HTML>");
 
     let mut cookie = Cookie::new("ID", "mo");

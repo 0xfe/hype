@@ -16,9 +16,9 @@ pub struct Status {
 }
 
 impl Status {
-    pub fn new(status: status::Status, message: impl Into<String>) -> Self {
+    pub fn new(status: impl Into<status::Status>, message: impl Into<String>) -> Self {
         return Self {
-            status,
+            status: status.into(),
             body: message.into(),
             headers: Headers::new(),
         };
@@ -44,8 +44,5 @@ impl Handler for Status {
 
 #[allow(non_snake_case)]
 pub fn NotFoundHandler() -> Status {
-    Status::new(
-        status::from(status::NOT_FOUND),
-        "<html>404 Not Found</html>",
-    )
+    Status::new(status::NOT_FOUND, "<html>404 Not Found</html>")
 }

@@ -16,7 +16,7 @@ impl Handler for MyHandler {
         _: &Request,
         w: &mut dyn AsyncWriteStream,
     ) -> Result<handler::Action, Error> {
-        let mut response = Response::new(status::from(status::OK));
+        let mut response = Response::new(status::OK);
         response.headers.set("foo", "bar");
         response.set_body("hello world!\n");
 
