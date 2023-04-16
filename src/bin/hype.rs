@@ -58,21 +58,24 @@ impl Handler for AuthHandler {
 //   curl -H "x-hype-auth-token: foo" http://localhost:5000/backends/backend-ayGoPVg
 
 #[derive(Debug, Clone)]
-struct State {
+struct AppState {
     backends: Arc<RwLock<HashMap<String, lbconfig::Backend>>>,
 }
 
 async fn add_backend(
     _: Request,
     backend: lbconfig::Backend,
-    state: State,
+    state: AppState,
 ) -> (status::Status, String) {
     let id = backend.id.clone();
     state.backends.write().await.insert(id.clone(), backend);
     (status::from(status::OK), format!("Got backend: {:?}", id))
 }
 
-async fn get_backend(r: Request, state: State) -> Result<(status::Status, String), handler::Error> {
+async fn get_backend(
+    r: Request,
+    state: AppState,
+) -> Result<(status::Status, String), handler::Error> {
     let response = format!(
         "{:#?}",
         state
@@ -98,12 +101,11 @@ async fn main() {
     let mut server = Server::new(&args.host, args.port);
     info!("Starting hype admin server on {}:{}", args.host, args.port);
 
-    let log_handler = handlers::Log {};
-    let auth_handler = AuthHandler {
-        token: "foo".into(),
-    };
+    let middleware = Stack::new().push(handlers::Log {}).push(AuthHandler {
+        token: "foo".to_string(),
+    });
 
-    let state = State {
+    let state = AppState {
         backends: Arc::new(RwLock::new(HashMap::new())),
     };
 
@@ -111,19 +113,18 @@ async fn main() {
         .route_method(
             Method::POST,
             "/backends",
-            Stack::new()
-                .push(log_handler.clone())
-                .push(auth_handler.clone())
+            middleware
+                .clone()
                 .push(handler::json(add_backend, state.clone())),
         )
         .await;
 
     server
-        .route(
+        .route_method(
+            Method::GET,
             "/backends/:id",
-            Stack::new()
-                .push(log_handler)
-                .push(auth_handler)
+            middleware
+                .clone()
                 .push(handler::get(get_backend, state.clone())),
         )
         .await;
