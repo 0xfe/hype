@@ -57,7 +57,7 @@ curl --insecure https://localhost:4000
 
 ## In Progress
 
--   [ ] Simplified handler APIs
+-   [x] Simplified handler using service/state API
 -   [ ] Improve matcher rules system
     -   [ ] Ignore trailing slashes for prefix matches
     -   [x] Support longest matching path
@@ -66,6 +66,7 @@ curl --insecure https://localhost:4000
     -   [x] POST /admin/backends
     -   [x] GET /admin/backends/:id
 -   [x] Make it easy to share middleware across routes
+-   [ ] Make Request::clone() cheaper for service API
 
 ## TODO
 

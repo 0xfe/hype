@@ -34,7 +34,7 @@ impl Handler for Status {
     ) -> Result<handler::Action, handler::Error> {
         let mut response = Response::new(self.status.clone());
         response.headers = self.headers.clone();
-        response.set_body(self.body.clone().into());
+        response.set_body(self.body.clone());
 
         let buf = response.serialize();
         w.write_all(buf.as_bytes()).await.unwrap();

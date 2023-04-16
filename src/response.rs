@@ -19,6 +19,14 @@ impl From<Message> for Response {
     }
 }
 
+impl<T: Into<Body>> From<T> for Response {
+    fn from(value: T) -> Self {
+        let mut r = Response::new(status::from(status::OK));
+        r.set_body(value.into());
+        r
+    }
+}
+
 impl Response {
     // This is just for testing. It parses the body as a set of newline strings,
     // so will not accept raw bodies, e.g., for PUT.
@@ -77,8 +85,13 @@ impl Response {
         }
     }
 
-    pub fn set_body(&mut self, body: Body) {
-        self.body = body;
+    pub fn with_body(mut self, body: impl Into<Body>) -> Self {
+        self.body = body.into();
+        self
+    }
+
+    pub fn set_body(&mut self, body: impl Into<Body>) {
+        self.body = body.into();
     }
 
     pub async fn content(&self) -> String {

@@ -1,21 +1,15 @@
-use async_trait::async_trait;
-
 use crate::{
-    handler::{self, AsyncWriteStream, Handler},
+    handler::{self},
     request::Request,
 };
 
-#[derive(Clone, Debug)]
-pub struct Log;
+use super::service::{service, ServiceHandler};
 
-#[async_trait]
-impl Handler for Log {
-    async fn handle(
-        &self,
-        r: &Request,
-        _w: &mut dyn AsyncWriteStream,
-    ) -> Result<handler::Action, handler::Error> {
-        info!("Request {}", r.url.as_ref().unwrap());
-        Ok(handler::Action::Next)
-    }
+async fn log_handler(r: Request, _: ()) -> Result<handler::Action, handler::Error> {
+    info!("Request {}", r.url.as_ref().unwrap());
+    Ok(handler::Action::Next)
+}
+
+pub fn log() -> ServiceHandler<handler::Action, ()> {
+    service(log_handler)
 }

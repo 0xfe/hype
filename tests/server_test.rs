@@ -35,14 +35,14 @@ impl Handler for MyHandler {
             {
                 "Next" => {
                     let mut response = Response::new(status::from(status::OK));
-                    response.set_body("Next".into());
+                    response.set_body("Next");
                     let buf = response.serialize();
                     w.write_all(buf.as_bytes()).await.unwrap();
                     return Ok(handler::Action::Next);
                 }
                 "Done" => {
                     let mut response = Response::new(status::from(status::OK));
-                    response.set_body("Done".into());
+                    response.set_body("Done");
                     let buf = response.serialize();
                     w.write_all(buf.as_bytes()).await.unwrap();
                     return Ok(handler::Action::Done);
@@ -76,7 +76,7 @@ impl Handler for MyHandler {
         }
 
         let mut response = Response::new(status::from(status::OK));
-        response.set_body("OK".into());
+        response.set_body("OK");
 
         response.headers.set(
             "x-hype-test-keepalive-timeout",

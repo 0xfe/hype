@@ -55,7 +55,7 @@ impl Web {
     ) -> io::Result<()> {
         let mut response = Response::new(status::from(status));
         response.headers.set("Content-Type", content_type);
-        response.set_body(body.into());
+        response.set_body(body);
 
         w.write_all(response.serialize().as_bytes()).await
     }

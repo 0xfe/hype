@@ -4,19 +4,12 @@ use std::{error, fmt, io::Cursor};
 
 use async_trait::async_trait;
 
-use futures::{future::BoxFuture, Future};
-use serde::{de::DeserializeOwned, Deserialize};
 use tokio::{
-    io::{AsyncRead, AsyncWrite, AsyncWriteExt},
+    io::{AsyncRead, AsyncWrite},
     net::TcpStream,
 };
 
-use crate::{
-    conntrack::ConnId,
-    request::Request,
-    response::Response,
-    status::{self, Status},
-};
+use crate::{conntrack::ConnId, request::Request, response::Response, status::Status};
 
 /// Handlers can return a follow up action, or an error. Actions may lead too
 /// another handler, or a redirect, or an immediate response. Errors always lead
@@ -28,12 +21,21 @@ pub enum Action {
     /// Continue to next handler in the stack.
     Next,
 
+    /// Respond immediately with the included response.
+    Response(Response),
+
     /// Respond immediately with a 401 Redirect to a new location. Does not
     /// continue to next handler in the stack.
     Redirect(String),
 
     /// This session is complete. Do not continue to next handler in the stack.
     Done,
+}
+
+impl<T: Into<Response>> From<T> for Action {
+    fn from(r: T) -> Self {
+        Action::Response(r.into())
+    }
 }
 
 /// A failed handler returns an Error.
@@ -129,77 +131,5 @@ impl std::fmt::Debug for dyn ErrorHandler {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "ErrorHandlerFn").unwrap();
         Ok(())
-    }
-}
-
-pub fn parse_json<'de, T: Deserialize<'de>>(body: &'de Vec<u8>) -> Result<T, Error> {
-    serde_json::from_str::<T>(
-        std::str::from_utf8(body.as_slice()).map_err(|e| Error::Failed(e.to_string()))?,
-    )
-    .map_err(|e| Error::Failed(e.to_string()))
-}
-
-pub struct GetHandler<S> {
-    f: Box<
-        dyn Fn(Request, S) -> BoxFuture<'static, Result<(status::Status, String), Error>>
-            + Send
-            + Sync,
-    >,
-    state: S,
-}
-
-#[async_trait]
-impl<S: Send + Sync + Clone> Handler for GetHandler<S> {
-    async fn handle(&self, r: &Request, w: &mut dyn AsyncWriteStream) -> Result<Action, Error> {
-        let result = (self.f)(r.clone(), self.state.clone()).await?;
-        let mut response = Response::new(result.0);
-        response.set_body(result.1.into());
-
-        let buf = response.serialize();
-        w.write_all(buf.as_bytes()).await.unwrap();
-        Ok(Action::Next)
-    }
-}
-
-pub fn get<Func: Send + Sync, Fut, S>(func: Func, state: S) -> GetHandler<S>
-where
-    Func: Send + 'static + Fn(Request, S) -> Fut,
-    Fut: Send + 'static + Future<Output = Result<(status::Status, String), Error>>,
-{
-    GetHandler {
-        f: Box::new(move |a, b| Box::pin(func(a, b))),
-        state,
-    }
-}
-
-pub struct JsonHandler<T, S> {
-    func: Box<dyn Fn(Request, T, S) -> BoxFuture<'static, (status::Status, String)> + Send + Sync>,
-    state: S,
-}
-
-#[async_trait]
-impl<T: Send + Sync + DeserializeOwned, S: Send + Sync + Clone> Handler for JsonHandler<T, S> {
-    async fn handle(&self, r: &Request, w: &mut dyn AsyncWriteStream) -> Result<Action, Error> {
-        let content = r.body.content().await.clone();
-        let json: T = parse_json(&content)?;
-
-        let result = (self.func)(r.clone(), json, self.state.clone()).await;
-        let mut response = Response::new(result.0);
-        response.set_body(result.1.into());
-
-        let buf = response.serialize();
-        w.write_all(buf.as_bytes()).await.unwrap();
-        Ok(Action::Done)
-    }
-}
-
-pub fn json<'de, Func: Send + Sync, Fut, T, S>(func: Func, state: S) -> JsonHandler<T, S>
-where
-    Func: Send + 'static + Fn(Request, T, S) -> Fut,
-    Fut: Send + 'static + Future<Output = (status::Status, String)>,
-{
-    JsonHandler {
-        func: Box::new(move |a, b, c| Box::pin(func(a, b, c))),
-        state,
     }
 }

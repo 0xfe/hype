@@ -27,7 +27,7 @@ impl Handler for MyHandler {
         w: &mut dyn AsyncWriteStream,
     ) -> Result<handler::Action, handler::Error> {
         let mut response = Response::new(status::from(status::NOT_FOUND));
-        response.set_body(format!("404 File not found: {}\n", r.path()).into());
+        response.set_body(format!("404 File not found: {}\n", r.path()));
         let buf = response.serialize();
         w.write_all(buf.as_bytes()).await.unwrap();
         Ok(handler::Action::Done)

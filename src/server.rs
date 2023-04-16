@@ -98,7 +98,7 @@ impl DefaultErrorHandler {
     ) -> io::Result<()> {
         let mut response = Response::new(status::from(status));
         response.headers.set("Content-Type", content_type);
-        response.set_body(body.into());
+        response.set_body(body);
         w.write_all(response.serialize().as_bytes()).await
     }
 }
@@ -114,6 +114,12 @@ impl ErrorHandler for DefaultErrorHandler {
         return match err {
             Ok(handler::Action::Done) => Ok(handler::Action::Done),
             Ok(handler::Action::Next) => Ok(handler::Action::Next),
+            Ok(handler::Action::Response(mut response)) => {
+                w.write_all(response.serialize().as_bytes()).await.or(Err(
+                    handler::Error::Failed("could not write to stream".into()),
+                ))?;
+                Ok(handler::Action::Done)
+            }
             Ok(handler::Action::Redirect(to)) => {
                 let mut response = Response::new(status::from(status::MOVED_PERMANENTLY));
                 response.headers.set("Location", to);

@@ -4,12 +4,9 @@ extern crate log;
 use argh::FromArgs;
 
 use hype::handler::{self};
-use hype::{
-    handlers::status::NotFoundHandler,
-    request::Request,
-    server::Server,
-    status::{self},
-};
+use hype::response::Response;
+use hype::{handlers, status};
+use hype::{handlers::status::NotFoundHandler, request::Request, server::Server};
 
 #[derive(FromArgs)]
 /// Reach new heights.
@@ -35,17 +32,19 @@ struct Args {
     key_file: String,
 }
 
-async fn hello(r: Request, _: ()) -> Result<(status::Status, String), handler::Error> {
-    Ok((
-        status::from(status::OK),
-        format!(
-            "Hello, {}: {}!",
-            r.path(),
-            r.query_params()
-                .get("name")
-                .unwrap_or(&String::from("world"))
-        ),
+async fn hello(r: Request, _: ()) -> Result<String, handler::Error> {
+    Ok(format!(
+        "Hello, {}: {}!",
+        r.path(),
+        r.query_params()
+            .get("name")
+            .unwrap_or(&String::from("world"))
     ))
+}
+
+async fn hello2(_: Request, _: ()) -> Result<Response, handler::Error> {
+    let r = Response::new(status::from(status::OK)).with_body("yooo!");
+    Ok(r)
 }
 
 #[tokio::main]
@@ -66,13 +65,11 @@ async fn main() {
     server
         .route(
             "/boo",
-            handler::get(
-                |_, _| async move { Ok((status::from(status::OK), "boo!".to_string())) },
-                (),
-            ),
+            handlers::service(|_, _: ()| async move { Ok("boo!") }),
         )
         .await;
-    server.route("/hello", handler::get(hello, ())).await;
+    server.route("/hello", handlers::service(hello)).await;
+    server.route("/hello2", handlers::service(hello2)).await;
     server.route_default(NotFoundHandler());
     server.start().await.unwrap();
 }

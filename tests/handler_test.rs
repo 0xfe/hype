@@ -18,7 +18,7 @@ impl Handler for MyHandler {
     ) -> Result<handler::Action, Error> {
         let mut response = Response::new(status::from(status::OK));
         response.headers.set("foo", "bar");
-        response.set_body("hello world!\n".into());
+        response.set_body("hello world!\n");
 
         w.write_all(response.serialize().as_bytes()).await.unwrap();
         Ok(handler::Action::Done)
