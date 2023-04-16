@@ -32,7 +32,16 @@ struct Args {
     key_file: String,
 }
 
-async fn hello(r: Request, _: ()) -> Result<String, handler::Error> {
+async fn hello1(_: Request, _: ()) -> Result<impl Into<String>, handler::Error> {
+    Ok("Hello world!")
+}
+
+async fn hello2(_: Request, _: ()) -> Result<Response, handler::Error> {
+    let r = Response::new(status::from(status::OK)).with_body("yooo!");
+    Ok(r)
+}
+
+async fn hello3(r: Request, _: ()) -> Result<String, handler::Error> {
     Ok(format!(
         "Hello, {}: {}!",
         r.path(),
@@ -42,9 +51,11 @@ async fn hello(r: Request, _: ()) -> Result<String, handler::Error> {
     ))
 }
 
-async fn hello2(_: Request, _: ()) -> Result<Response, handler::Error> {
-    let r = Response::new(status::from(status::OK)).with_body("yooo!");
-    Ok(r)
+async fn hello4(r: Request, _: ()) -> Result<String, handler::Error> {
+    Ok(format!(
+        "Hello, {}!",
+        r.params.get("name").unwrap_or(&String::from("world"))
+    ))
 }
 
 #[tokio::main]
@@ -62,12 +73,23 @@ async fn main() {
         server.enable_tls(args.cert_file.into(), args.key_file.into());
     }
 
+    // Hello world with inline async block returning String.
     server.route(
-        "/boo",
+        "/hello",
         handlers::service(|_, _: ()| async move { Ok("boo!") }),
     );
-    server.route("/hello", handlers::service(hello));
+
+    // Hello world with function returning string.
+    server.route("/hello1", handlers::service(hello1));
+
+    // Hello world with function returning Response.
     server.route("/hello2", handlers::service(hello2));
+
+    // Hello world parsing URL parametrs
+    server.route("/hello3", handlers::service(hello3));
+
+    // Hello world with path matcher
+    server.route("/hello4/:name", handlers::service(hello4));
     server.route_default(NotFoundHandler());
     server.start().await.unwrap();
 }
