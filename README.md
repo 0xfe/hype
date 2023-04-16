@@ -1,10 +1,16 @@
 # hype
 
-hype is a programmable L4/7 load balancer
+`hype` is a programmable L4/7 load balancer built into a composable web framework. It lets you
+build sophisticated reverse proxies, ingresses, or web application firewalls that can be dynamically
+programmed with a third-party controller.
+
+Although `hype` is somewhat usable, it is still a heavy work in progress.
+
+MIT Licensed. Copyright 2023 Mohit Muthanna Cheppudira.
 
 ## Hello World!
 
-See [hello.rs](https://github.com/0xfe/hype/blob/main/src/bin/hello.rs) for an example.
+See [hello.rs](https://github.com/0xfe/hype/blob/main/src/bin/hello.rs) for a working example. Run with `cargo run --bin hello`.
 
 ```rust
 async fn hello1(_: Request, _: ()) -> Result<impl Into<String>, handler::Error> {
@@ -82,68 +88,50 @@ async fn main() {
 }
 ```
 
-## Running binaries in bin/
-
-Start with debug logging.
+## Running binaries in bin/ and tests in tests/
 
 ```
-
+# Start hello with debug logging
 $ RUST_LOG=debug cargo run --bin hello
 
-# Run with TLS
-
+# Run with TLS (see section below for creating certs)
 $ cargo run --bin hello -- -s
 
 # Run balancer
-
 $ vi lbconfig.yaml
 $ cargo run --bin balancer
 
-```
-
-## Run tests
-
-```
-
 # Run all tests
-
 $ cargo test
 
 # Run specific tests
-
 $ cargo test parser
 
-# Run all tests in file
-
+# Run all tests in a file
 # cargo test --test request_test
 
-# Show standard output
-
+# Show standard output while running tests
 $ cargo test -- --nocapture
 
 # To see logs (via `info!`, `debug!` etc.) in tests, add the following line to the test.
 
-hype::logger::init()
+   hype::logger::init()
 
 # Then run the tests with the `-- --nocapture` flag, and optionally set the `RUST_LOG=debug` env var.
 
 # Build docs
-
 $ cargo doc
-
 ```
 
 ## Generate TLS key and cert file for localhost
 
 ```
-
 $ openssl genrsa -out localhost.key 2048
 $ openssl req -new -x509 -sha256 -key localhost.key -out localhost.crt -days 3650
 
 # To test:
 
 curl --insecure https://localhost:4000
-
 ```
 
 ## In Progress
