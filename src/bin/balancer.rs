@@ -53,7 +53,7 @@ async fn main() {
         }
 
         let lb = hype::handlers::Lb::new(balancer);
-        server.route(route.location, lb).await;
+        server.route(route.location, lb);
     }
     server.start().await.unwrap();
 }

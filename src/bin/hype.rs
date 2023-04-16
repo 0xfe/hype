@@ -95,25 +95,21 @@ async fn main() {
         backends: Arc::new(RwLock::new(HashMap::new())),
     };
 
-    server
-        .route_method(
-            Method::POST,
-            "/backends",
-            middleware
-                .clone()
-                .push(handlers::service(add_backend).with_state(state.clone())),
-        )
-        .await;
+    server.route_method(
+        Method::POST,
+        "/backends",
+        middleware
+            .clone()
+            .push(handlers::service(add_backend).with_state(state.clone())),
+    );
 
-    server
-        .route_method(
-            Method::GET,
-            "/backends/:id",
-            middleware
-                .clone()
-                .push(handlers::service(get_backend).with_state(state.clone())),
-        )
-        .await;
+    server.route_method(
+        Method::GET,
+        "/backends/:id",
+        middleware
+            .clone()
+            .push(handlers::service(get_backend).with_state(state.clone())),
+    );
 
     server.route_default(handlers::NotFoundHandler());
     server.start().await.unwrap();

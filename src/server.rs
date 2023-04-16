@@ -210,13 +210,13 @@ impl Server {
     }
 
     /// Add a new handler to the server. This handler will be called if the request path matches the given path.
-    pub async fn route(&self, path: impl Into<String>, handler: impl Into<RouteHandler>) {
+    pub fn route(&self, path: impl Into<String>, handler: impl Into<RouteHandler>) {
         self.router.add_route(Matcher::new(&path.into()), handler);
     }
 
     /// Add a new method handler to the server. This handler will be called if the request path matches the given
     /// path and the request method matches the given method.
-    pub async fn route_method(
+    pub fn route_method(
         &self,
         method: Method,
         path: impl Into<String>,
@@ -228,7 +228,7 @@ impl Server {
     }
 
     /// Route multiple methods to the same handler.
-    pub async fn route_methods(
+    pub fn route_methods(
         &self,
         methods: Vec<Method>,
         path: impl Into<String>,
@@ -245,7 +245,7 @@ impl Server {
     }
 
     /// Set the error handler for the server. This is called if any handler returns an error.
-    pub async fn route_error(&mut self, handler: Box<dyn ErrorHandler>) {
+    pub fn route_error(&mut self, handler: Box<dyn ErrorHandler>) {
         self.error_handler = Arc::new(RwLock::new(handler));
     }
 

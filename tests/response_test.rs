@@ -26,16 +26,4 @@ fn it_works_with_cookies() {
 
     response.set_cookie(cookie);
     response.set_cookie(Cookie::new("SID", "foobar"));
-
-    /*
-        assert_eq!(
-            response.serialize(),
-            "HTTP/1.1 200 OK\r
-    Content-Length: 32\r
-    Set-Cookie: ID=mo; Secure; Domain=mo.town\r
-    Set-Cookie: SID=foobar\r
-    \r
-    <HTML><b>Hello world!</b></HTML>"
-        );
-        */
 }

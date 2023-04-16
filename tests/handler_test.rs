@@ -27,7 +27,7 @@ impl Handler for MyHandler {
 
 #[tokio::test]
 async fn it_works() {
-    let h = Box::new(MyHandler {});
+    let h = MyHandler {};
 
     let buf = r##"POST / HTTP/1.1
 Host: localhost:4000

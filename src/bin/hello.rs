@@ -62,14 +62,12 @@ async fn main() {
         server.enable_tls(args.cert_file.into(), args.key_file.into());
     }
 
-    server
-        .route(
-            "/boo",
-            handlers::service(|_, _: ()| async move { Ok("boo!") }),
-        )
-        .await;
-    server.route("/hello", handlers::service(hello)).await;
-    server.route("/hello2", handlers::service(hello2)).await;
+    server.route(
+        "/boo",
+        handlers::service(|_, _: ()| async move { Ok("boo!") }),
+    );
+    server.route("/hello", handlers::service(hello));
+    server.route("/hello2", handlers::service(hello2));
     server.route_default(NotFoundHandler());
     server.start().await.unwrap();
 }

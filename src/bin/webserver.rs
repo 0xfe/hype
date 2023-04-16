@@ -61,7 +61,7 @@ async fn main() {
             config::Handler::Web(params) => handlers::web::Web::from(params).into(),
         };
 
-        server.route(route.location.clone(), handler).await;
+        server.route(route.location.clone(), handler);
     }
 
     server.route_default(MyHandler {});

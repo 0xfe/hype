@@ -14,7 +14,6 @@ use hype::{
     },
     request::{Method, Request},
     response::Response,
-    router::RouteHandler,
     server::Server,
     status,
 };
@@ -156,7 +155,7 @@ async fn weighted_rr_policy() {
 async fn start_server(port: u16, text: String) -> (Arc<mpsc::Sender<bool>>, Arc<Notify>) {
     let handler = handlers::status::Status::new(status::from(status::OK), text);
     let mut server = Server::new("localhost", port);
-    server.route_default(RouteHandler::new(Box::new(handler)));
+    server.route_default(handler);
     let ready = server.start_notifier();
     let shutdown = server.shutdown();
 
@@ -206,12 +205,8 @@ async fn lb_with_client_and_server() {
     shutdowns.extend(shutdowns2);
 
     let mut lb_server = Server::new("localhost", 10099);
-    lb_server
-        .route("/lb1".to_string(), RouteHandler::new(Box::new(lb1)))
-        .await;
-    lb_server
-        .route("/lb2".to_string(), RouteHandler::new(Box::new(lb2)))
-        .await;
+    lb_server.route("/lb1".to_string(), lb1);
+    lb_server.route("/lb2".to_string(), lb2);
 
     let lb_ready = lb_server.start_notifier();
     let lb_shutdown = lb_server.shutdown();
@@ -302,7 +297,7 @@ impl Handler for EchoHandler {
 
 async fn start_echo_server(port: u16) -> (Arc<mpsc::Sender<bool>>, Arc<Notify>) {
     let mut server = Server::new("localhost", port);
-    server.route_default(RouteHandler::new(Box::new(EchoHandler {})));
+    server.route_default(EchoHandler {});
     let ready = server.start_notifier();
     let shutdown = server.shutdown();
 
@@ -342,9 +337,7 @@ async fn streaming_lb() {
     let (lb, shutdowns) = start_streaming_backends(3, 10100).await;
 
     let mut lb_server = Server::new("localhost", 10199);
-    lb_server
-        .route("/lb".to_string(), RouteHandler::new(Box::new(lb)))
-        .await;
+    lb_server.route("/lb".to_string(), lb);
 
     let lb_ready = lb_server.start_notifier();
     let lb_shutdown = lb_server.shutdown();
@@ -399,9 +392,7 @@ async fn streaming_lb_chunked() {
     let (lb, shutdowns) = start_streaming_backends(3, 10200).await;
 
     let mut lb_server = Server::new("localhost", 10299);
-    lb_server
-        .route("/lb".to_string(), RouteHandler::new(Box::new(lb)))
-        .await;
+    lb_server.route("/lb".to_string(), lb);
 
     let lb_ready = lb_server.start_notifier();
     let lb_shutdown = lb_server.shutdown();
