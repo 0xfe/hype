@@ -32,7 +32,7 @@ struct Args {
     key_file: String,
 }
 
-async fn hello1(_: Request, _: ()) -> Result<impl Into<String>, handler::Error> {
+async fn hello1(_r: Request) -> Result<impl Into<String>, handler::Error> {
     Ok("Hello world!")
 }
 
@@ -75,13 +75,10 @@ async fn main() {
     }
 
     // Hello world with inline async block returning String.
-    server.route(
-        "/hello",
-        handlers::service(|_, _: ()| async move { Ok("boo!") }),
-    );
+    server.route("/hello", handlers::handler(|_| async move { Ok("boo!") }));
 
     // Hello world with function returning string.
-    server.route("/hello1", handlers::service(hello1));
+    server.route("/hello1", handlers::handler(hello1));
 
     // Hello world with function returning Response.
     server.route("/hello2", handlers::service(hello2));

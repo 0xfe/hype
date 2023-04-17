@@ -166,7 +166,8 @@ impl Parser {
             return Err(ParseError::BadMethodLine(method_line.into()));
         }
 
-        if let Some(method) = VALID_METHODS.get(&parts[0]) {
+        let got_method = parts[0].to_uppercase();
+        if let Some(method) = VALID_METHODS.get(got_method.as_str()) {
             self.message.request_mut().method = *method;
         } else {
             return Err(ParseError::InvalidMethod(parts[0].into()));

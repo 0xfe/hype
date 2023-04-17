@@ -13,4 +13,5 @@ pub use crate::handlers::redirect::Redirect;
 pub use crate::handlers::status::NotFoundHandler;
 pub use crate::handlers::status::Status;
 
+pub use crate::handlers::service::handler;
 pub use crate::handlers::service::service;

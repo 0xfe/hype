@@ -28,12 +28,15 @@ where
     state: S,
 }
 
-impl<R, S> ServiceHandler<R, S>
+impl<R, S: Clone> ServiceHandler<R, S>
 where
     R: Into<Action>,
 {
-    pub fn with_state(self, state: S) -> Self {
-        ServiceHandler { f: self.f, state }
+    pub fn with_state(self, state: &S) -> Self {
+        ServiceHandler {
+            f: self.f,
+            state: state.clone(),
+        }
     }
 }
 
@@ -57,6 +60,34 @@ where
     ServiceHandler {
         f: Box::new(move |a, b| Box::pin(func(a, b))),
         state: S::default(),
+    }
+}
+
+pub struct FnHandler<R>
+where
+    R: Into<Action>,
+{
+    /// Wraps the async handler function.
+    f: Box<dyn Fn(Request) -> BoxFuture<'static, Result<R, Error>> + Send + Sync>,
+}
+
+#[async_trait]
+impl<R: Into<Action> + Send + Sync> Handler for FnHandler<R> {
+    async fn handle(&self, r: &Request, _w: &mut dyn AsyncWriteStream) -> Result<Action, Error> {
+        let result = (self.f)(r.clone()).await?;
+        Ok(result.into())
+    }
+}
+
+/// Create a new service handler from an async function. Use `with_state` to attach a state to the
+/// service handler.
+pub fn handler<Func: Send + Sync, Fut, R: Into<Action>>(func: Func) -> FnHandler<R>
+where
+    Func: Send + 'static + Fn(Request) -> Fut,
+    Fut: Send + 'static + Future<Output = Result<R, Error>>,
+{
+    FnHandler {
+        f: Box::new(move |a| Box::pin(func(a))),
     }
 }
 

@@ -87,7 +87,7 @@ async fn main() {
 
     let middleware = Stack::new()
         .push(handlers::log())
-        .push(handlers::service(auth).with_state(AuthState {
+        .push(handlers::service(auth).with_state(&AuthState {
             token: "foo".to_string(),
         }));
 
@@ -100,7 +100,7 @@ async fn main() {
         "/backends",
         middleware
             .clone()
-            .push(handlers::service(add_backend).with_state(state.clone())),
+            .push(handlers::service(add_backend).with_state(&state)),
     );
 
     server.route_method(
@@ -108,7 +108,7 @@ async fn main() {
         "/backends/:id",
         middleware
             .clone()
-            .push(handlers::service(get_backend).with_state(state.clone())),
+            .push(handlers::service(get_backend).with_state(&state)),
     );
 
     server.route_default(handlers::NotFoundHandler());

@@ -4,25 +4,29 @@
 build sophisticated reverse proxies, ingresses, or web application firewalls that can be dynamically
 programmed with a third-party controller.
 
-Although `hype` is somewhat usable, it is still a heavy work in progress.
+### Features
 
-MIT Licensed. Copyright 2023 Mohit Muthanna Cheppudira.
+-   Fully async native HTTP/1.1 client and server implementations.
+-   Easy-to-use service and routing APIs to create HTTP handlers and middleware.
+-   Support for both store-and-forward and streaming requests and responses.
+-   TLS 1.1 support.
 
-## Hello World!
+**Note**: Although `hype` is somewhat usable, it is still a heavy work in progress.
+
+## Example: Hello World!
 
 See [hello.rs](https://github.com/0xfe/hype/blob/main/src/bin/hello.rs) for a working example. Run with `cargo run --bin hello`.
 
 ```rust
-async fn hello1(_: Request, _: ()) -> Result<impl Into<String>, handler::Error> {
+async fn hello1(_: Request) -> Result<impl Into<String>, handler::Error> {
     Ok("Hello world!")
 }
 
-async fn hello2(_: Request, _: ()) -> Result<Response, handler::Error> {
-    let r = Response::new(status::from(status::OK)).with_body("yooo!");
-    Ok(r)
+async fn hello2(_: Request) -> Result<Response, handler::Error> {
+    Ok(Response::new(status::OK).with_body("yooo!"))
 }
 
-async fn hello3(r: Request, _: ()) -> Result<String, handler::Error> {
+async fn hello3(r: Request) -> Result<String, handler::Error> {
     Ok(format!( "Hello, {}!", r.params.get("name")?))
 }
 
@@ -32,24 +36,63 @@ async fn main() {
     let mut server = Server::new("localhost", 4000);
 
     // Hello world with inline async block returning String.
-    server.route(
-        "/hello",
-        handlers::service(|_, _: ()| async move { Ok("boo!") }),
-    );
+    server.route("/hello", handler(|_| async move { Ok("boo!") }));
 
     // Hello world with function returning string.
-    server.route("/hello1", handlers::service(hello1));
+    server.route("/hello1", handler(hello1));
 
     // Hello world with function returning Response.
-    server.route("/hello2", handlers::service(hello2));
+    server.route("/hello2", handler(hello2));
 
     // Hello world with path matcher
-    server.route("/hello3/:name", handlers::service(hello4));
+    server.route("/hello3/:name", handler(hello4));
     server.start().await.unwrap();
 }
 ```
 
-## Hello Loadbalancer!
+## Example: Stateful services
+
+Use `hype::handlers::service` to create stateful handlers. See [hello.rs](https://github.com/0xfe/hype/blob/main/src/bin/app.rs) for a working example. Run with `cargo run --bin app`
+
+```rust
+#[derive(Debug, Clone, Default)]
+struct AppState {
+    counter: Arc<Mutex<u32>>,
+}
+
+#[tokio::main]
+async fn main() {
+    hype::logger::init();
+
+    let app = AppState {
+        counter: Arc::new(Mutex::new(0)),
+    };
+
+    let mut server = Server::new("127.0.0.1", 4000);
+    server.route_method(
+        Method::GET,
+        "/counter/get",
+        handlers::service(
+            |_, s: AppState| async move { Ok(format!("{}\n", s.counter.lock().await)) },
+        )
+        .with_state(&app),
+    );
+
+    server.route_method(
+        Method::POST,
+        "/counter/inc",
+        handlers::service(|_, s: AppState| async move {
+            *s.counter.lock().await += 1;
+            Ok("OK\n")
+        })
+        .with_state(&app),
+    );
+
+    server.start().await.unwrap();
+}
+```
+
+## Example: Hello Loadbalancer!
 
 ```rust
 #[tokio::main]
@@ -123,7 +166,19 @@ $ openssl req -new -x509 -sha256 -key localhost.key -out localhost.crt -days 365
 curl --insecure https://localhost:4000
 ```
 
-## In Progress
+## License (MIT)
+
+Copyright 2023 Mohit Muthanna Cheppudira.
+
+Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the “Software”), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED “AS IS”, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+
+## Status
+
+### In Progress
 
 -   [x] Simplified handler using service/state API
 -   [ ] Improve matcher rules system
@@ -136,7 +191,7 @@ curl --insecure https://localhost:4000
 -   [x] Make it easy to share middleware across routes
 -   [ ] Make Request::clone() cheaper for service API
 
-## TODO
+### TODO
 
 -   [ ] Implement gzip transfer encoding
 -   [ ] Implement wildcard host matching and rewriting
@@ -151,7 +206,7 @@ curl --insecure https://localhost:4000
     -   templating engine with https://crates.io/crates/tera
 -   [ ] Use https://github.com/dtolnay/thiserror and anyhow::Error for error management
 
-## DONE
+### DONE
 
 -   [x] Build balancer end-to-end unit tests
 -   [x] Implement multimap-based headers and rewriting
