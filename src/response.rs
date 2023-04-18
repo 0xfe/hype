@@ -31,13 +31,13 @@ impl Response {
     // This is just for testing. It parses the body as a set of newline strings,
     // so will not accept raw bodies, e.g., for PUT.
     pub fn from(buf: String) -> Result<Response, String> {
-        if buf.len() == 0 {
+        if buf.is_empty() {
             return Err("No data in buffer".into());
         }
 
         let lines: Vec<String> = buf.split('\n').map(|s| s.trim().to_string()).collect();
 
-        if lines.len() == 0 {
+        if lines.is_empty() {
             return Err("Can't parse response, no data.".into());
         }
 

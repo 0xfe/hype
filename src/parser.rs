@@ -85,16 +85,18 @@ impl fmt::Display for ParseError {
 pub struct RequestParser {}
 
 impl RequestParser {
+    #[allow(clippy::new_ret_no_self)]
     pub fn new() -> Parser {
-        return Parser::new(State::StartRequest);
+        Parser::new(State::StartRequest)
     }
 }
 
 pub struct ResponseParser {}
 
 impl ResponseParser {
+    #[allow(clippy::new_ret_no_self)]
     pub fn new() -> Parser {
-        return Parser::new(State::StartResponse);
+        Parser::new(State::StartResponse)
     }
 }
 
@@ -148,7 +150,7 @@ impl Parser {
         {
             return Err(ParseError::InvalidStateTransition(
                 self.state.clone(),
-                target_state.clone(),
+                target_state,
             ));
         }
 
