@@ -29,7 +29,7 @@ impl<T: Backend, P: Picker<T>> Http<T, P> {
         let backends = self.backends.read().await;
         let index = self
             .picker
-            .pick_backend(&*backends)
+            .pick_backend(&backends)
             .map_err(|e| ClientError::InternalError(format!("could not pick backend: {}", e)))?;
 
         if index > backends.len() {

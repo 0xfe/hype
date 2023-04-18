@@ -38,7 +38,7 @@ async fn it_works_with_waker() {
 
     let mut stream = body_reader.chunk_stream();
     let mut count = 0;
-    while let Some(_) = stream.next().await {
+    while (stream.next().await).is_some() {
         count += 1;
     }
 
@@ -67,11 +67,11 @@ async fn it_works_with_multiple_streams() {
     let mut stream2 = body_reader.chunk_stream();
 
     let mut count = 0;
-    while let Some(_) = stream1.next().await {
+    while (stream1.next().await).is_some() {
         count += 1;
     }
 
-    while let Some(_) = stream2.next().await {
+    while (stream2.next().await).is_some() {
         count += 1;
     }
 

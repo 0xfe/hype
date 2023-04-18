@@ -213,7 +213,7 @@ impl Parser {
         let mut result: Result<(), ParseError> = Ok(());
         let header_line = std::str::from_utf8(&self.buf[..]).unwrap();
 
-        if header_line == "\r" || header_line == "" {
+        if header_line == "\r" || header_line.is_empty() {
             let headers = self.message.headers_mut();
 
             let mut has_body = false;
@@ -245,18 +245,16 @@ impl Parser {
                 self.buf.clear();
                 return Ok(());
             }
-        } else {
-            if let Some((k, v)) = header_line.split_once(':') {
-                let key = k.to_lowercase();
-                if key == "content-length" {
-                    let body = self.message.body_mut();
-                    body.set_content_length(v.trim().parse::<usize>().unwrap_or(0));
-                }
-
-                self.message.headers_mut().add(key, v.trim());
-            } else {
-                result = Err(ParseError::BadHeaderLine(header_line.into()));
+        } else if let Some((k, v)) = header_line.split_once(':') {
+            let key = k.to_lowercase();
+            if key == "content-length" {
+                let body = self.message.body_mut();
+                body.set_content_length(v.trim().parse::<usize>().unwrap_or(0));
             }
+
+            self.message.headers_mut().add(key, v.trim());
+        } else {
+            result = Err(ParseError::BadHeaderLine(header_line.into()));
         }
 
         self.buf.clear();
@@ -406,7 +404,7 @@ impl Parser {
 
     pub fn is_complete(&self) -> bool {
         debug!("STATE: {:?}", self.state);
-        return self.state == State::ParseComplete;
+        self.state == State::ParseComplete
     }
 
     fn parse_eof(&mut self) -> Result<(), ParseError> {
@@ -426,6 +424,6 @@ impl Parser {
     }
 
     pub fn get_message(&self) -> Message {
-        return self.message.clone();
+        self.message.clone()
     }
 }

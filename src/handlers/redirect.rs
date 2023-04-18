@@ -14,9 +14,9 @@ pub struct Redirect {
 
 impl Redirect {
     pub fn new(location: impl Into<String>) -> Self {
-        return Redirect {
+        Redirect {
             location: location.into(),
-        };
+        }
     }
 }
 

@@ -87,7 +87,7 @@ pub struct Route {
     pub backends: Vec<Backend>,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Default)]
 pub struct Config {
     #[serde(flatten)]
     pub server: Server,
@@ -106,18 +106,9 @@ impl fmt::Display for ConfigError {
 impl error::Error for ConfigError {}
 
 impl Config {
-    pub fn from_str(config_str: impl AsRef<str>) -> Result<Self, ConfigError> {
+    pub fn from(config_str: impl AsRef<str>) -> Result<Self, ConfigError> {
         let config =
             serde_yaml::from_str(config_str.as_ref()).map_err(|e| ConfigError(e.to_string()))?;
         Ok(config)
-    }
-}
-
-impl Default for Config {
-    fn default() -> Self {
-        Self {
-            server: Server::default(),
-            routes: vec![],
-        }
     }
 }

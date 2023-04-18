@@ -87,11 +87,11 @@ impl Client {
     /// let client = Client::new("localhost:8080");
     /// ```
     pub fn new(address: impl Into<String>) -> Self {
-        return Self {
+        Self {
             address: address.into(),
             enable_tls: false,
             tls_server_name: String::from(""),
-        };
+        }
     }
 
     pub fn enable_tls(&mut self, server_name: impl Into<String>) -> &mut Self {
@@ -107,14 +107,19 @@ impl Client {
             .map_err(|e| ClientError::LookupError(format!("{}: {}", self.address.clone(), e)))?
             .collect();
 
-        if addresses.len() == 0 {
-            return Err(ClientError::LookupError(format!(
-                "no hosts found for {}",
-                self.address
-            )));
+        match addresses.is_empty() {
+            true => {
+                return Err(ClientError::LookupError(format!(
+                    "no hosts found for {}",
+                    self.address
+                )));
+            }
+            false => (),
         }
 
         let address = addresses[0];
+
+        #[allow(clippy::needless_late_init)]
         let tcp_stream;
 
         if address.is_ipv4() {
@@ -149,7 +154,7 @@ impl Client {
                 .with_no_client_auth(); // i guess this was previously the default?
             let connector = TlsConnector::from(Arc::new(config));
             let domain = rustls::ServerName::try_from(self.tls_server_name.as_str())
-                .map_err(|e| ClientError::TLSError(format!("invalid domain: {}", e.to_string())))?;
+                .map_err(|e| ClientError::TLSError(format!("invalid domain: {}", e)))?;
 
             let tls_stream = connector
                 .connect(domain, tcp_stream)
@@ -278,10 +283,7 @@ impl ConnectedClient {
             } else {
                 Ok(message
                     .map_err(|e| {
-                        ClientError::InternalError(format!(
-                            "error receiving response: {}",
-                            e.to_string()
-                        ))
+                        ClientError::InternalError(format!("error receiving response: {}", e))
                     })?
                     .into())
             }
@@ -296,12 +298,12 @@ impl ConnectedClient {
     async fn close_internal(
         writer: Arc<Mutex<Box<dyn AsyncWriteStream>>>,
     ) -> Result<(), ClientError> {
-        Ok(writer
+        writer
             .lock()
             .await
             .shutdown()
             .await
-            .map_err(|e| ClientError::ShutdownError(e.to_string()))?)
+            .map_err(|e| ClientError::ShutdownError(e.to_string()))
     }
 
     pub async fn close(&mut self) -> Result<(), ClientError> {
@@ -310,6 +312,6 @@ impl ConnectedClient {
     }
 
     pub async fn is_closed(&self) -> bool {
-        return *self.closed.lock().await;
+        *self.closed.lock().await
     }
 }

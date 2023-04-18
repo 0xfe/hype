@@ -363,7 +363,7 @@ async fn streaming_lb() {
         String::from_utf8_lossy(stream.next().await.unwrap().as_slice())
     );
 
-    assert_eq!(request.body.complete(), false);
+    assert!(!request.body.complete());
 
     request.body.append("foobar".as_bytes()).unwrap();
     assert_eq!(
@@ -377,7 +377,7 @@ async fn streaming_lb() {
         String::from_utf8_lossy(stream.next().await.unwrap().as_slice())
     );
 
-    assert_eq!(request.body.complete(), true);
+    assert!(request.body.complete());
 
     for shutdown in shutdowns {
         shutdown_server(shutdown).await;

@@ -52,7 +52,7 @@ impl ConnTracker {
     pub fn push_stream(&mut self, stream: Box<dyn AsyncStream>) -> Conn {
         let conn = Conn::new(stream);
         let id = conn.id.clone();
-        self.conns.write().unwrap().insert(id.clone(), conn.clone());
+        self.conns.write().unwrap().insert(id, conn.clone());
         conn
     }
 
@@ -89,6 +89,12 @@ impl ConnTracker {
                 }
             }
         });
+    }
+}
+
+impl Default for ConnTracker {
+    fn default() -> Self {
+        Self::new()
     }
 }
 

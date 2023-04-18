@@ -16,6 +16,11 @@ impl Headers {
         self.fields.len()
     }
 
+    #[must_use]
+    pub fn is_empty(&self) -> bool {
+        self.len() == 0
+    }
+
     pub fn add(&mut self, key: impl Into<String>, value: impl Into<String>) {
         let key = key.into().to_lowercase();
         let values = self.fields.entry(key).or_insert(Vec::new());
@@ -80,5 +85,11 @@ impl Headers {
             serialized.truncate(serialized.len() - 2);
         }
         serialized
+    }
+}
+
+impl Default for Headers {
+    fn default() -> Self {
+        Self::new()
     }
 }

@@ -159,18 +159,18 @@ async fn keep_alive() {
     let response = client.send_request(&request).await.unwrap();
     assert_eq!(response.status.code, 200);
     assert_eq!(response.body.content().await, "OK".as_bytes());
-    assert_eq!(client.is_closed().await, false);
+    assert!(!client.is_closed().await);
 
     let response = client.send_request(&request).await.unwrap();
     assert_eq!(response.status.code, 200);
     assert_eq!(response.body.content().await, "OK".as_bytes());
-    assert_eq!(client.is_closed().await, false);
+    assert!(!client.is_closed().await);
 
     shutdown_server(shutdown).await;
 
     let response = client.send_request(&request).await;
-    assert_eq!(response.is_err(), true);
-    assert_eq!(client.is_closed().await, true);
+    assert!(response.is_err());
+    assert!(client.is_closed().await);
     // EXPECT ERROR
 }
 
@@ -225,13 +225,13 @@ async fn keep_alive_timeout() {
     let response = client.send_request(&request).await.unwrap();
     assert_eq!(response.status.code, 200);
     assert_eq!(response.body.content().await, "OK".as_bytes());
-    assert_eq!(client.is_closed().await, false);
+    assert!(!client.is_closed().await);
 
     tokio::time::sleep(Duration::from_secs(2)).await;
 
     let response = client.send_request(&request).await;
-    assert_eq!(response.is_err(), true);
-    assert_eq!(client.is_closed().await, true);
+    assert!(response.is_err());
+    assert!(client.is_closed().await);
 
     shutdown_server(shutdown).await;
 }
@@ -254,16 +254,16 @@ async fn keep_alive_max() {
     let response = client.send_request(&request).await.unwrap();
     assert_eq!(response.status.code, 200);
     assert_eq!(response.body.content().await, "OK".as_bytes());
-    assert_eq!(client.is_closed().await, false);
+    assert!(!client.is_closed().await);
 
     let response = client.send_request(&request).await.unwrap();
     assert_eq!(response.status.code, 200);
     assert_eq!(response.body.content().await, "OK".as_bytes());
-    assert_eq!(client.is_closed().await, false);
+    assert!(!client.is_closed().await);
 
     let response = client.send_request(&request).await;
-    assert_eq!(response.is_err(), true);
-    assert_eq!(client.is_closed().await, true);
+    assert!(response.is_err());
+    assert!(client.is_closed().await);
 
     shutdown_server(shutdown).await;
 }
@@ -284,11 +284,11 @@ async fn connection_close() {
     let response = client.send_request(&request).await.unwrap();
     assert_eq!(response.status.code, 200);
     assert_eq!(response.content().await, "OK");
-    assert_eq!(client.is_closed().await, false);
+    assert!(!client.is_closed().await);
 
     let response = client.send_request(&request).await;
-    assert_eq!(response.is_err(), true);
-    assert_eq!(client.is_closed().await, true);
+    assert!(response.is_err());
+    assert!(client.is_closed().await);
 
     shutdown_server(shutdown).await;
 }

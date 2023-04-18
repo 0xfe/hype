@@ -9,6 +9,7 @@ programmed with a third-party controller.
 -   Fully async native HTTP/1.1 client and server implementations.
 -   Easy-to-use service and routing APIs to create HTTP handlers and middleware.
 -   Support for both store-and-forward and streaming requests and responses.
+-   L7 load balancer implementation, with support for pluggabla strategies, such as RR, Weighted RR, etc.
 -   TLS 1.1 support.
 
 **Note**: Although `hype` is somewhat usable, it is still a heavy work in progress.

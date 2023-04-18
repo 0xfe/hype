@@ -3,7 +3,7 @@ use hype::{request::Method, router::Matcher};
 #[test]
 fn matcher_test() {
     // Pattern -> Path
-    assert!(Matcher::new(&"/foo".to_string())
+    assert!(Matcher::new("/foo".to_string())
         .extract_params("/foo", None)
         .is_some());
     assert!(Matcher::new("/foo/*")

@@ -58,7 +58,7 @@ impl TryFrom<&str> for Cookie {
         }
 
         let parts: Vec<&str> = kv[1].trim().split(';').map(|c| c.trim()).collect();
-        if parts.len() == 0 {
+        if parts.is_empty() {
             return Err(CookieError::MissingCookieLine);
         }
 
@@ -109,7 +109,7 @@ impl TryFrom<&str> for Cookie {
                             }
                             "max-age" => {
                                 cookie.push_flag(Flag::MaxAge(
-                                    str::parse::<u32>(attrs[1]).unwrap_or(0 as u32),
+                                    str::parse::<u32>(attrs[1]).unwrap_or(0_u32),
                                 ));
                             }
                             _ => {
@@ -148,14 +148,14 @@ impl Cookie {
     }
 
     pub fn has_flag(&self, flag: &Flag) -> bool {
-        return self.flags.contains(flag);
+        self.flags.contains(flag)
     }
 
     pub fn get_flags(&self) -> Vec<&Flag> {
         return self.flags.iter().collect();
     }
 
-    pub fn serialize(&self) -> Result<String, ()> {
+    pub fn serialize(&self) -> String {
         let mut buf = String::from("Set-Cookie: ");
         buf.push_str(&self.name);
         buf.push('=');
@@ -184,6 +184,6 @@ impl Cookie {
             buf.push_str(&flagbuf);
         }
 
-        Ok(buf)
+        buf
     }
 }

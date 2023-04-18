@@ -69,7 +69,7 @@ impl Web {
 
         let ext = Path::new(path.as_ref())
             .extension()
-            .unwrap_or(&OsStr::new("txt"))
+            .unwrap_or(OsStr::new("txt"))
             .to_str()
             .unwrap();
 
@@ -118,7 +118,7 @@ impl Web {
         }
 
         if metadata.is_dir() {
-            if self.trailing_slashes && !r.abs_path().ends_with("/") {
+            if self.trailing_slashes && !r.abs_path().ends_with('/') {
                 info!("Redirecting {} to {}", r.abs_path(), r.abs_path() + "/");
                 return Ok(handler::Action::Redirect(r.abs_path() + "/"));
             }

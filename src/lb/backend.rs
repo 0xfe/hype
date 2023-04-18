@@ -30,7 +30,7 @@ impl HttpBackend {
     }
 
     async fn create_client(&self) -> Result<ConnectedClient, ClientError> {
-        let mut client = Client::new(&self.address.to_string());
+        let mut client = Client::new(self.address.to_string());
         if self.enable_tls {
             client.enable_tls(&self.tls_server_name);
         }

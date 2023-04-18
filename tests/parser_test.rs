@@ -19,12 +19,12 @@ fn parse(
 
 fn parse_request(buf: &str) -> (Option<Request>, Result<(), ParseError>) {
     let (message, r1) = parse(buf, parser::State::StartRequest);
-    return (message.map(|m| m.into()), r1);
+    (message.map(|m| m.into()), r1)
 }
 
 fn parse_response(buf: &str) -> (Option<Response>, Result<(), ParseError>) {
     let (message, r1) = parse(buf, parser::State::StartResponse);
-    return (message.map(|m| m.into()), r1);
+    (message.map(|m| m.into()), r1)
 }
 
 fn assert_parse_request_result(

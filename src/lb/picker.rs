@@ -27,7 +27,7 @@ impl fmt::Display for PickerError {
 impl error::Error for PickerError {}
 
 pub trait Picker<T: Backend>: Send + Sync {
-    fn pick_backend(&self, backends: &Vec<T>) -> Result<usize, PickerError>;
+    fn pick_backend(&self, backends: &[T]) -> Result<usize, PickerError>;
 }
 
 pub struct RRPicker {
@@ -42,8 +42,14 @@ impl RRPicker {
     }
 }
 
+impl Default for RRPicker {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl<T: Backend> Picker<T> for RRPicker {
-    fn pick_backend(&self, backends: &Vec<T>) -> Result<usize, PickerError> {
+    fn pick_backend(&self, backends: &[T]) -> Result<usize, PickerError> {
         let mut last_index_guard = self.last_index.lock().unwrap();
         if let Some(last_index) = *last_index_guard {
             if last_index >= backends.len() - 1 {
@@ -72,8 +78,14 @@ impl RandomPicker {
     }
 }
 
+impl Default for RandomPicker {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl<T: Backend> Picker<T> for RandomPicker {
-    fn pick_backend(&self, backends: &Vec<T>) -> Result<usize, PickerError> {
+    fn pick_backend(&self, backends: &[T]) -> Result<usize, PickerError> {
         Ok(self.rng.lock().unwrap().gen_range(0..backends.len()))
     }
 }
@@ -95,7 +107,7 @@ impl WeightedRRPicker {
 }
 
 impl<T: Backend> Picker<T> for WeightedRRPicker {
-    fn pick_backend(&self, backends: &Vec<T>) -> Result<usize, PickerError> {
+    fn pick_backend(&self, backends: &[T]) -> Result<usize, PickerError> {
         let mut li = self.last_index.lock().unwrap();
         let mut li_i = self.last_inner_index.lock().unwrap();
 

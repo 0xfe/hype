@@ -46,7 +46,7 @@ async fn main() {
     }
 
     let input = fs::read_to_string(&args[1]).unwrap();
-    let config = Config::from_str(input).expect("bad configuration file");
+    let config = Config::from(input).expect("bad configuration file");
 
     info!("Starting hype...");
     debug!("config: {:?}", config);

@@ -7,6 +7,7 @@ pub mod service;
 pub mod status;
 pub mod web;
 
+pub use crate::handlers::file::File;
 pub use crate::handlers::lb::Lb;
 pub use crate::handlers::log::log;
 pub use crate::handlers::redirect::Redirect;

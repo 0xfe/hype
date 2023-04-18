@@ -21,11 +21,11 @@ impl Rewriter {
     ) -> Result<Self, String> {
         let url_match_re = url_match_re.into();
 
-        return Ok(Self {
-            url_match_re: Regex::new(url_match_re.clone().as_str())
+        Ok(Self {
+            url_match_re: Regex::new(url_match_re.as_str())
                 .or(Err(format!("bad regex: {}", url_match_re)))?,
             substitution: substitution.into(),
-        });
+        })
     }
 }
 

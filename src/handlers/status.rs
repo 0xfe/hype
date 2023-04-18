@@ -17,11 +17,11 @@ pub struct Status {
 
 impl Status {
     pub fn new(status: impl Into<status::Status>, message: impl Into<String>) -> Self {
-        return Self {
+        Self {
             status: status.into(),
             body: message.into(),
             headers: Headers::new(),
-        };
+        }
     }
 }
 

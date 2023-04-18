@@ -16,9 +16,9 @@ pub struct Lb<P: Picker<HttpBackend>> {
 
 impl<P: Picker<HttpBackend>> Lb<P> {
     pub fn new(balancer: Http<HttpBackend, P>) -> Self {
-        return Self {
+        Self {
             lb: Arc::new(RwLock::new(balancer)),
-        };
+        }
     }
 }
 

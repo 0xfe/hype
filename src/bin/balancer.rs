@@ -33,7 +33,7 @@ async fn main() {
     let args: Args = argh::from_env();
 
     let input = fs::read_to_string(args.config).unwrap();
-    let config = lbconfig::Config::from_str(input).unwrap();
+    let config = lbconfig::Config::from(input).unwrap();
     debug!("Config: {:?}", config);
 
     let mut server = Server::new(config.server.listen_ip, config.server.port);

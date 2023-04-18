@@ -22,6 +22,7 @@ where
     R: Into<Action>,
 {
     /// Wraps the async handler function.
+    #[allow(clippy::type_complexity)]
     f: Box<dyn Fn(Request, S) -> BoxFuture<'static, Result<R, Error>> + Send + Sync>,
 
     /// Any arbitrary state

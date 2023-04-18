@@ -197,7 +197,7 @@ impl Server {
 
     /// Add a new handler to the server. This handler will be called if the request path matches the given path.
     pub fn route(&self, path: impl Into<String>, handler: impl Into<RouteHandler>) {
-        self.router.add_route(Matcher::new(&path.into()), handler);
+        self.router.add_route(Matcher::new(path.into()), handler);
     }
 
     /// Add a new method handler to the server. This handler will be called if the request path matches the given
@@ -208,7 +208,7 @@ impl Server {
         path: impl Into<String>,
         handler: impl Into<RouteHandler>,
     ) {
-        let mut matcher = Matcher::new(&path.into());
+        let mut matcher = Matcher::new(path.into());
         matcher.push_method(method);
         self.router.add_route(matcher, handler);
     }
@@ -220,7 +220,7 @@ impl Server {
         path: impl Into<String>,
         handler: impl Into<RouteHandler>,
     ) {
-        let mut matcher = Matcher::new(&path.into());
+        let mut matcher = Matcher::new(path.into());
         matcher.push_methods(methods);
         self.router.add_route(matcher, handler);
     }
@@ -390,10 +390,10 @@ impl ConnectedServer {
                 // shutdown the connection when the keep-alive timeout expires.
                 "keep-alive" => {
                     if let Some(keepalive) = headers.get_first("keep-alive") {
-                        let parts: Vec<&str> = keepalive.split(",").map(|s| s.trim()).collect();
+                        let parts: Vec<&str> = keepalive.split(',').map(|s| s.trim()).collect();
                         for part in parts {
                             let kv: Vec<&str> = part.split('=').map(|kv| kv.trim()).collect();
-                            if kv.len() == 0 {
+                            if kv.is_empty() {
                                 break;
                             }
                             match kv[0] {

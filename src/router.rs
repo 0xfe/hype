@@ -98,7 +98,13 @@ impl Router {
             }
         }
 
-        h.handler().read().await.handle(&r, w).await
+        h.handler().read().await.handle(r, w).await
+    }
+}
+
+impl Default for Router {
+    fn default() -> Self {
+        Self::new()
     }
 }
 
@@ -131,7 +137,12 @@ impl Matcher {
 
     // If there are specific methods to match against, then prioritize this matcher higher.
     pub fn len(&self) -> usize {
-        self.pattern.components().count() + if self.methods.len() == 0 { 0 } else { 1 }
+        self.pattern.components().count() + if self.methods.is_empty() { 0 } else { 1 }
+    }
+
+    #[must_use]
+    pub fn is_empty(&self) -> bool {
+        self.len() == 0
     }
 
     pub fn extract_params<'a, T: AsRef<str> + ?Sized>(
@@ -155,14 +166,12 @@ impl Matcher {
             if let (Some(path), Some(patt)) = (path, patt) {
                 let patt = patt.as_os_str().to_str().unwrap();
 
-                if patt.starts_with(":") {
-                    let param_name = patt.trim_start_matches(":");
+                if patt.starts_with(':') {
+                    let param_name = patt.trim_start_matches(':');
                     let param_value = path.as_os_str().to_str().unwrap();
                     params.insert(param_name, param_value);
                     matched_path.push(path);
-                } else if patt == "*" {
-                    matched_path.push(path);
-                } else if patt == path.as_os_str().to_str().unwrap() {
+                } else if patt == "*" || patt == path.as_os_str().to_str().unwrap() {
                     matched_path.push(path);
                 } else {
                     return None;
@@ -177,13 +186,13 @@ impl Matcher {
                 break;
             }
 
-            if path == None && patt == None {
+            if path.is_none() && patt.is_none() {
                 break;
             }
         }
 
         debug!("Matched path: {:?}", matched_path);
-        if self.methods.len() == 0 || self.methods.contains(&method.unwrap()) {
+        if self.methods.is_empty() || self.methods.contains(&method.unwrap()) {
             return Some((matched_path, params));
         }
         None

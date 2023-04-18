@@ -127,7 +127,7 @@ impl Body {
             return true;
         }
 
-        return false;
+        false
     }
 
     pub fn push_chunk(&self, chunk: Vec<u8>) {
@@ -221,7 +221,7 @@ impl Body {
     pub fn content_stream(&self) -> ContentStream {
         let content_state;
         if let Content::Full(state) = &self.content {
-            content_state = Arc::clone(&state);
+            content_state = Arc::clone(state);
         } else {
             panic!("content_stream(): chunked content")
         }
@@ -267,6 +267,12 @@ impl Body {
     }
 }
 
+impl Default for Body {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 pub struct ChunkStream {
     raw: bool,
     done: bool,
@@ -292,7 +298,7 @@ impl Stream for ChunkStream {
                 } else if self.raw && !done {
                     // No more chunks, send closing '0' chunk
                     done = true;
-                    let chunk = vec!['0' as u8, '\r' as u8, '\n' as u8, '\r' as u8, '\n' as u8];
+                    let chunk = vec![b'0', b'\r', b'\n', b'\r', b'\n'];
                     return_val = Some(Poll::Ready(Some(chunk)));
                 } else {
                     // Closing chunk sent, close stream
@@ -312,16 +318,16 @@ impl Stream for ChunkStream {
             let mut chunk: Vec<u8>;
             if self.raw {
                 chunk = format!("{:x}", current_chunk.len()).as_bytes().to_vec();
-                chunk.extend(['\r' as u8, '\n' as u8]);
+                chunk.extend([b'\r', b'\n']);
                 chunk.extend(current_chunk);
-                chunk.extend(['\r' as u8, '\n' as u8]);
+                chunk.extend([b'\r', b'\n']);
             } else {
                 chunk = current_chunk;
             }
 
-            return Poll::Ready(Some(chunk));
+            Poll::Ready(Some(chunk))
         } else {
-            return return_val.unwrap();
+            return_val.unwrap()
         }
     }
 }
@@ -351,6 +357,6 @@ impl Stream for ContentStream {
         }
 
         self.current_pos += content.len();
-        return Poll::Ready(Some(content));
+        Poll::Ready(Some(content))
     }
 }

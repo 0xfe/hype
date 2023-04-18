@@ -64,7 +64,7 @@ impl File {
                 let mut pathbuf = PathBuf::new();
                 pathbuf.push("/");
                 pathbuf.push(handler_path);
-                pathbuf.push(&fs_path.strip_prefix(base_fs_path).unwrap().to_string());
+                pathbuf.push(fs_path.strip_prefix(base_fs_path).unwrap());
                 pathbuf.push(file_name.to_string());
 
                 let output = format!(
@@ -74,7 +74,7 @@ impl File {
                 );
                 body = body + &output;
             } else {
-                body = body + "<ul>\n";
+                body += "<ul>\n";
                 break;
             }
         }
@@ -93,7 +93,7 @@ impl File {
 
         let ext = Path::new(&path)
             .extension()
-            .unwrap_or(&OsStr::new("txt"))
+            .unwrap_or(OsStr::new("txt"))
             .to_str()
             .unwrap();
 
@@ -135,7 +135,7 @@ impl File {
         let handler_path = r.handler_path.as_ref().unwrap_or(&default_path);
         let handler_path = handler_path
             .strip_prefix('/')
-            .unwrap_or(&handler_path)
+            .unwrap_or(handler_path)
             .to_string();
 
         if metadata.is_dir() {

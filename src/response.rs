@@ -99,10 +99,7 @@ impl Response {
     }
 
     pub fn set_cookie(&mut self, cookie: Cookie) {
-        _ = cookie.serialize().and_then(|cookie| {
-            self.headers.add("set-cookie", cookie);
-            Ok(())
-        });
+        self.headers.add("set-cookie", cookie.serialize());
     }
 
     pub fn set_chunked(&mut self) {

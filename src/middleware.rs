@@ -22,13 +22,14 @@ impl Stack {
     }
 
     pub fn extend(&mut self, handlers: Vec<RouteHandler>) {
-        self.handlers.append(
-            handlers
-                .into_iter()
-                .map(|h| h.into())
-                .collect::<Vec<_>>()
-                .as_mut(),
-        )
+        self.handlers
+            .append(handlers.into_iter().collect::<Vec<_>>().as_mut())
+    }
+}
+
+impl Default for Stack {
+    fn default() -> Self {
+        Self::new()
     }
 }
 

@@ -70,7 +70,7 @@ impl fmt::Display for ConfigError {
 impl error::Error for ConfigError {}
 
 impl Config {
-    pub fn from_str(config_str: impl AsRef<str>) -> Result<Self, ConfigError> {
+    pub fn from(config_str: impl AsRef<str>) -> Result<Self, ConfigError> {
         let mut config = Config {
             routes: vec![],
             server: Server {
