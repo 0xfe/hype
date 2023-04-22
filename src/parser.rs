@@ -46,16 +46,16 @@ lazy_static! {
 #[derive(Debug, PartialEq)]
 pub enum ParseError {
     UnexpectedState,
-    InvalidStateTransition(State, State),
+    InvalidChunkSize,
+    NonNumericChunkSize,
+    UnexpectedEOF,
     BadMethodLine(String),
     BadHeaderLine(String),
     BadStatusLine(String),
     InvalidMethod(String),
     InvalidPath(String),
     BodyError(String),
-    InvalidChunkSize,
-    NonNumericChunkSize,
-    UnexpectedEOF,
+    InvalidStateTransition(State, State),
 }
 
 impl fmt::Display for ParseError {
@@ -65,6 +65,12 @@ impl fmt::Display for ParseError {
             ParseError::InvalidChunkSize => write!(f, "Parser: invalid chunk size"),
             ParseError::NonNumericChunkSize => write!(f, "Parser: non-numeric chunk size"),
             ParseError::UnexpectedEOF => write!(f, "Parser: unexpected state"),
+            ParseError::BadMethodLine(msg) => write!(f, "Parser: bad method line: {}", msg),
+            ParseError::BadStatusLine(msg) => write!(f, "Parser: bad status line: {}", msg),
+            ParseError::BadHeaderLine(msg) => write!(f, "Parser: bad header line: {}", msg),
+            ParseError::InvalidMethod(msg) => write!(f, "Parser: invalid method: {}", msg),
+            ParseError::InvalidPath(msg) => write!(f, "Parser: invalid path: {}", msg),
+            ParseError::BodyError(msg) => write!(f, "Parser: body error: {}", msg),
             ParseError::InvalidStateTransition(src, dest) => {
                 write!(
                     f,
@@ -72,12 +78,6 @@ impl fmt::Display for ParseError {
                     src, dest
                 )
             }
-            ParseError::BadMethodLine(msg) => write!(f, "Parser: bad method line: {}", msg),
-            ParseError::BadStatusLine(msg) => write!(f, "Parser: bad status line: {}", msg),
-            ParseError::BadHeaderLine(msg) => write!(f, "Parser: bad header line: {}", msg),
-            ParseError::InvalidMethod(msg) => write!(f, "Parser: invalid method: {}", msg),
-            ParseError::InvalidPath(msg) => write!(f, "Parser: invalid path: {}", msg),
-            ParseError::BodyError(msg) => write!(f, "Parser: body error: {}", msg),
         }
     }
 }

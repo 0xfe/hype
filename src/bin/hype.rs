@@ -12,12 +12,13 @@ use argh::FromArgs;
 use hype::{
     handler::{self, Action},
     handlers::{self},
-    lbconfig,
+    lbconfig::{self, BackendId, RouteId},
     middleware::Stack,
     request::{Method, Request},
     server::Server,
     status,
 };
+use serde::Deserialize;
 use tokio::sync::RwLock;
 
 #[derive(FromArgs)]
@@ -32,6 +33,7 @@ struct Args {
     port: u16,
 }
 
+/// A very basic auth mechanism used for development.
 #[derive(Clone, Debug, Default)]
 struct AuthState {
     token: String,
@@ -51,9 +53,19 @@ async fn auth(r: Request, state: AuthState) -> Result<Action, handler::Error> {
     Ok(Action::Next)
 }
 
+#[derive(Debug, Deserialize, Clone)]
+struct RouteConfig {
+    #[serde(default)]
+    pub id: RouteId,
+    pub location: String,
+    pub host_header: Option<String>,
+    pub backends: Vec<BackendId>,
+}
+
 #[derive(Debug, Clone, Default)]
 struct AppState {
-    backends: Arc<RwLock<HashMap<String, lbconfig::Backend>>>,
+    backends: Arc<RwLock<HashMap<lbconfig::BackendId, lbconfig::Backend>>>,
+    routes: Arc<RwLock<HashMap<String, RouteConfig>>>,
 }
 
 async fn add_backend(r: Request, state: AppState) -> Result<String, handler::Error> {
@@ -71,10 +83,25 @@ async fn get_backend(r: Request, state: AppState) -> Result<String, handler::Err
 
     let lock = state.backends.read().await;
     let backend = lock
-        .get(id)
+        .get(id.as_ref())
         .ok_or(handler::Error::Status(status::NOT_FOUND.into()))?;
 
     Ok(format!("{:#?}", backend))
+}
+
+async fn add_route(r: Request, state: AppState) -> Result<String, handler::Error> {
+    let route: RouteConfig = handlers::service::json(&r.body.content().await)?;
+
+    {
+        let lock = state.backends.read().await;
+        if route.backends.iter().any(|b| !lock.contains_key(b)) {
+            return Err(handler::Error::Status(status::NOT_FOUND.into()));
+        }
+    }
+
+    let id = route.id.clone();
+    state.routes.write().await.insert(id.clone().into(), route);
+    Ok(format!("Got backend: {:?}", id))
 }
 
 #[tokio::main]
@@ -93,6 +120,7 @@ async fn main() {
 
     let state = AppState {
         backends: Arc::new(RwLock::new(HashMap::new())),
+        routes: Arc::new(RwLock::new(HashMap::new())),
     };
 
     server.route_method(
@@ -109,6 +137,14 @@ async fn main() {
         middleware
             .clone()
             .push(handlers::service(get_backend).with_state(&state)),
+    );
+
+    server.route_method(
+        Method::POST,
+        "/routes",
+        middleware
+            .clone()
+            .push(handlers::service(add_route).with_state(&state)),
     );
 
     server.route_default(handlers::NotFoundHandler());

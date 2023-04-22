@@ -28,13 +28,49 @@ fn default_tls_key_file() -> String {
     String::from("localhost.key")
 }
 
-fn default_backend_id() -> String {
-    format!("backend-{}", random_string(7))
+fn random_default(prefix: &str) -> String {
+    format!("{}-{}", prefix, random_string(7))
 }
 
-fn default_route_id() -> String {
-    format!("route-{}", random_string(7))
+macro_rules! ConfigID {
+    ($struct_name: ident, $prefix:expr) => {
+        #[derive(Debug, Clone, Deserialize, Eq, PartialEq, Hash)]
+        pub struct $struct_name(pub String);
+
+        impl Default for $struct_name {
+            fn default() -> Self {
+                $struct_name(random_default($prefix.to_lowercase().as_str()))
+            }
+        }
+
+        impl From<$struct_name> for String {
+            fn from(id: $struct_name) -> Self {
+                id.0
+            }
+        }
+
+        impl AsRef<str> for $struct_name {
+            fn as_ref(&self) -> &str {
+                self.0.as_str()
+            }
+        }
+
+        impl AsRef<String> for $struct_name {
+            fn as_ref(&self) -> &String {
+                &self.0
+            }
+        }
+
+        impl AsRef<$struct_name> for String {
+            fn as_ref(&self) -> &$struct_name {
+                unsafe { &*(self as *const String as *const $struct_name) }
+            }
+        }
+    };
 }
+
+ConfigID!(BackendId, "be");
+ConfigID!(RouteId, "rt");
 
 #[derive(Debug, Deserialize)]
 pub struct Server {
@@ -66,8 +102,8 @@ impl Default for Server {
 
 #[derive(Debug, Deserialize, Clone)]
 pub struct Backend {
-    #[serde(default = "default_backend_id")]
-    pub id: String,
+    #[serde(default)]
+    pub id: BackendId,
     pub host: String,
     pub port: u16,
 
@@ -80,8 +116,8 @@ pub struct Backend {
 
 #[derive(Debug, Deserialize)]
 pub struct Route {
-    #[serde(default = "default_route_id")]
-    pub id: String,
+    #[serde(default)]
+    pub id: RouteId,
     pub location: String,
     pub host_header: Option<String>,
     pub backends: Vec<Backend>,
